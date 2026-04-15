@@ -2,6 +2,7 @@
 description: "Use when modifying Express server, WebSocket signaling, ROM API, emulator HTML endpoint, or server/index.ts"
 applyTo: "server/**"
 ---
+
 # 백엔드 서버 가이드
 
 ## 서버 역할 (3가지만)
@@ -14,10 +15,10 @@ applyTo: "server/**"
 
 ## 환경변수
 
-| 변수 | 기본값 | 용도 |
-|------|--------|------|
-| `PORT` | `3001` | 서버 포트 (Railway 자동 주입) |
-| `CORS_ORIGIN` | `*` | 허용 오리진 (쉼표 구분, 프로덕션에서는 Vercel URL) |
+| 변수          | 기본값 | 용도                                               |
+| ------------- | ------ | -------------------------------------------------- |
+| `PORT`        | `3001` | 서버 포트 (Railway 자동 주입)                      |
+| `CORS_ORIGIN` | `*`    | 허용 오리진 (쉼표 구분, 프로덕션에서는 Vercel URL) |
 
 ## 방(Room) 생명주기
 

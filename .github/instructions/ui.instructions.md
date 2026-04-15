@@ -2,6 +2,7 @@
 description: "Use when creating or modifying UI components, styling, Tailwind classes, shadcn/ui usage, or layout"
 applyTo: ["src/components/**", "src/index.css"]
 ---
+
 # UI 컴포넌트 가이드
 
 ## 필수 패턴
@@ -17,6 +18,7 @@ applyTo: ["src/components/**", "src/index.css"]
 `button`, `input`, `card`, `badge`, `avatar`, `dialog`, `scroll-area`, `tooltip`, `separator`, `sonner`, `alert-dialog`
 
 새 컴포넌트 추가 시:
+
 1. `npm install @radix-ui/react-{컴포넌트}`
 2. `src/components/ui/{컴포넌트}.tsx`에 직접 생성 (shadcn CLI가 `components.json` 이슈로 동작 안 함)
 3. 기존 컴포넌트 파일 참고하여 같은 패턴으로 작성

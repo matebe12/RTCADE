@@ -2,6 +2,7 @@
 description: "Use when modifying EmulatorPlayer, iframe communication, EmulatorJS configuration, postMessage protocol, or emulator HTML generation"
 applyTo: "src/components/EmulatorPlayer.tsx"
 ---
+
 # EmulatorJS / iframe 통신 가이드
 
 ## iframe 격리 원칙

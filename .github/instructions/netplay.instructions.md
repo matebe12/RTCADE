@@ -2,6 +2,7 @@
 description: "Use when modifying netplay sync, P2P connection, WebRTC DataChannel, resync logic, peer.ts, signaling.ts, or NetplayLobby.tsx playing state"
 applyTo: "src/netplay/**"
 ---
+
 # Netplay 수정 가이드
 
 ## 아키텍처 제약
