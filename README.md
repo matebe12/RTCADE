@@ -20,15 +20,15 @@ WebRTC DataChannel을 통해 서버 중계 없이 1:1 P2P로 직접 연결하여
 
 ## 기술 스택
 
-| 계층 | 기술 |
-|------|------|
-| 프론트엔드 | React 19 + TypeScript 6 + Vite 8 |
-| UI | Tailwind CSS v4 + shadcn/ui (dark theme) |
-| 에뮬레이터 | EmulatorJS CDN (LibRetro WASM cores) |
-| P2P | WebRTC RTCPeerConnection + DataChannel |
-| 시그널링 | WebSocket (ws 8) |
-| 백엔드 | Express 5 + Node.js (tsx) |
-| 폰트 | Press Start 2P (Google Fonts) |
+| 계층       | 기술                                     |
+| ---------- | ---------------------------------------- |
+| 프론트엔드 | React 19 + TypeScript 6 + Vite 8         |
+| UI         | Tailwind CSS v4 + shadcn/ui (dark theme) |
+| 에뮬레이터 | EmulatorJS CDN (LibRetro WASM cores)     |
+| P2P        | WebRTC RTCPeerConnection + DataChannel   |
+| 시그널링   | WebSocket (ws 8)                         |
+| 백엔드     | Express 5 + Node.js (tsx)                |
+| 폰트       | Press Start 2P (Google Fonts)            |
 
 ---
 
@@ -87,6 +87,7 @@ server/roms/{코어명}/{ROM파일.zip}
 ```
 
 예시:
+
 ```
 server/roms/mame2003/mslug3.zip     # Metal Slug 3
 server/roms/mame2003/neogeo.zip     # BIOS (자동 감지)
@@ -135,51 +136,51 @@ GUEST: pause → loadState → play (micro-pause ~16ms)
 
 ### 시그널링 (WebSocket)
 
-| 메시지 | 방향 | 용도 |
-|--------|------|------|
-| `create-room` | HOST→서버 | 방 생성 (ROM/코어/닉네임) |
-| `room-created` | 서버→HOST | 6자리 코드 반환 |
-| `join-room` | GUEST→서버 | 코드로 방 참가 |
-| `room-joined` | 서버→GUEST | ROM/코어/HOST 프로필 정보 |
-| `guest-joined` | 서버→HOST | GUEST 프로필 정보 |
-| `offer/answer` | 릴레이 | SDP 교환 |
-| `ice-candidate` | 릴레이 | ICE candidate 교환 |
-| `peer-disconnected` | 서버→상대 | 연결 해제 알림 |
+| 메시지              | 방향       | 용도                      |
+| ------------------- | ---------- | ------------------------- |
+| `create-room`       | HOST→서버  | 방 생성 (ROM/코어/닉네임) |
+| `room-created`      | 서버→HOST  | 6자리 코드 반환           |
+| `join-room`         | GUEST→서버 | 코드로 방 참가            |
+| `room-joined`       | 서버→GUEST | ROM/코어/HOST 프로필 정보 |
+| `guest-joined`      | 서버→HOST  | GUEST 프로필 정보         |
+| `offer/answer`      | 릴레이     | SDP 교환                  |
+| `ice-candidate`     | 릴레이     | ICE candidate 교환        |
+| `peer-disconnected` | 서버→상대  | 연결 해제 알림            |
 
 ### DataChannel (P2P)
 
 **JSON 메시지:**
 
-| type | 방향 | 용도 |
-|------|------|------|
-| `input` | 양방향 | `{button, down, seq}` 입력 이벤트 |
-| `peer-ready` | GUEST→HOST | 에뮬레이터 로딩 완료 |
-| `save-state-header` | HOST→GUEST | 초기 상태 전송 헤더 |
-| `resync-state-header` | HOST→GUEST | 리싱크 상태 전송 헤더 |
-| `state-loaded` | GUEST→HOST | 상태 로드 완료 |
-| `start-signal` | HOST→GUEST | 게임 시작 |
+| type                  | 방향       | 용도                              |
+| --------------------- | ---------- | --------------------------------- |
+| `input`               | 양방향     | `{button, down, seq}` 입력 이벤트 |
+| `peer-ready`          | GUEST→HOST | 에뮬레이터 로딩 완료              |
+| `save-state-header`   | HOST→GUEST | 초기 상태 전송 헤더               |
+| `resync-state-header` | HOST→GUEST | 리싱크 상태 전송 헤더             |
+| `state-loaded`        | GUEST→HOST | 상태 로드 완료                    |
+| `start-signal`        | HOST→GUEST | 게임 시작                         |
 
 **Binary 메시지:**
 
-| 용도 | 청크 크기 |
-|------|-----------|
-| 초기 세이브 스테이트 | 64KB |
-| 리싱크 스테이트 | 256KB |
+| 용도                 | 청크 크기 |
+| -------------------- | --------- |
+| 초기 세이브 스테이트 | 64KB      |
+| 리싱크 스테이트      | 256KB     |
 
 ---
 
 ## 키 매핑
 
-| 키 | LibRetro 버튼 | 용도 |
-|----|---------------|------|
-| ← → ↑ ↓ | D-Pad | 이동 |
-| A | B (0) | 버튼 1 (약펀치) |
-| S | A (8) | 버튼 2 (약킥) |
-| D | Y (1) | 버튼 3 (강펀치) |
-| F | X (9) | 버튼 4 (강킥) |
-| 1 | Start (3) | 시작 |
-| 5 | Select (2) | 셀렉트/코인 |
-| Q / E | L / R (10/11) | 숄더 |
+| 키      | LibRetro 버튼 | 용도            |
+| ------- | ------------- | --------------- |
+| ← → ↑ ↓ | D-Pad         | 이동            |
+| A       | B (0)         | 버튼 1 (약펀치) |
+| S       | A (8)         | 버튼 2 (약킥)   |
+| D       | Y (1)         | 버튼 3 (강펀치) |
+| F       | X (9)         | 버튼 4 (강킥)   |
+| 1       | Start (3)     | 시작            |
+| 5       | Select (2)    | 셀렉트/코인     |
+| Q / E   | L / R (10/11) | 숄더            |
 
 > 넷플레이 모드에서는 모든 키보드 이벤트를 캡처하여 EmulatorJS 내장 핸들러를 차단합니다.
 
@@ -232,32 +233,32 @@ RTCADE/
 
 ## 지원 시스템 (24개 코어)
 
-| 시스템 | 코어명 | 비고 |
-|--------|--------|------|
-| NES | `nes` | |
-| SNES | `snes` | |
-| N64 | `n64` | |
-| Game Boy / Color | `gb` | |
-| Game Boy Advance | `gba` | |
-| Nintendo DS | `nds` | |
-| PlayStation | `psx` | |
-| PSP | `psp` | |
-| Mega Drive / Genesis | `segaMD` | |
-| Master System | `segaMS` | |
-| Game Gear | `segaGG` | |
-| Saturn | `segaSaturn` | |
-| Sega CD | `segaCD` | |
-| 32X | `sega32x` | |
-| MAME 2003+ | `mame2003` | → `mame2003_plus`로 리매핑 |
-| Arcade (FBNeo) | `arcade` | → `fbneo`로 리매핑 |
-| Atari 2600 | `atari2600` | |
-| Atari 7800 | `atari7800` | |
-| Lynx | `lynx` | |
-| Jaguar | `jaguar` | |
-| 3DO | `3do` | |
-| ColecoVision | `coleco` | |
-| Virtual Boy | `vb` | |
-| DOS | `dosbox` | |
+| 시스템               | 코어명       | 비고                       |
+| -------------------- | ------------ | -------------------------- |
+| NES                  | `nes`        |                            |
+| SNES                 | `snes`       |                            |
+| N64                  | `n64`        |                            |
+| Game Boy / Color     | `gb`         |                            |
+| Game Boy Advance     | `gba`        |                            |
+| Nintendo DS          | `nds`        |                            |
+| PlayStation          | `psx`        |                            |
+| PSP                  | `psp`        |                            |
+| Mega Drive / Genesis | `segaMD`     |                            |
+| Master System        | `segaMS`     |                            |
+| Game Gear            | `segaGG`     |                            |
+| Saturn               | `segaSaturn` |                            |
+| Sega CD              | `segaCD`     |                            |
+| 32X                  | `sega32x`    |                            |
+| MAME 2003+           | `mame2003`   | → `mame2003_plus`로 리매핑 |
+| Arcade (FBNeo)       | `arcade`     | → `fbneo`로 리매핑         |
+| Atari 2600           | `atari2600`  |                            |
+| Atari 7800           | `atari7800`  |                            |
+| Lynx                 | `lynx`       |                            |
+| Jaguar               | `jaguar`     |                            |
+| 3DO                  | `3do`        |                            |
+| ColecoVision         | `coleco`     |                            |
+| Virtual Boy          | `vb`         |                            |
+| DOS                  | `dosbox`     |                            |
 
 ---
 
@@ -292,12 +293,12 @@ RTCADE/
 
 ### 시도했다가 포기한 방식
 
-| 방식 | 실패 원인 |
-|------|-----------|
-| RAF Hook Lockstep | EmulatorJS는 rAF가 아닌 setTimeout으로 메인 루프 구동 |
-| Frame-tick 하트비트 | 60fps DC 메시지 플러딩으로 입력 밀림 |
-| Frame-delay Lockstep | iframe 내부 프레임 레벨 제어 불가 |
-| Pause-Resume 리싱크 | 5단계 라운드트립 100~300ms 정지 → 체감 끊김 |
+| 방식                 | 실패 원인                                             |
+| -------------------- | ----------------------------------------------------- |
+| RAF Hook Lockstep    | EmulatorJS는 rAF가 아닌 setTimeout으로 메인 루프 구동 |
+| Frame-tick 하트비트  | 60fps DC 메시지 플러딩으로 입력 밀림                  |
+| Frame-delay Lockstep | iframe 내부 프레임 레벨 제어 불가                     |
+| Pause-Resume 리싱크  | 5단계 라운드트립 100~300ms 정지 → 체감 끊김           |
 
 ### 현재 한계
 
