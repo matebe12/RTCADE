@@ -9,7 +9,7 @@ const server = createServer(app);
 const wss = new WebSocketServer({ server });
 
 const PORT = parseInt(process.env.PORT || "3001", 10);
-const ROMS_DIR = path.join(import.meta.dirname, "roms");
+const ROMS_DIR = process.env.ROMS_PATH || path.join(import.meta.dirname, "roms");
 
 const ALLOWED_ORIGINS = process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(",") : ["*"];
 
