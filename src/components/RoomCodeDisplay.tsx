@@ -34,9 +34,7 @@ export function RoomCodeDisplay({ code, className }: RoomCodeDisplayProps) {
 
   return (
     <div className={cn("flex items-center gap-3", className)}>
-      <span className="font-[family-name:var(--font-arcade)] text-2xl tracking-[0.5em] text-primary">
-        {code}
-      </span>
+      <span className="font-arcade text-2xl tracking-[0.5em] text-primary">{code}</span>
       <Button variant="ghost" size="icon" className="size-8" onClick={handleCopy}>
         {copied ? <Check className="size-4 text-green-500" /> : <Copy className="size-4" />}
       </Button>

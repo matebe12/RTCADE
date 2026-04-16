@@ -1,5 +1,7 @@
 import { useEffect, useRef, forwardRef, useImperativeHandle } from "react";
 
+import { appEnvironment } from "@/config/environment";
+
 export type SystemCore =
   | "nes"
   | "snes"
@@ -42,9 +44,10 @@ interface EmulatorPlayerProps {
   onResyncState?: (state: ArrayBuffer) => void;
   onResyncLoaded?: () => void;
   onResyncFailed?: () => void;
+  onChatShortcut?: () => void;
 }
 
-const API_BASE = import.meta.env.VITE_API_URL || `http://${window.location.hostname}:3001`;
+const API_BASE = appEnvironment.apiBaseUrl;
 
 const EmulatorPlayer = forwardRef<HTMLIFrameElement, EmulatorPlayerProps>(function EmulatorPlayer(
   {
@@ -61,6 +64,7 @@ const EmulatorPlayer = forwardRef<HTMLIFrameElement, EmulatorPlayerProps>(functi
     onResyncState,
     onResyncLoaded,
     onResyncFailed,
+    onChatShortcut,
   },
   ref,
 ) {
@@ -128,6 +132,9 @@ const EmulatorPlayer = forwardRef<HTMLIFrameElement, EmulatorPlayerProps>(functi
       if (e.data?.type === "resync-failed" && onResyncFailed) {
         onResyncFailed();
       }
+      if (e.data?.type === "chat-shortcut" && onChatShortcut) {
+        onChatShortcut();
+      }
     };
     window.addEventListener("message", handleMessage);
     return () => window.removeEventListener("message", handleMessage);
@@ -140,12 +147,14 @@ const EmulatorPlayer = forwardRef<HTMLIFrameElement, EmulatorPlayerProps>(functi
     onResyncState,
     onResyncLoaded,
     onResyncFailed,
+    onChatShortcut,
   ]);
 
   return (
     <iframe
       ref={iframeRef}
       title="emulator"
+      tabIndex={0}
       className="w-[800px] h-[600px] max-w-[95vw] max-h-[70vh] bg-neutral-900 rounded-lg border-none"
     />
   );
@@ -213,6 +222,16 @@ export function sendRemoteInput(
 // Tell the iframe to unpause and start the game (netplay sync)
 export function sendStartGame(iframeRef: React.RefObject<HTMLIFrameElement | null>) {
   iframeRef.current?.contentWindow?.postMessage({ type: "start-game" }, "*");
+}
+
+export function focusEmulator(iframeRef: React.RefObject<HTMLIFrameElement | null>) {
+  iframeRef.current?.focus();
+
+  try {
+    iframeRef.current?.contentWindow?.focus();
+  } catch {
+    // Ignore focus errors across browser implementations.
+  }
 }
 
 // Ask the iframe to extract a save state (HOST)

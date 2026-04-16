@@ -195,6 +195,12 @@ white-space:pre-wrap;overflow-y:auto;font-size:14px}
     "Digit1": 3, "Digit5": 2, "KeyQ": 10, "KeyE": 11
   };
   window.addEventListener("keydown", function(e) {
+    if (_isNetplay && e.code === "Enter" && !e.repeat && !e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
+      e.stopImmediatePropagation();
+      e.preventDefault();
+      parent.postMessage({ type: "chat-shortcut" }, "*");
+      return;
+    }
     if (_isNetplay && _gameRunning) {
       e.stopImmediatePropagation();
       e.preventDefault();
@@ -369,11 +375,30 @@ interface Room {
   romFilename: string;
   core: string;
   bios?: string;
+  isPublic: boolean;
+  createdAt: number;
   hostNickname?: string;
   hostAvatar?: string;
 }
 
 const rooms = new Map<string, Room>();
+
+app.get("/api/rooms", (_req, res) => {
+  const publicRooms = Array.from(rooms.values())
+    .filter((room) => room.isPublic && room.guest === null)
+    .sort((left, right) => right.createdAt - left.createdAt)
+    .map((room) => ({
+      code: room.code,
+      romPath: room.romFilename,
+      core: room.core,
+      bios: room.bios,
+      createdAt: room.createdAt,
+      hostNickname: room.hostNickname,
+      hostAvatar: room.hostAvatar,
+    }));
+
+  res.json(publicRooms);
+});
 
 function generateCode(): string {
   let code: string;
@@ -411,6 +436,8 @@ wss.on("connection", (ws) => {
           romFilename: String(msg.romFilename || ""),
           core: String(msg.core || "nes"),
           bios: msg.bios ? String(msg.bios) : undefined,
+          isPublic: !!msg.isPublic,
+          createdAt: Date.now(),
           hostNickname: msg.nickname ? String(msg.nickname) : undefined,
           hostAvatar: msg.avatar ? String(msg.avatar) : undefined,
         };

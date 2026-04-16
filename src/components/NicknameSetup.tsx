@@ -36,9 +36,7 @@ export function NicknameSetup({ open, onComplete }: NicknameSetupProps) {
     <Dialog open={open}>
       <DialogContent className="sm:max-w-md" onInteractOutside={(e) => e.preventDefault()}>
         <DialogHeader>
-          <DialogTitle className="font-[family-name:var(--font-arcade)] text-sm text-center">
-            프로필 설정
-          </DialogTitle>
+          <DialogTitle className="font-arcade text-sm text-center">프로필 설정</DialogTitle>
           <DialogDescription className="text-center">
             닉네임과 아바타를 선택하세요
           </DialogDescription>

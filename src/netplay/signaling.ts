@@ -4,6 +4,7 @@ export type SignalingMessage =
       romFilename: string;
       core: string;
       bios?: string;
+      isPublic?: boolean;
       nickname?: string;
       avatar?: string;
     }
