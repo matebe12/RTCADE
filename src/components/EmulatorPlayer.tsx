@@ -82,6 +82,7 @@ const EmulatorPlayer = forwardRef<HTMLIFrameElement, EmulatorPlayerProps>(functi
       if (role) params.set("role", role);
       if (biosPath) params.set("bios", biosPath);
       iframe.src = `${API_BASE}/emulator?${params}`;
+      return undefined;
     } else {
       // Local file mode: use blob iframe + postMessage
       const html = buildLocalEmulatorHTML(core);
