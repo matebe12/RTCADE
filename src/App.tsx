@@ -46,6 +46,9 @@ function App() {
 
       <NicknameSetup
         open={needsSetup || showSetup}
+        profile={profile}
+        allowClose={!needsSetup}
+        onClose={() => setShowSetup(false)}
         onComplete={(p) => {
           setProfile(p);
           setShowSetup(false);

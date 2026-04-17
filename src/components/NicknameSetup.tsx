@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -13,13 +13,30 @@ import { cn } from "@/lib/utils";
 
 interface NicknameSetupProps {
   open: boolean;
+  profile: UserProfile | null;
+  allowClose?: boolean;
+  onClose?: () => void;
   onComplete: (profile: UserProfile) => void;
 }
 
-export function NicknameSetup({ open, onComplete }: NicknameSetupProps) {
-  const [nickname, setNickname] = useState("");
-  const [avatar, setAvatar] = useState(AVATAR_OPTIONS[0]);
+export function NicknameSetup({
+  open,
+  profile,
+  allowClose = false,
+  onClose,
+  onComplete,
+}: NicknameSetupProps) {
+  const [nickname, setNickname] = useState(profile?.nickname ?? "");
+  const [avatar, setAvatar] = useState(profile?.avatar ?? AVATAR_OPTIONS[0]);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (!open) return;
+
+    setNickname(profile?.nickname ?? "");
+    setAvatar(profile?.avatar ?? AVATAR_OPTIONS[0]);
+    setError("");
+  }, [open, profile]);
 
   const handleSubmit = () => {
     const trimmed = nickname.trim();
@@ -33,11 +50,18 @@ export function NicknameSetup({ open, onComplete }: NicknameSetupProps) {
   };
 
   return (
-    <Dialog open={open}>
+    <Dialog
+      open={open}
+      onOpenChange={(nextOpen) => {
+        if (!nextOpen && allowClose) {
+          onClose?.();
+        }
+      }}
+    >
       <DialogContent
         className="sm:max-w-md"
         onInteractOutside={(e) => e.preventDefault()}
-        showCloseButton={false}
+        showCloseButton={allowClose}
       >
         <DialogHeader>
           <DialogTitle className="font-arcade text-sm text-center">프로필 설정</DialogTitle>

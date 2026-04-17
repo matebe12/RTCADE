@@ -49,9 +49,6 @@ export default function AppShell({ profile, onOpenProfile }: AppShellProps) {
                 {appEnvironment.siteTagline}
               </span>
             </NavLink>
-            <Badge variant="secondary" className="hidden text-[10px] lg:inline-flex">
-              테마 {themeLabel}
-            </Badge>
           </div>
 
           <nav className="flex flex-wrap items-center gap-2">
