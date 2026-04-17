@@ -67,7 +67,7 @@ export default function NetplayMenuScreen({
   onReplayRecentOpponent,
 }: NetplayMenuScreenProps) {
   return (
-    <Card className="w-full max-w-sm">
+    <Card className="w-full border-border/70 bg-card/95">
       <CardHeader className="text-center">
         <CardTitle className="font-arcade text-sm text-primary">🌐 온라인 대전</CardTitle>
       </CardHeader>
