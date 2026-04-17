@@ -1,7 +1,9 @@
-import { Activity, ArrowRight, Bell, Globe, Users } from "lucide-react";
+import { Activity, ArrowRight, Bell, Radio, Users } from "lucide-react";
 import { NavLink } from "react-router-dom";
 
 import { appEnvironment } from "@/config/environment";
+import { useOperationsNotices } from "@/hooks/useOperationsNotices";
+import { useOperationsStats } from "@/hooks/useOperationsStats";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,40 +12,62 @@ interface HomePageProps {
   hasProfile: boolean;
 }
 
-const statCards = [
-  {
-    title: "총 방문자",
-    description: "Railway PostgreSQL 기반 누적 방문자 집계를 붙일 자리입니다.",
-    icon: Users,
-  },
-  {
-    title: "오늘 방문자",
-    description: "일별 dedupe 정책을 적용한 오늘 방문자 수 카드가 들어옵니다.",
-    icon: Bell,
-  },
-  {
-    title: "현재 게임중",
-    description: "활성 room 기반 동시 플레이 수를 준실시간으로 노출합니다.",
-    icon: Activity,
-  },
-];
+const numberFormatter = new Intl.NumberFormat("ko-KR");
+
+const relativeTimeFormatter = new Intl.DateTimeFormat("ko-KR", {
+  hour: "2-digit",
+  minute: "2-digit",
+  month: "short",
+  day: "numeric",
+});
 
 export default function HomePage({ hasProfile }: HomePageProps) {
+  const { error: noticeError, isLoading: noticesLoading, notices } = useOperationsNotices();
+  const { error: statsError, isLoading: statsLoading, stats, updatedAt } = useOperationsStats();
+  const previewNotices = notices.slice(0, 3);
+
+  const statCards = [
+    {
+      title: "총 방문자",
+      description: stats?.dbEnabled
+        ? "Railway PostgreSQL에 기록된 누적 방문자 수입니다."
+        : "DB가 연결되지 않으면 운영 지표는 0으로 표시됩니다.",
+      icon: Users,
+      value: stats ? numberFormatter.format(stats.totalVisitors) : "--",
+    },
+    {
+      title: "오늘 방문자",
+      description: stats?.dbEnabled
+        ? "오늘 날짜 기준 dedupe 정책을 적용한 방문자 수입니다."
+        : "방문자 집계는 DB 연결 후 자동으로 활성화됩니다.",
+      icon: Bell,
+      value: stats ? numberFormatter.format(stats.todayVisitors) : "--",
+    },
+    {
+      title: "현재 게임중",
+      description: stats
+        ? `열린 방 ${stats.openRooms}개, 대기 ${stats.waitingRooms}개를 합친 현재 접속 플레이어 수입니다.`
+        : "활성 room 기반 동시 플레이 수를 준실시간으로 불러옵니다.",
+      icon: Activity,
+      value: stats ? numberFormatter.format(stats.connectedPlayers) : "--",
+    },
+  ];
+
   return (
     <div className="flex w-full flex-col gap-6 lg:gap-8">
       <section className="grid gap-4 lg:grid-cols-[1.4fr_0.8fr]">
         <Card className="overflow-hidden border-border/70 bg-card/95">
           <CardHeader className="space-y-4">
             <Badge variant="secondary" className="w-fit text-[10px]">
-              리팩터링 기반 구축 시작
+              {stats?.dbEnabled ? "운영 API 연결됨" : "운영 API 준비됨"}
             </Badge>
             <div className="space-y-3">
               <CardTitle className="max-w-3xl text-3xl leading-tight lg:text-4xl">
-                넷플레이 허브를 사이트형 제품으로 확장할 준비를 시작했습니다.
+                넷플레이 허브에 운영 지표와 공지 흐름을 실제 데이터로 연결했습니다.
               </CardTitle>
               <CardDescription className="max-w-2xl text-sm leading-6 text-muted-foreground">
-                홈, 넷플레이, 공지사항, 설정을 분리된 앱 셸 위에 올리고, 이후 운영 지표와 공지
-                시스템을 같은 레이아웃 체계로 확장합니다.
+                홈에서는 방문자 수와 현재 게임중 수를 요약하고, 공지사항 페이지에서는 Railway
+                PostgreSQL에 저장된 공지 목록을 읽기 전용으로 노출합니다.
               </CardDescription>
             </div>
           </CardHeader>
@@ -74,17 +98,26 @@ export default function HomePage({ hasProfile }: HomePageProps) {
         <Card className="border-border/70 bg-card/95">
           <CardHeader>
             <CardTitle className="text-lg">현재 준비 상태</CardTitle>
-            <CardDescription>리팩터 전환 중에도 기존 넷플레이 흐름은 유지합니다.</CardDescription>
+            <CardDescription>기존 넷플레이 흐름은 유지한 채 운영 계층만 별도로 확장합니다.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3 text-sm text-muted-foreground">
             <div className="rounded-lg border border-border/70 bg-background/50 p-4">
-              채팅, 세션 요약, 공개 방, 최근 기록 기능은 이미 baseline 커밋으로 고정되었습니다.
+              {statsLoading
+                ? "운영 지표 연결 상태를 확인하는 중입니다."
+                : statsError
+                  ? `운영 지표를 아직 불러오지 못했습니다. ${statsError}`
+                  : `운영 지표 API가 응답 중이며 마지막 갱신은 ${updatedAt ? relativeTimeFormatter.format(updatedAt) : "방금"} 입니다.`}
             </div>
             <div className="rounded-lg border border-border/70 bg-background/50 p-4">
               {hasProfile
                 ? "현재 프로필이 설정되어 있어 바로 넷플레이를 시작할 수 있습니다."
                 : "프로필이 아직 없으면 시작 시 닉네임과 아바타를 먼저 설정하게 됩니다."}
             </div>
+            {stats && (
+              <div className="rounded-lg border border-border/70 bg-background/50 p-4">
+                현재 열린 방 {stats.openRooms}개 중 진행 중인 방은 {stats.activeRooms}개, 대기 중인 방은 {stats.waitingRooms}개입니다.
+              </div>
+            )}
           </CardContent>
         </Card>
       </section>
@@ -100,10 +133,11 @@ export default function HomePage({ hasProfile }: HomePageProps) {
                     <Icon className="size-4 text-primary" />
                     {card.title}
                   </div>
-                  <Badge variant="outline" className="text-[10px]">
-                    준비 중
+                  <Badge variant={stats?.dbEnabled ? "secondary" : "outline"} className="text-[10px]">
+                    {statsLoading ? "로딩 중" : stats?.dbEnabled ? "실시간" : "폴백"}
                   </Badge>
                 </div>
+                <div className="text-3xl font-semibold tracking-tight text-foreground">{card.value}</div>
                 <CardDescription>{card.description}</CardDescription>
               </CardHeader>
             </Card>
@@ -119,13 +153,41 @@ export default function HomePage({ hasProfile }: HomePageProps) {
               공지사항 허브
             </div>
             <CardDescription>
-              상단 고정 공지, 일반 공지 목록, 운영 배너 슬롯이 이 영역에서 시작됩니다.
+              PostgreSQL에 저장된 공지를 홈에서 미리 보고, 전체 목록은 공지사항 페이지에서 확인합니다.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
-            <div className="rounded-lg border border-dashed border-border/70 bg-background/40 p-4 text-sm text-muted-foreground">
-              운영 점검, 신규 기능 안내, 이벤트 소식은 추후 이 레일을 통해 노출됩니다.
-            </div>
+            {noticesLoading ? (
+              <div className="rounded-lg border border-dashed border-border/70 bg-background/40 p-4 text-sm text-muted-foreground">
+                공지 목록을 불러오는 중입니다.
+              </div>
+            ) : noticeError ? (
+              <div className="rounded-lg border border-dashed border-border/70 bg-background/40 p-4 text-sm text-muted-foreground">
+                공지사항을 아직 불러오지 못했습니다. {noticeError}
+              </div>
+            ) : previewNotices.length === 0 ? (
+              <div className="rounded-lg border border-dashed border-border/70 bg-background/40 p-4 text-sm text-muted-foreground">
+                아직 게시된 공지가 없습니다. 이후 점검, 업데이트, 이벤트 소식이 여기에 표시됩니다.
+              </div>
+            ) : (
+              previewNotices.map((notice) => (
+                <div key={notice.id} className="rounded-lg border border-border/70 bg-background/50 p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="space-y-2">
+                      <div className="text-sm font-medium text-foreground">{notice.title}</div>
+                      <div className="text-sm leading-6 text-muted-foreground line-clamp-2">
+                        {notice.body}
+                      </div>
+                    </div>
+                    {notice.isPinned && (
+                      <Badge variant="secondary" className="text-[10px]">
+                        고정
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+              ))
+            )}
             <Button asChild variant="ghost" className="w-fit px-0 text-sm">
               <NavLink to="/notices">
                 공지사항 구조 미리 보기
@@ -138,17 +200,18 @@ export default function HomePage({ hasProfile }: HomePageProps) {
         <Card className="border-border/70 bg-card/95">
           <CardHeader>
             <div className="flex items-center gap-2 text-sm font-medium text-foreground">
-              <Globe className="size-4 text-primary" />
-              넷플레이 이동
+              <Radio className="size-4 text-primary" />
+              넷플레이 현황
             </div>
             <CardDescription>
-              현재 플레이 경험은 그대로 유지한 채 상위 셸 구조만 교체합니다.
+              운영 API와 별개로 현재 넷플레이 로비와 방 흐름은 그대로 유지됩니다.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="rounded-lg border border-border/70 bg-background/50 p-4 text-sm text-muted-foreground">
-              리팩터 이후에는 이 영역에 최근 매치, 현재 게임중, 빠른 참가 카드가 함께 들어가게
-              됩니다.
+              {stats
+                ? `현재 ${stats.connectedPlayers}명이 접속 중이며 ${stats.activeRooms}개 방에서 플레이 중입니다.`
+                : "리팩터 이후에는 이 영역에 최근 매치, 현재 게임중, 빠른 참가 카드가 함께 들어가게 됩니다."}
             </div>
             <Button asChild className="w-full">
               <NavLink to="/netplay">넷플레이 로비로 이동</NavLink>

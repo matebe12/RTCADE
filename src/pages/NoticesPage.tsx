@@ -1,27 +1,21 @@
 import { Bell, Pin } from "lucide-react";
 
+import { useOperationsNotices } from "@/hooks/useOperationsNotices";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
-const placeholderNotices = [
-  {
-    title: "상단 고정 공지 슬롯",
-    description: "긴급 점검, 배포 안내, 시즌 이벤트 같은 운영 공지가 항상 최상단에 노출됩니다.",
-    pinned: true,
-  },
-  {
-    title: "일반 공지 목록",
-    description: "패치 노트, 신규 기능 안내, ROM 정책 변경 같은 공지가 시간순으로 쌓일 자리입니다.",
-    pinned: false,
-  },
-  {
-    title: "향후 관리자 발행 API",
-    description: "1차는 읽기 전용 노출만 제공하고, 관리자 작성 UI는 후속 단계로 분리합니다.",
-    pinned: false,
-  },
-];
+const publishedAtFormatter = new Intl.DateTimeFormat("ko-KR", {
+  year: "numeric",
+  month: "short",
+  day: "numeric",
+  hour: "2-digit",
+  minute: "2-digit",
+});
 
 export default function NoticesPage() {
+  const { error, isLoading, notices } = useOperationsNotices();
+  const pinnedNotice = notices.find((notice) => notice.isPinned) ?? null;
+
   return (
     <div className="flex w-full flex-col gap-6">
       <Card className="border-border/70 bg-card/95">
@@ -30,33 +24,79 @@ export default function NoticesPage() {
             <Bell className="size-4 text-primary" />
             공지사항 센터
           </div>
-          <CardTitle className="text-2xl">운영 공지와 제품 업데이트가 들어갈 자리입니다.</CardTitle>
+          <CardTitle className="text-2xl">운영 공지와 제품 업데이트를 실제 데이터로 읽어옵니다.</CardTitle>
           <CardDescription className="text-sm leading-6">
-            이번 리팩터 1차 범위는 읽기 전용 노출과 상단 고정 공지까지입니다. 작성 UI와 권한 모델은
-            이후 단계로 둡니다.
+            이번 범위는 읽기 전용 노출과 상단 고정 공지까지입니다. 작성 UI와 권한 모델은 이후 단계로 둡니다.
           </CardDescription>
         </CardHeader>
       </Card>
 
+      {pinnedNotice && (
+        <Card className="border-primary/30 bg-primary/5">
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <Badge variant="secondary" className="text-[10px]">
+                <Pin className="size-3" />
+                상단 고정
+              </Badge>
+              <CardTitle className="text-lg">{pinnedNotice.title}</CardTitle>
+            </div>
+            <CardDescription>
+              {publishedAtFormatter.format(new Date(pinnedNotice.publishedAt))}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="text-sm leading-7 text-muted-foreground">
+            {pinnedNotice.body}
+          </CardContent>
+        </Card>
+      )}
+
       <div className="grid gap-4">
-        {placeholderNotices.map((notice) => (
-          <Card key={notice.title} className="border-border/70 bg-card/95">
-            <CardHeader>
-              <div className="flex items-center gap-2">
-                {notice.pinned && (
-                  <Badge variant="secondary" className="text-[10px]">
-                    <Pin className="size-3" />
-                    고정
-                  </Badge>
-                )}
-                <CardTitle className="text-lg">{notice.title}</CardTitle>
-              </div>
-            </CardHeader>
-            <CardContent className="text-sm text-muted-foreground">
-              {notice.description}
+        {isLoading ? (
+          <Card className="border-border/70 bg-card/95">
+            <CardContent className="p-6 text-sm text-muted-foreground">
+              공지사항을 불러오는 중입니다.
             </CardContent>
           </Card>
-        ))}
+        ) : error ? (
+          <Card className="border-border/70 bg-card/95">
+            <CardContent className="p-6 text-sm text-muted-foreground">
+              공지사항을 아직 불러오지 못했습니다. {error}
+            </CardContent>
+          </Card>
+        ) : notices.length === 0 ? (
+          <Card className="border-border/70 bg-card/95">
+            <CardContent className="p-6 text-sm text-muted-foreground">
+              아직 게시된 공지가 없습니다. 운영 공지가 발행되면 이 목록에 시간순으로 표시됩니다.
+            </CardContent>
+          </Card>
+        ) : (
+          notices.map((notice) => (
+            <Card key={notice.id} className="border-border/70 bg-card/95">
+              <CardHeader>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      {notice.isPinned && (
+                        <Badge variant="secondary" className="text-[10px]">
+                          <Pin className="size-3" />
+                          고정
+                        </Badge>
+                      )}
+                      <CardTitle className="text-lg">{notice.title}</CardTitle>
+                    </div>
+                    <CardDescription>
+                      {publishedAtFormatter.format(new Date(notice.publishedAt))}
+                    </CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="text-sm leading-7 text-muted-foreground">
+                {notice.body}
+              </CardContent>
+            </Card>
+          ))
+        )}
       </div>
     </div>
   );
