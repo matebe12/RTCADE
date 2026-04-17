@@ -1,4 +1,4 @@
-import type { RawData, WebSocket, WebSocketServer } from "ws";
+import { RawData, WebSocket, WebSocketServer } from "ws";
 
 import type { Room, RoomStore } from "./roomStore";
 

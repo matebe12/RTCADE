@@ -18,7 +18,8 @@ function buildEmulatorHtml({ bios, rawCore, role, rom }: EmulatorRequestOptions)
   const localPlayer = role === "guest" ? 1 : 0;
   const remotePlayer = role === "guest" ? 0 : 1;
 
-  return `<!DOCTYPE html>
+  return (
+    `<!DOCTYPE html>
 <html><head>
 <style>body{margin:0;background:#111;overflow:hidden}#game{width:100vw;height:100vh}
 #error-overlay{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.9);
@@ -259,7 +260,8 @@ white-space:pre-wrap;overflow-y:auto;font-size:14px}
     `/script>
 <script src="https://cdn.emulatorjs.org/stable/data/loader.js"><` +
     `/script>
-</body></html>`;
+</body></html>`
+  );
 }
 
 export function registerEmulatorRoute(app: Express) {
