@@ -23,12 +23,13 @@ async function bootstrap() {
 
   await operationsDatabase.initialize();
 
+  app.use(express.json());
   app.use(createCorsMiddleware(config.allowedOrigins));
   app.use(createVisitorTrackingMiddleware(operationsDatabase));
   registerRomRoutes(app, config.romsDir);
   registerEmulatorRoute(app);
   registerPublicRoomRoutes(app, roomStore);
-  registerNoticeRoutes(app, operationsDatabase);
+  registerNoticeRoutes(app, operationsDatabase, config.noticeAdminToken);
   registerStatsRoutes(app, operationsDatabase, roomStore);
   attachSignalingServer(wss, roomStore);
 

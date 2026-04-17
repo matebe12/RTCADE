@@ -1,7 +1,8 @@
-import { Bell, Globe, Home, Settings } from "lucide-react";
+import { ArrowRight, Bell, Globe, Home, Pin, Settings } from "lucide-react";
 import { NavLink, Outlet } from "react-router-dom";
 
 import { appEnvironment } from "@/config/environment";
+import { useOperationsNotices } from "@/hooks/useOperationsNotices";
 import { UserBadge } from "@/components/UserBadge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -23,6 +24,8 @@ const navigationItems = [
 
 export default function AppShell({ profile, onOpenProfile }: AppShellProps) {
   const { theme, resolvedTheme } = useTheme();
+  const { error: noticeError, notices } = useOperationsNotices();
+  const pinnedNotice = noticeError ? null : notices.find((notice) => notice.isPinned) ?? null;
   const themeLabel =
     theme === "system"
       ? `시스템 · ${resolvedTheme === "dark" ? "다크" : "라이트"}`
@@ -89,6 +92,30 @@ export default function AppShell({ profile, onOpenProfile }: AppShellProps) {
           </div>
         </div>
       </header>
+
+      {pinnedNotice && (
+        <div className="border-b border-primary/20 bg-[linear-gradient(90deg,rgba(0,160,255,0.12),rgba(255,135,61,0.08))]">
+          <div className="mx-auto flex w-full max-w-6xl flex-col gap-3 px-4 py-3 lg:flex-row lg:items-center lg:gap-4">
+            <div className="flex min-w-0 flex-1 items-start gap-3">
+              <Badge variant="secondary" className="mt-0.5 shrink-0 text-[10px]">
+                <Pin className="size-3" />
+                고정 공지
+              </Badge>
+              <div className="min-w-0 space-y-1">
+                <div className="text-sm font-medium text-foreground">{pinnedNotice.title}</div>
+                <div className="truncate text-sm text-muted-foreground">{pinnedNotice.body}</div>
+              </div>
+            </div>
+
+            <Button asChild variant="secondary" size="sm" className="shrink-0">
+              <NavLink to="/notices">
+                전체 공지 보기
+                <ArrowRight className="size-4" />
+              </NavLink>
+            </Button>
+          </div>
+        </div>
+      )}
 
       <main className="mx-auto flex w-full max-w-6xl flex-1 px-4 py-8 lg:py-10">
         <Outlet />

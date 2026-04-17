@@ -11,23 +11,54 @@ export interface NoticeRecord {
   updatedAt: string;
 }
 
+export interface CreateNoticeInput {
+  body: string;
+  isPinned?: boolean;
+  isPublished?: boolean;
+  publishedAt?: string;
+  title: string;
+}
+
+export interface UpdateNoticeInput {
+  body?: string;
+  isPinned?: boolean;
+  isPublished?: boolean;
+  publishedAt?: string;
+  title?: string;
+}
+
 export interface VisitorCounts {
   todayVisitors: number;
   totalVisitors: number;
 }
 
 export interface OperationsDatabase {
+  createNotice: (input: CreateNoticeInput) => Promise<NoticeRecord | null>;
   isEnabled: boolean;
   getVisitorCounts: () => Promise<VisitorCounts>;
   initialize: () => Promise<void>;
   listNotices: (limit?: number) => Promise<NoticeRecord[]>;
   recordVisit: (visitorId: string) => Promise<void>;
+  updateNotice: (id: number, input: UpdateNoticeInput) => Promise<NoticeRecord | null>;
 }
 
 const DEFAULT_COUNTS: VisitorCounts = {
   todayVisitors: 0,
   totalVisitors: 0,
 };
+
+const DEFAULT_NOTICES = [
+  {
+    title: "RTCADE 운영 센터 오픈",
+    body: "홈에서 총 방문자, 오늘 방문자, 현재 게임중 수를 바로 확인할 수 있고, 공지사항 페이지에서 운영 공지를 읽기 전용으로 확인할 수 있습니다.",
+    isPinned: true,
+  },
+  {
+    title: "Railway PostgreSQL 연동 완료",
+    body: "서버는 visitors, daily_visitors, notices 테이블을 자동 초기화합니다. 데이터베이스 연결이 없을 때도 서비스는 폴백 모드로 계속 동작합니다.",
+    isPinned: false,
+  },
+] as const;
 
 function shouldUseSsl(databaseUrl: string) {
   try {
@@ -84,6 +115,52 @@ const CREATE_NOTICE_INDEX_SQL = `
   ON notices (is_published, is_pinned, published_at DESC)
 `;
 
+function mapNoticeRow(row: {
+  id: string;
+  title: string;
+  body: string;
+  is_pinned: boolean;
+  is_published: boolean;
+  published_at: Date;
+  created_at: Date;
+  updated_at: Date;
+}): NoticeRecord {
+  return {
+    id: Number(row.id),
+    title: row.title,
+    body: row.body,
+    isPinned: row.is_pinned,
+    isPublished: row.is_published,
+    publishedAt: row.published_at.toISOString(),
+    createdAt: row.created_at.toISOString(),
+    updatedAt: row.updated_at.toISOString(),
+  };
+}
+
+function normalizePublishedAt(value: string | undefined) {
+  return value ? new Date(value) : new Date();
+}
+
+async function seedDefaultNotices(pool: Pool) {
+  const existingNoticesResult = await pool.query<{ count: string }>(
+    "SELECT COUNT(*)::text AS count FROM notices",
+  );
+
+  if (Number(existingNoticesResult.rows[0]?.count || "0") > 0) {
+    return;
+  }
+
+  for (const notice of DEFAULT_NOTICES) {
+    await pool.query(
+      `
+        INSERT INTO notices (title, body, is_pinned, is_published, published_at)
+        VALUES ($1, $2, $3, TRUE, NOW())
+      `,
+      [notice.title, notice.body, notice.isPinned],
+    );
+  }
+}
+
 export function createOperationsDatabase(databaseUrl: string | null): OperationsDatabase {
   let pool =
     databaseUrl !== null
@@ -107,6 +184,38 @@ export function createOperationsDatabase(databaseUrl: string | null): Operations
   }
 
   return {
+    createNotice: async (input) =>
+      runSafely(async () => {
+        if (input.isPinned) {
+          await pool!.query("UPDATE notices SET is_pinned = FALSE WHERE is_pinned = TRUE");
+        }
+
+        const result = await pool!.query<{
+          id: string;
+          title: string;
+          body: string;
+          is_pinned: boolean;
+          is_published: boolean;
+          published_at: Date;
+          created_at: Date;
+          updated_at: Date;
+        }>(
+          `
+            INSERT INTO notices (title, body, is_pinned, is_published, published_at)
+            VALUES ($1, $2, $3, $4, $5)
+            RETURNING id, title, body, is_pinned, is_published, published_at, created_at, updated_at
+          `,
+          [
+            input.title,
+            input.body,
+            input.isPinned ?? false,
+            input.isPublished ?? true,
+            normalizePublishedAt(input.publishedAt),
+          ],
+        );
+
+        return mapNoticeRow(result.rows[0]);
+      }, null),
     get isEnabled() {
       return pool !== null;
     },
@@ -134,6 +243,7 @@ export function createOperationsDatabase(databaseUrl: string | null): Operations
         await pool.query(CREATE_DAILY_VISITORS_TABLE_SQL);
         await pool.query(CREATE_NOTICES_TABLE_SQL);
         await pool.query(CREATE_NOTICE_INDEX_SQL);
+        await seedDefaultNotices(pool);
       } catch (error) {
         console.error("[DB] Initialization failed, disabling DB-backed features:", error);
         await pool.end().catch(() => undefined);
@@ -162,16 +272,7 @@ export function createOperationsDatabase(databaseUrl: string | null): Operations
           [limit],
         );
 
-        return result.rows.map((row) => ({
-          id: Number(row.id),
-          title: row.title,
-          body: row.body,
-          isPinned: row.is_pinned,
-          isPublished: row.is_published,
-          publishedAt: row.published_at.toISOString(),
-          createdAt: row.created_at.toISOString(),
-          updatedAt: row.updated_at.toISOString(),
-        }));
+        return result.rows.map(mapNoticeRow);
       }, []),
     recordVisit: async (visitorId) => {
       await runSafely(async () => {
@@ -195,5 +296,47 @@ export function createOperationsDatabase(databaseUrl: string | null): Operations
         );
       }, undefined);
     },
+    updateNotice: async (id, input) =>
+      runSafely(async () => {
+        if (input.isPinned) {
+          await pool!.query("UPDATE notices SET is_pinned = FALSE WHERE is_pinned = TRUE AND id <> $1", [
+            id,
+          ]);
+        }
+
+        const result = await pool!.query<{
+          id: string;
+          title: string;
+          body: string;
+          is_pinned: boolean;
+          is_published: boolean;
+          published_at: Date;
+          created_at: Date;
+          updated_at: Date;
+        }>(
+          `
+            UPDATE notices
+            SET
+              title = COALESCE($2, title),
+              body = COALESCE($3, body),
+              is_pinned = COALESCE($4, is_pinned),
+              is_published = COALESCE($5, is_published),
+              published_at = COALESCE($6, published_at),
+              updated_at = NOW()
+            WHERE id = $1
+            RETURNING id, title, body, is_pinned, is_published, published_at, created_at, updated_at
+          `,
+          [
+            id,
+            input.title ?? null,
+            input.body ?? null,
+            input.isPinned ?? null,
+            input.isPublished ?? null,
+            input.publishedAt ? normalizePublishedAt(input.publishedAt) : null,
+          ],
+        );
+
+        return result.rows[0] ? mapNoticeRow(result.rows[0]) : null;
+      }, null),
   };
 }

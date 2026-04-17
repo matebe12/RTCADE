@@ -83,6 +83,11 @@ npm run dev:all
 - GET /api/stats — 총 방문자, 오늘 방문자, 현재 열린 방/대기 방/접속 플레이어 수
 - GET /api/notices — 게시된 공지 목록
 
+관리자 토큰을 설정하면 공지 작성·수정 API도 함께 사용할 수 있습니다.
+
+- POST /api/admin/notices — 공지 생성
+- PATCH /api/admin/notices/:id — 공지 수정, 고정 여부/발행 여부 전환
+
 양쪽 서버 모두 `0.0.0.0`에 바인드 → LAN 내 다른 기기에서 `http://<호스트IP>:5173`으로 접근 가능
 
 ### ROM 추가
@@ -109,11 +114,26 @@ CORS_ORIGIN=https://your-vercel-app.vercel.app
 ROMS_PATH=/app/server/roms
 DATABASE_URL=postgresql://postgres:password@postgres.railway.internal:5432/railway
 DATABASE_PUBLIC_URL=postgresql://postgres:password@public-host:port/railway?sslmode=require
+NOTICE_ADMIN_TOKEN=replace-with-a-strong-random-token
 ```
 
 Railway에 배포된 백엔드는 내부 URL인 DATABASE_URL을 쓰는 편이 안전합니다. 로컬에서 직접 DB 연결을 시험할 때만 DATABASE_PUBLIC_URL을 쓰면 됩니다.
 
 DATABASE_URL과 DATABASE_PUBLIC_URL이 모두 없으면 서버는 공지/방문자 통계를 비활성화한 채 계속 기동합니다.
+
+관리자 공지 API는 Authorization 헤더에 Bearer 토큰을 넣어 호출합니다.
+
+```bash
+curl -X POST "$API_URL/api/admin/notices" \
+   -H "Authorization: Bearer $NOTICE_ADMIN_TOKEN" \
+   -H "Content-Type: application/json" \
+   -d '{
+      "title": "점검 안내",
+      "body": "오늘 23:00부터 23:30까지 점검이 진행됩니다.",
+      "isPinned": true,
+      "isPublished": true
+   }'
+```
 
 ---
 

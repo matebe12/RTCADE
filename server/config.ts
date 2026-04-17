@@ -6,6 +6,7 @@ export interface ServerConfig {
   romsDir: string;
   allowedOrigins: string[];
   databaseUrl: string | null;
+  noticeAdminToken: string | null;
 }
 
 function buildDatabaseUrlFromEnv() {
@@ -47,6 +48,7 @@ export function getServerConfig(): ServerConfig {
     romsDir: process.env.ROMS_PATH || path.join(import.meta.dirname, "roms"),
     allowedOrigins: process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(",") : ["*"],
     databaseUrl: buildDatabaseUrlFromEnv(),
+    noticeAdminToken: process.env.NOTICE_ADMIN_TOKEN || null,
   };
 }
 
@@ -58,8 +60,14 @@ export function createCorsMiddleware(allowedOrigins: string[]): RequestHandler {
       res.header("Access-Control-Allow-Origin", origin);
     }
 
-    res.header("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
-    res.header("Access-Control-Allow-Headers", "Content-Type");
+    res.header("Access-Control-Allow-Methods", "GET,POST,PATCH,OPTIONS");
+    res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
+
+    if (req.method === "OPTIONS") {
+      res.sendStatus(204);
+      return;
+    }
+
     next();
   };
 }
