@@ -5,8 +5,8 @@ const apiBaseUrl = import.meta.env.VITE_API_URL || defaultApiUrl;
 const wsUrl = import.meta.env.VITE_WS_URL || defaultWsUrl;
 
 export const appEnvironment = {
-  siteName: "RETRO EMULATOR",
-  siteTagline: "브라우저 기반 레트로 넷플레이 허브",
+  siteName: "RTCADE",
+  siteTagline: "추억의 게임을 다시 연결하는 공간",
   apiBaseUrl,
   wsUrl,
 } as const;
