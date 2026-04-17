@@ -130,10 +130,14 @@ export class NetplayPeer {
   }
 
   // Send save state as chunked binary over DataChannel
-  sendSaveState(state: ArrayBuffer) {
+  sendSaveState(state: ArrayBuffer): boolean {
     if (this.stateDc?.readyState !== "open") {
       console.warn("[PEER] sendSaveState: state DC not open");
-      return;
+      return false;
+    }
+    if (this.stateDc.bufferedAmount > STATE_BUFFER_THRESHOLD) {
+      console.warn(`[PEER] sendSaveState: backpressure, buffered=${this.stateDc.bufferedAmount}`);
+      return false;
     }
     const total = state.byteLength;
     const numChunks = Math.ceil(total / SAVE_STATE_CHUNK_SIZE);
@@ -147,6 +151,7 @@ export class NetplayPeer {
       this.stateDc.send(state.slice(start, end));
     }
     console.log("[PEER] sendSaveState: all chunks sent");
+    return true;
   }
 
   // Tell HOST that GUEST loaded the state

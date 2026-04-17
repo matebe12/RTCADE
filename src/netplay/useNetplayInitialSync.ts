@@ -147,7 +147,16 @@ export function useNetplayInitialSync({
     (stateBuffer: ArrayBuffer) => {
       if (roleRef.current === "host") {
         updateSync(NETPLAY_COPY.syncPreparing);
-        peerRef.current?.sendSaveState(stateBuffer);
+        const sent = peerRef.current?.sendSaveState(stateBuffer);
+        if (!sent) {
+          console.error("[SYNC] sendSaveState failed (backpressure or DC not ready)");
+          updateSync("전송 실패 - 재시도 중...");
+          // Retry after brief delay
+          setTimeout(() => {
+            const retry = peerRef.current?.sendSaveState(stateBuffer);
+            if (retry) updateSync(NETPLAY_COPY.syncPreparing);
+          }, 100);
+        }
       }
     },
     [peerRef, roleRef, updateSync],
