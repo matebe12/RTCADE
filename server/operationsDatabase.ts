@@ -299,9 +299,10 @@ export function createOperationsDatabase(databaseUrl: string | null): Operations
     updateNotice: async (id, input) =>
       runSafely(async () => {
         if (input.isPinned) {
-          await pool!.query("UPDATE notices SET is_pinned = FALSE WHERE is_pinned = TRUE AND id <> $1", [
-            id,
-          ]);
+          await pool!.query(
+            "UPDATE notices SET is_pinned = FALSE WHERE is_pinned = TRUE AND id <> $1",
+            [id],
+          );
         }
 
         const result = await pool!.query<{

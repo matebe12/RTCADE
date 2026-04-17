@@ -1,7 +1,6 @@
 import { Activity, ArrowRight, Bell, Radio, Users } from "lucide-react";
 import { NavLink } from "react-router-dom";
 
-import { appEnvironment } from "@/config/environment";
 import { useOperationsNotices } from "@/hooks/useOperationsNotices";
 import { useOperationsStats } from "@/hooks/useOperationsStats";
 import { Badge } from "@/components/ui/badge";
@@ -29,17 +28,13 @@ export default function HomePage({ hasProfile }: HomePageProps) {
   const statCards = [
     {
       title: "총 방문자",
-      description: stats?.dbEnabled
-        ? "Railway PostgreSQL에 기록된 누적 방문자 수입니다."
-        : "DB가 연결되지 않으면 운영 지표는 0으로 표시됩니다.",
+      description: "지금까지 이 공간을 찾아온 이용자 수입니다.",
       icon: Users,
       value: stats ? numberFormatter.format(stats.totalVisitors) : "--",
     },
     {
       title: "오늘 방문자",
-      description: stats?.dbEnabled
-        ? "오늘 날짜 기준 dedupe 정책을 적용한 방문자 수입니다."
-        : "방문자 집계는 DB 연결 후 자동으로 활성화됩니다.",
+      description: "오늘 이곳을 찾은 이용자 수를 기준으로 집계합니다.",
       icon: Bell,
       value: stats ? numberFormatter.format(stats.todayVisitors) : "--",
     },
@@ -59,15 +54,15 @@ export default function HomePage({ hasProfile }: HomePageProps) {
         <Card className="overflow-hidden border-border/70 bg-card/95">
           <CardHeader className="space-y-4">
             <Badge variant="secondary" className="w-fit text-[10px]">
-              {stats?.dbEnabled ? "운영 API 연결됨" : "운영 API 준비됨"}
+              서비스 현황
             </Badge>
             <div className="space-y-3">
               <CardTitle className="max-w-3xl text-3xl leading-tight lg:text-4xl">
-                넷플레이 허브에 운영 지표와 공지 흐름을 실제 데이터로 연결했습니다.
+                넷플레이 허브의 소식과 이용 현황을 한눈에 확인할 수 있습니다.
               </CardTitle>
               <CardDescription className="max-w-2xl text-sm leading-6 text-muted-foreground">
-                홈에서는 방문자 수와 현재 게임중 수를 요약하고, 공지사항 페이지에서는 Railway
-                PostgreSQL에 저장된 공지 목록을 읽기 전용으로 노출합니다.
+                홈에서는 방문 현황과 현재 게임중 수를 요약하고, 공지사항 페이지에서는 최신 소식을
+                읽기 전용으로 확인할 수 있습니다.
               </CardDescription>
             </div>
           </CardHeader>
@@ -84,13 +79,8 @@ export default function HomePage({ hasProfile }: HomePageProps) {
               </Button>
             </div>
 
-            <div className="grid gap-2 text-xs text-muted-foreground">
-              <div className="rounded-lg border border-border/70 bg-background/60 px-3 py-2">
-                API {appEnvironment.apiHostLabel}
-              </div>
-              <div className="rounded-lg border border-border/70 bg-background/60 px-3 py-2">
-                WS {appEnvironment.wsHostLabel}
-              </div>
+            <div className="rounded-lg border border-border/70 bg-background/60 px-3 py-2 text-xs text-muted-foreground">
+              공지와 이용 현황은 자동으로 갱신됩니다.
             </div>
           </CardContent>
         </Card>
@@ -98,15 +88,17 @@ export default function HomePage({ hasProfile }: HomePageProps) {
         <Card className="border-border/70 bg-card/95">
           <CardHeader>
             <CardTitle className="text-lg">현재 준비 상태</CardTitle>
-            <CardDescription>기존 넷플레이 흐름은 유지한 채 운영 계층만 별도로 확장합니다.</CardDescription>
+            <CardDescription>
+              기존 넷플레이 흐름은 유지한 채 운영 계층만 별도로 확장합니다.
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3 text-sm text-muted-foreground">
             <div className="rounded-lg border border-border/70 bg-background/50 p-4">
               {statsLoading
-                ? "운영 지표 연결 상태를 확인하는 중입니다."
+                ? "이용 현황을 확인하는 중입니다."
                 : statsError
-                  ? `운영 지표를 아직 불러오지 못했습니다. ${statsError}`
-                  : `운영 지표 API가 응답 중이며 마지막 갱신은 ${updatedAt ? relativeTimeFormatter.format(updatedAt) : "방금"} 입니다.`}
+                  ? statsError
+                  : `최근 현황이 반영되어 있으며 마지막 갱신은 ${updatedAt ? relativeTimeFormatter.format(updatedAt) : "방금"} 입니다.`}
             </div>
             <div className="rounded-lg border border-border/70 bg-background/50 p-4">
               {hasProfile
@@ -115,7 +107,8 @@ export default function HomePage({ hasProfile }: HomePageProps) {
             </div>
             {stats && (
               <div className="rounded-lg border border-border/70 bg-background/50 p-4">
-                현재 열린 방 {stats.openRooms}개 중 진행 중인 방은 {stats.activeRooms}개, 대기 중인 방은 {stats.waitingRooms}개입니다.
+                현재 열린 방 {stats.openRooms}개 중 진행 중인 방은 {stats.activeRooms}개, 대기 중인
+                방은 {stats.waitingRooms}개입니다.
               </div>
             )}
           </CardContent>
@@ -133,11 +126,13 @@ export default function HomePage({ hasProfile }: HomePageProps) {
                     <Icon className="size-4 text-primary" />
                     {card.title}
                   </div>
-                  <Badge variant={stats?.dbEnabled ? "secondary" : "outline"} className="text-[10px]">
-                    {statsLoading ? "로딩 중" : stats?.dbEnabled ? "실시간" : "폴백"}
+                  <Badge variant="secondary" className="text-[10px]">
+                    {statsLoading ? "로딩 중" : "업데이트"}
                   </Badge>
                 </div>
-                <div className="text-3xl font-semibold tracking-tight text-foreground">{card.value}</div>
+                <div className="text-3xl font-semibold tracking-tight text-foreground">
+                  {card.value}
+                </div>
                 <CardDescription>{card.description}</CardDescription>
               </CardHeader>
             </Card>
@@ -153,7 +148,7 @@ export default function HomePage({ hasProfile }: HomePageProps) {
               공지사항 허브
             </div>
             <CardDescription>
-              PostgreSQL에 저장된 공지를 홈에서 미리 보고, 전체 목록은 공지사항 페이지에서 확인합니다.
+              홈에서 최근 공지를 미리 보고, 전체 목록은 공지사항 페이지에서 확인할 수 있습니다.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
@@ -163,7 +158,7 @@ export default function HomePage({ hasProfile }: HomePageProps) {
               </div>
             ) : noticeError ? (
               <div className="rounded-lg border border-dashed border-border/70 bg-background/40 p-4 text-sm text-muted-foreground">
-                공지사항을 아직 불러오지 못했습니다. {noticeError}
+                {noticeError}
               </div>
             ) : previewNotices.length === 0 ? (
               <div className="rounded-lg border border-dashed border-border/70 bg-background/40 p-4 text-sm text-muted-foreground">
@@ -171,7 +166,10 @@ export default function HomePage({ hasProfile }: HomePageProps) {
               </div>
             ) : (
               previewNotices.map((notice) => (
-                <div key={notice.id} className="rounded-lg border border-border/70 bg-background/50 p-4">
+                <div
+                  key={notice.id}
+                  className="rounded-lg border border-border/70 bg-background/50 p-4"
+                >
                   <div className="flex items-start justify-between gap-3">
                     <div className="space-y-2">
                       <div className="text-sm font-medium text-foreground">{notice.title}</div>
@@ -203,9 +201,7 @@ export default function HomePage({ hasProfile }: HomePageProps) {
               <Radio className="size-4 text-primary" />
               넷플레이 현황
             </div>
-            <CardDescription>
-              운영 API와 별개로 현재 넷플레이 로비와 방 흐름은 그대로 유지됩니다.
-            </CardDescription>
+            <CardDescription>현재 넷플레이 로비와 방 흐름은 그대로 유지됩니다.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="rounded-lg border border-border/70 bg-background/50 p-4 text-sm text-muted-foreground">

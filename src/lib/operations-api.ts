@@ -37,7 +37,7 @@ async function fetchJson<T>(pathname: string): Promise<T> {
   const response = await fetch(buildApiUrl(pathname));
 
   if (!response.ok) {
-    throw new Error(`API ${response.status} ${response.statusText}`);
+    throw new Error("요청을 처리하지 못했습니다.");
   }
 
   return (await response.json()) as T;

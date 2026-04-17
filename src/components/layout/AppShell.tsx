@@ -25,7 +25,7 @@ const navigationItems = [
 export default function AppShell({ profile, onOpenProfile }: AppShellProps) {
   const { theme, resolvedTheme } = useTheme();
   const { error: noticeError, notices } = useOperationsNotices();
-  const pinnedNotice = noticeError ? null : notices.find((notice) => notice.isPinned) ?? null;
+  const pinnedNotice = noticeError ? null : (notices.find((notice) => notice.isPinned) ?? null);
   const themeLabel =
     theme === "system"
       ? `시스템 · ${resolvedTheme === "dark" ? "다크" : "라이트"}`
@@ -76,9 +76,6 @@ export default function AppShell({ profile, onOpenProfile }: AppShellProps) {
           </nav>
 
           <div className="flex flex-wrap items-center gap-2 lg:justify-end">
-            <Badge variant="outline" className="text-[10px]">
-              API {appEnvironment.apiHostLabel}
-            </Badge>
             <Button variant="outline" className="h-10 gap-2 px-3" onClick={onOpenProfile}>
               {profile ? (
                 <>

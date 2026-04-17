@@ -24,9 +24,11 @@ export default function NoticesPage() {
             <Bell className="size-4 text-primary" />
             공지사항 센터
           </div>
-          <CardTitle className="text-2xl">운영 공지와 제품 업데이트를 실제 데이터로 읽어옵니다.</CardTitle>
+          <CardTitle className="text-2xl">
+            운영 공지와 제품 업데이트를 실제 데이터로 읽어옵니다.
+          </CardTitle>
           <CardDescription className="text-sm leading-6">
-            이번 범위는 읽기 전용 노출과 상단 고정 공지까지입니다. 작성 UI와 권한 모델은 이후 단계로 둡니다.
+            중요한 공지는 상단에 고정되고, 나머지 소식은 시간순으로 확인할 수 있습니다.
           </CardDescription>
         </CardHeader>
       </Card>
@@ -60,9 +62,7 @@ export default function NoticesPage() {
           </Card>
         ) : error ? (
           <Card className="border-border/70 bg-card/95">
-            <CardContent className="p-6 text-sm text-muted-foreground">
-              공지사항을 아직 불러오지 못했습니다. {error}
-            </CardContent>
+            <CardContent className="p-6 text-sm text-muted-foreground">{error}</CardContent>
           </Card>
         ) : notices.length === 0 ? (
           <Card className="border-border/70 bg-card/95">

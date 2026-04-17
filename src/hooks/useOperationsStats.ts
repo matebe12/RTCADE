@@ -16,12 +16,9 @@ export function useOperationsStats(pollIntervalMs = 15000) {
         setError(null);
         setUpdatedAt(Date.now());
       });
-    } catch (caughtError) {
-      const message =
-        caughtError instanceof Error ? caughtError.message : "운영 지표를 불러오지 못했습니다.";
-
+    } catch {
       startTransition(() => {
-        setError(message);
+        setError("지금은 이용 현황을 불러오지 못했습니다.");
       });
     } finally {
       startTransition(() => {

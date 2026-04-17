@@ -44,8 +44,7 @@ function validateCreateNoticeInput(body: unknown): CreateNoticeInput | null {
     title: candidate.title.trim(),
     body: candidate.body.trim(),
     isPinned: typeof candidate.isPinned === "boolean" ? candidate.isPinned : undefined,
-    isPublished:
-      typeof candidate.isPublished === "boolean" ? candidate.isPublished : undefined,
+    isPublished: typeof candidate.isPublished === "boolean" ? candidate.isPublished : undefined,
     publishedAt: typeof candidate.publishedAt === "string" ? candidate.publishedAt : undefined,
   };
 }
