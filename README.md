@@ -27,7 +27,7 @@ WebRTC DataChannel을 통해 서버 중계 없이 1:1 P2P로 직접 연결하여
 | 에뮬레이터 | EmulatorJS CDN (LibRetro WASM cores)     |
 | P2P        | WebRTC RTCPeerConnection + DataChannel   |
 | 시그널링   | WebSocket (ws 8)                         |
-| 백엔드     | Express 5 + Node.js (tsx)                |
+| 백엔드     | Express 5 + Node.js (tsx) + PostgreSQL   |
 | 폰트       | Press Start 2P (Google Fonts)            |
 
 ---
@@ -78,6 +78,11 @@ npm install
 npm run dev:all
 ```
 
+운영용 Postgres가 연결되면 서버는 다음 읽기 전용 운영 API를 함께 제공합니다.
+
+- GET /api/stats — 총 방문자, 오늘 방문자, 현재 열린 방/대기 방/접속 플레이어 수
+- GET /api/notices — 게시된 공지 목록
+
 양쪽 서버 모두 `0.0.0.0`에 바인드 → LAN 내 다른 기기에서 `http://<호스트IP>:5173`으로 접근 가능
 
 ### ROM 추가
@@ -95,6 +100,20 @@ server/roms/nes/contra.zip          # Contra
 ```
 
 BIOS 파일(`neogeo.zip`, `pgm.zip` 등)은 자동으로 인식되어 같은 폴더의 ROM에 자동 연결됩니다.
+
+### 백엔드 환경변수
+
+```bash
+PORT=3001
+CORS_ORIGIN=https://your-vercel-app.vercel.app
+ROMS_PATH=/app/server/roms
+DATABASE_URL=postgresql://postgres:password@postgres.railway.internal:5432/railway
+DATABASE_PUBLIC_URL=postgresql://postgres:password@public-host:port/railway?sslmode=require
+```
+
+Railway에 배포된 백엔드는 내부 URL인 DATABASE_URL을 쓰는 편이 안전합니다. 로컬에서 직접 DB 연결을 시험할 때만 DATABASE_PUBLIC_URL을 쓰면 됩니다.
+
+DATABASE_URL과 DATABASE_PUBLIC_URL이 모두 없으면 서버는 공지/방문자 통계를 비활성화한 채 계속 기동합니다.
 
 ---
 

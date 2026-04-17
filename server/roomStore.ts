@@ -23,6 +23,13 @@ export interface PublicRoomSummary {
   hostAvatar?: string;
 }
 
+export interface RoomActivitySnapshot {
+  activeRooms: number;
+  connectedPlayers: number;
+  openRooms: number;
+  waitingRooms: number;
+}
+
 interface CreateRoomOptions {
   host: WebSocket;
   romFilename: string;
@@ -39,6 +46,7 @@ export interface RoomStore {
   deleteRoom: (code: string) => void;
   detachGuest: (room: Room) => void;
   findRoom: (code: string) => Room | null;
+  getActivitySnapshot: () => RoomActivitySnapshot;
   listPublicRooms: () => PublicRoomSummary[];
 }
 
@@ -88,6 +96,28 @@ export function createRoomStore(): RoomStore {
       room.guest = null;
     },
     findRoom: (code) => rooms.get(code) ?? null,
+    getActivitySnapshot: () => {
+      let waitingRooms = 0;
+      let activeRooms = 0;
+      let connectedPlayers = 0;
+
+      for (const room of rooms.values()) {
+        connectedPlayers += room.guest ? 2 : 1;
+
+        if (room.guest) {
+          activeRooms += 1;
+        } else {
+          waitingRooms += 1;
+        }
+      }
+
+      return {
+        activeRooms,
+        connectedPlayers,
+        openRooms: rooms.size,
+        waitingRooms,
+      };
+    },
     listPublicRooms: () =>
       Array.from(rooms.values())
         .filter((room) => room.isPublic && room.guest === null)
