@@ -38,7 +38,7 @@ export default function AppShell({ profile, onOpenProfile }: AppShellProps) {
         <div className="mx-auto flex w-full max-w-6xl flex-col gap-4 px-4 py-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex items-center gap-4">
             <NavLink to="/" className="flex min-w-0 flex-col">
-              <span className="font-arcade text-sm text-primary">RETRO EMULATOR</span>
+              <span className="font-arcade text-sm text-primary">RTCADE</span>
               <span className="text-[11px] text-muted-foreground">
                 {appEnvironment.siteTagline}
               </span>
