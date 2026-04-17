@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { NETPLAY_COPY } from "@/netplay/netplayCopy";
 import { cn } from "@/lib/utils";
 
 export interface NetplayChatMessage {
@@ -67,11 +68,11 @@ export default function NetplayChatPanel({
   const isChatReady = chatChannelState === "open";
 
   return (
-    <Card className="w-full max-w-[800px] overflow-hidden border-border/70 bg-card/95 xl:w-[320px] xl:max-w-[320px]">
+    <Card className="w-full max-w-200 overflow-hidden border-border/70 bg-card/95 xl:w-[320px] xl:max-w-[320px]">
       <CardHeader className="flex flex-row items-start justify-between gap-3 border-b px-4 py-3">
         <div className="min-w-0 space-y-2">
           <div className="flex items-center gap-2">
-            <CardTitle className="text-sm font-medium tracking-normal">매치 채팅</CardTitle>
+            <CardTitle className="text-sm font-medium tracking-normal">대화</CardTitle>
             {unreadCount > 0 && (
               <Badge variant="destructive" className="text-[10px]">
                 {unreadCount}
@@ -82,7 +83,7 @@ export default function NetplayChatPanel({
             <span className="text-base leading-none">{remoteDisplay.avatar}</span>
             <span className="truncate font-medium text-foreground">{remoteDisplay.nickname}</span>
             <Badge variant={isChatReady ? "secondary" : "outline"} className="text-[10px]">
-              {isChatReady ? "채팅 연결됨" : "채팅 연결 중"}
+              {isChatReady ? "사용 가능" : "준비 중"}
             </Badge>
           </div>
         </div>
@@ -99,15 +100,17 @@ export default function NetplayChatPanel({
         </Button>
       </CardHeader>
 
-      <CardContent className="flex h-[22rem] flex-col gap-3 p-3 xl:h-[600px]">
+      <CardContent className="flex h-88 flex-col gap-3 p-3 xl:h-150">
         <ScrollArea className="flex-1 rounded-md border border-border/60 bg-background/50">
           <div className="flex min-h-full flex-col gap-3 p-3">
             {messages.length === 0 ? (
               <div className="flex flex-1 flex-col items-center justify-center gap-3 py-10 text-center text-muted-foreground">
                 <MessageSquare className="size-8 opacity-50" />
                 <div className="space-y-1">
-                  <p className="text-sm font-medium text-foreground">채팅이 아직 없습니다</p>
-                  <p className="text-xs">매칭된 상대와 바로 대화를 시작할 수 있습니다.</p>
+                  <p className="text-sm font-medium text-foreground">
+                    {NETPLAY_COPY.chatEmptyTitle}
+                  </p>
+                  <p className="text-xs">{NETPLAY_COPY.chatEmptyDescription}</p>
                 </div>
               </div>
             ) : (
@@ -132,7 +135,7 @@ export default function NetplayChatPanel({
                       </div>
                       <div
                         className={cn(
-                          "rounded-2xl px-3 py-2 text-sm whitespace-pre-wrap break-words",
+                          "rounded-2xl px-3 py-2 text-sm whitespace-pre-wrap wrap-break-word",
                           isLocal
                             ? "bg-primary text-primary-foreground"
                             : "bg-secondary text-secondary-foreground",
@@ -154,8 +157,8 @@ export default function NetplayChatPanel({
             {isPeerTyping
               ? `${remoteDisplay.nickname} 입력 중...`
               : isChatReady
-                ? "Enter로 전송"
-                : "채팅 채널이 열리면 바로 사용할 수 있습니다."}
+                ? NETPLAY_COPY.chatReadyHint
+                : NETPLAY_COPY.chatPendingHint}
           </div>
 
           <div className="flex items-center gap-2">
@@ -176,7 +179,7 @@ export default function NetplayChatPanel({
                 }
               }}
               maxLength={300}
-              placeholder={isChatReady ? "메시지를 입력하세요" : "채팅 연결 중..."}
+              placeholder={isChatReady ? "메시지를 입력하세요" : "곧 입력할 수 있습니다"}
               disabled={!isChatReady}
               autoComplete="off"
             />

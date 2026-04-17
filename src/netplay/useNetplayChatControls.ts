@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, type MutableRefObject, type RefObject }
 import { focusEmulator } from "@/components/EmulatorPlayer";
 import type { NetplayChatMessage } from "@/components/NetplayChatPanel";
 import type { ChatMessage as PeerChatMessage, NetplayPeer } from "@/netplay/peer";
+import { NETPLAY_COPY } from "@/netplay/netplayCopy";
 import { toast } from "sonner";
 
 const CHAT_TYPING_TIMEOUT_MS = 2000;
@@ -199,7 +200,7 @@ export function useNetplayChatControls({
 
     const sentMessage = peerRef.current?.sendChatMessage(trimmed);
     if (!sentMessage) {
-      toast.error("채팅 채널이 아직 준비되지 않았습니다.");
+      toast.error(NETPLAY_COPY.chatNotReady);
       return;
     }
 

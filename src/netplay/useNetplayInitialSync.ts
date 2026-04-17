@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, type MutableRefObject, type RefObject } from "react";
 
 import { loadSaveState, requestSaveState, sendStartGame } from "@/components/EmulatorPlayer";
+import { NETPLAY_COPY } from "@/netplay/netplayCopy";
 import type { NetplayPeer } from "@/netplay/peer";
 
 interface UseNetplayInitialSyncOptions {
@@ -73,7 +74,7 @@ export function useNetplayInitialSync({
     );
     remoteReadyRef.current = true;
     if (roleRef.current === "host" && localReadyRef.current) {
-      updateSync("세이브 스테이트 추출 중...");
+      updateSync(NETPLAY_COPY.syncPreparing);
       requestSaveState(emulatorRef);
     }
   }, [emulatorRef, roleRef, updateSync]);
@@ -90,11 +91,11 @@ export function useNetplayInitialSync({
       );
       if (roleRef.current === "guest") {
         if (localReadyRef.current) {
-          updateSync("세이브 스테이트 로드 중...");
+          updateSync(NETPLAY_COPY.syncFinishingSetup);
           loadSaveState(emulatorRef, stateBuffer);
         } else {
           pendingStateRef.current = stateBuffer;
-          updateSync("세이브 스테이트 수신 완료, 에뮬레이터 대기 중...");
+          updateSync(NETPLAY_COPY.syncStateReceived);
         }
       }
     },
@@ -104,7 +105,7 @@ export function useNetplayInitialSync({
   const handlePeerStateLoaded = useCallback(() => {
     if (roleRef.current === "host") {
       console.log("[LOBBY] HOST: GUEST state loaded, starting both!");
-      startGame("양쪽 동기화 완료! 게임 시작!", true);
+      startGame(NETPLAY_COPY.syncStartNow, true);
       startPeriodicResync();
     }
   }, [roleRef, startGame, startPeriodicResync]);
@@ -112,7 +113,7 @@ export function useNetplayInitialSync({
   const handlePeerStartSignal = useCallback(() => {
     if (roleRef.current === "guest" && !gameStartedRef.current) {
       console.log("[LOBBY] GUEST: received start signal from HOST!");
-      startGame("양쪽 동기화 완료! 게임 시작!", false);
+      startGame(NETPLAY_COPY.syncStartNow, false);
     }
   }, [gameStartedRef, roleRef, startGame]);
 
@@ -126,16 +127,16 @@ export function useNetplayInitialSync({
     );
 
     if (roleRef.current === "host") {
-      updateSync("에뮬레이터 로딩 완료 (HOST). 상대방 대기 중...");
+      updateSync(NETPLAY_COPY.syncWaitingForOpponent);
       if (remoteReadyRef.current) {
-        updateSync("세이브 스테이트 추출 중...");
+        updateSync(NETPLAY_COPY.syncPreparing);
         requestSaveState(emulatorRef);
       }
     } else {
-      updateSync("에뮬레이터 로딩 완료 (GUEST). HOST 대기 중...");
+      updateSync(NETPLAY_COPY.syncWaitingForStart);
       peerRef.current?.sendPeerReady();
       if (pendingStateRef.current) {
-        updateSync("세이브 스테이트 로드 중...");
+        updateSync(NETPLAY_COPY.syncFinishingSetup);
         loadSaveState(emulatorRef, pendingStateRef.current);
         pendingStateRef.current = null;
       }
@@ -145,7 +146,7 @@ export function useNetplayInitialSync({
   const handleSaveState = useCallback(
     (stateBuffer: ArrayBuffer) => {
       if (roleRef.current === "host") {
-        updateSync(`세이브 스테이트 전송 중... (${(stateBuffer.byteLength / 1024).toFixed(0)}KB)`);
+        updateSync(NETPLAY_COPY.syncPreparing);
         peerRef.current?.sendSaveState(stateBuffer);
       }
     },
@@ -155,7 +156,7 @@ export function useNetplayInitialSync({
   const handleStateLoaded = useCallback(() => {
     console.log("[LOBBY] handleStateLoaded, role:", roleRef.current);
     if (roleRef.current === "guest" && !gameStartedRef.current) {
-      updateSync("세이브 스테이트 로드 완료! HOST 시작 대기...");
+      updateSync(NETPLAY_COPY.syncReadyToStart);
       peerRef.current?.sendStateLoaded();
     }
   }, [gameStartedRef, peerRef, roleRef, updateSync]);
@@ -163,12 +164,12 @@ export function useNetplayInitialSync({
   const handleSaveStateError = useCallback(
     (error: string) => {
       console.warn("[NETPLAY] Save state error:", error);
-      updateSync(`세이브 스테이트 실패 (${error}). 동시 시작으로 폴백...`);
+      updateSync(NETPLAY_COPY.syncFallbackStart);
       if (roleRef.current === "host") {
         setTimeout(() => {
           if (!gameStartedRef.current) {
             console.log("[LOBBY] HOST: fallback start (no state sync)");
-            startGame("동시 시작! (스테이트 동기화 없음)", true);
+            startGame(NETPLAY_COPY.syncStartNow, true);
           }
         }, 500);
       }

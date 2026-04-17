@@ -2,6 +2,7 @@ import { useCallback, useEffect } from "react";
 
 import { buildBackendUrl } from "@/lib/backend-url";
 import type { LobbyState, PublicRoomInfo, RomInfo } from "@/stores/useNetplayLobbyStore";
+import { NETPLAY_COPY } from "@/netplay/netplayCopy";
 import { toast } from "sonner";
 
 type SetLobbyState = (next: LobbyState | ((previous: LobbyState) => LobbyState)) => void;
@@ -25,14 +26,14 @@ export function useNetplayDiscovery({
       const response = await fetch(buildBackendUrl("/api/roms"));
       const roms: RomInfo[] = await response.json();
       if (roms.length === 0) {
-        const message = "서버에 ROM 파일이 없습니다. server/roms/에 파일을 넣어주세요.";
+        const message = NETPLAY_COPY.romsUnavailable;
         setError(message);
         toast.error(message);
         return;
       }
       setLobbyState({ step: "browse", roms });
     } catch {
-      const message = "서버에 연결할 수 없습니다. 서버가 실행 중인지 확인하세요.";
+      const message = NETPLAY_COPY.romsLoadFailed;
       setError(message);
       toast.error(message);
     }
@@ -66,7 +67,7 @@ export function useNetplayDiscovery({
           return previous;
         });
       } catch {
-        const message = "공개 방 목록을 불러올 수 없습니다.";
+        const message = NETPLAY_COPY.publicRoomsLoadFailed;
         setError(message);
         if (openScreen) {
           setLobbyState({ step: "public-rooms", rooms: [] });

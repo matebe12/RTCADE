@@ -17,6 +17,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { UserProfile } from "@/lib/user-profile";
+import { NETPLAY_COPY, getConnectionStatusLabel } from "@/netplay/netplayCopy";
 import type { OpponentProfile } from "@/stores/useNetplayLobbyStore";
 import { ArrowLeft, Loader2, MessageSquare, Wifi, WifiOff } from "lucide-react";
 
@@ -151,11 +152,11 @@ export default function NetplayPlayingScreen({
           </Button>
 
           <Badge
-            variant={dcState === "open" ? "default" : "destructive"}
+            variant={dcState === "open" ? "default" : "secondary"}
             className="gap-1 text-[10px]"
           >
             {dcState === "open" ? <Wifi className="size-3" /> : <WifiOff className="size-3" />}
-            {dcState || "연결 안 됨"}
+            {getConnectionStatusLabel(dcState)}
           </Badge>
         </div>
 
@@ -163,7 +164,7 @@ export default function NetplayPlayingScreen({
           <div className="flex items-center gap-2">
             <Loader2 className="size-3 animate-spin text-muted-foreground" />
             <span className="text-xs text-muted-foreground">
-              {syncDisplay || "동기화 준비 중..."}
+              {syncDisplay || NETPLAY_COPY.defaultSyncStatus}
             </span>
           </div>
         )}

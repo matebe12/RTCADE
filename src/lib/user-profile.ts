@@ -28,6 +28,7 @@ const STORAGE_KEY = "retro-user-profile";
 const RECENT_GAMES_STORAGE_KEY = "retro-recent-games";
 const FAVORITE_GAMES_STORAGE_KEY = "retro-favorite-games";
 const RECENT_OPPONENTS_STORAGE_KEY = "retro-recent-opponents";
+const TOTAL_PLAY_COUNT_STORAGE_KEY = "retro-total-play-count";
 const MAX_RECENT_GAMES = 10;
 const MAX_RECENT_OPPONENTS = 8;
 
@@ -81,6 +82,22 @@ function writeJsonArray<T>(storageKey: string, value: T[]): void {
   localStorage.setItem(storageKey, JSON.stringify(value));
 }
 
+function readNumber(storageKey: string): number | null {
+  try {
+    const raw = localStorage.getItem(storageKey);
+    if (!raw) return null;
+
+    const parsed = JSON.parse(raw);
+    return typeof parsed === "number" && Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeNumber(storageKey: string, value: number): void {
+  localStorage.setItem(storageKey, JSON.stringify(value));
+}
+
 export function getRecentGames(): RecentGame[] {
   return readJsonArray<RecentGame>(RECENT_GAMES_STORAGE_KEY)
     .filter(
@@ -101,6 +118,30 @@ export function upsertRecentGame(game: RecentGame): RecentGame[] {
   ].slice(0, MAX_RECENT_GAMES);
   writeJsonArray(RECENT_GAMES_STORAGE_KEY, nextGames);
   return nextGames;
+}
+
+export function getTotalPlayedCount(): number {
+  const storedCount = readNumber(TOTAL_PLAY_COUNT_STORAGE_KEY);
+  if (storedCount !== null) {
+    return storedCount;
+  }
+
+  const derivedOpponentCount = getRecentOpponents().reduce(
+    (total, opponent) => total + opponent.playCount,
+    0,
+  );
+
+  if (derivedOpponentCount > 0) {
+    return derivedOpponentCount;
+  }
+
+  return getRecentGames().length;
+}
+
+export function incrementTotalPlayedCount(): number {
+  const nextCount = getTotalPlayedCount() + 1;
+  writeNumber(TOTAL_PLAY_COUNT_STORAGE_KEY, nextCount);
+  return nextCount;
 }
 
 export function getFavoriteGames(): string[] {

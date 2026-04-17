@@ -12,6 +12,17 @@ interface SettingsPageProps {
   onOpenProfile: () => void;
 }
 
+function getThemeLabel(theme: ThemePreference) {
+  switch (theme) {
+    case "light":
+      return "라이트";
+    case "dark":
+      return "다크";
+    default:
+      return "시스템";
+  }
+}
+
 const themeOptions: Array<{
   value: ThemePreference;
   label: string;
@@ -21,19 +32,19 @@ const themeOptions: Array<{
   {
     value: "light",
     label: "라이트",
-    description: "밝은 배경과 높은 가독성으로 페이지형 화면을 준비합니다.",
+    description: "밝고 또렷한 화면으로 메뉴와 안내를 보기 좋게 보여줍니다.",
     icon: Sun,
   },
   {
     value: "dark",
     label: "다크",
-    description: "현재 넷플레이와 에뮬레이터 중심 화면에 익숙한 톤입니다.",
+    description: "게임 화면과 잘 어울리는 차분한 분위기입니다.",
     icon: Moon,
   },
   {
     value: "system",
     label: "시스템",
-    description: "운영체제 설정을 따라 자동으로 전환됩니다.",
+    description: "기기 설정에 맞춰 자동으로 바뀝니다.",
     icon: Monitor,
   },
 ];
@@ -46,17 +57,23 @@ export default function SettingsPage({ profile, onOpenProfile }: SettingsPagePro
       <Card className="border-border/70 bg-card/95">
         <CardHeader>
           <CardTitle className="text-xl">프로필</CardTitle>
-          <CardDescription>닉네임과 아바타는 넷플레이, 채팅, 최근 상대 카드에 그대로 반영됩니다.</CardDescription>
+          <CardDescription>
+            닉네임과 아바타는 방, 채팅, 최근 함께한 기록에 표시됩니다.
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="rounded-lg border border-border/70 bg-background/50 p-4">
             {profile ? (
               <div className="space-y-3">
                 <UserBadge nickname={profile.nickname} avatar={profile.avatar} size="sm" />
-                <p className="text-sm text-muted-foreground">현재 프로필이 모든 세션 경험의 기본 식별자로 쓰입니다.</p>
+                <p className="text-sm text-muted-foreground">
+                  현재 프로필은 방과 채팅에서 함께 표시됩니다.
+                </p>
               </div>
             ) : (
-              <p className="text-sm text-muted-foreground">아직 프로필이 없습니다. 먼저 닉네임과 아바타를 설정하세요.</p>
+              <p className="text-sm text-muted-foreground">
+                아직 프로필이 없습니다. 먼저 닉네임과 아바타를 설정하세요.
+              </p>
             )}
           </div>
           <Button onClick={onOpenProfile} className="w-full">
@@ -70,10 +87,13 @@ export default function SettingsPage({ profile, onOpenProfile }: SettingsPagePro
           <div className="flex items-center justify-between gap-3">
             <div>
               <CardTitle className="text-xl">테마</CardTitle>
-              <CardDescription>라이트, 다크, 시스템 테마를 앱 전체에서 공통 토큰으로 관리합니다.</CardDescription>
+              <CardDescription>원하는 분위기로 화면을 맞춰보세요.</CardDescription>
             </div>
             <Badge variant="secondary" className="text-[10px]">
-              현재 {theme === "system" ? `시스템 · ${resolvedTheme === "dark" ? "다크" : "라이트"}` : theme}
+              현재{" "}
+              {theme === "system"
+                ? `시스템 · ${resolvedTheme === "dark" ? "다크" : "라이트"}`
+                : getThemeLabel(theme)}
             </Badge>
           </div>
         </CardHeader>

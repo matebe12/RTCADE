@@ -72,7 +72,7 @@ export default function NetplayPublicRoomsScreen({
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
                       <UserBadge
-                        nickname={room.hostNickname || "호스트"}
+                        nickname={room.hostNickname || "방장"}
                         avatar={room.hostAvatar || "🎮"}
                         size="sm"
                       />

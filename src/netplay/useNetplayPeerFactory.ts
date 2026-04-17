@@ -7,6 +7,7 @@ import {
   type ChatMessage as PeerChatMessage,
   type InputMessage,
 } from "@/netplay/peer";
+import { NETPLAY_COPY } from "@/netplay/netplayCopy";
 import {
   type ActiveSession,
   type LobbyState,
@@ -65,14 +66,14 @@ export function useNetplayPeerFactory({
 }: UseNetplayPeerFactoryOptions) {
   const createPeer = useCallback((): NetplayPeer => {
     const peer = new NetplayPeer({
-      onConnected: () => setStatus("P2P 연결됨!"),
+      onConnected: () => setStatus(NETPLAY_COPY.peerConnected),
       onDisconnected: () => {
         if (activeSessionRef.current) {
           completeSession("peer-left");
           return;
         }
 
-        toast.error("상대방이 나갔습니다.");
+        toast.error(NETPLAY_COPY.peerLeft);
         resetToMenu();
       },
       onInput: handleRemoteInput,
@@ -102,7 +103,7 @@ export function useNetplayPeerFactory({
         if (info.guestNickname) {
           setOpponentProfile({ nickname: info.guestNickname, avatar: info.guestAvatar || "🎮" });
         }
-        setStatus("상대방 접속! 게임 로딩 중...");
+        setStatus(NETPLAY_COPY.peerJoined);
         setState((previous) => {
           if (previous.step === "waiting") {
             roleRef.current = "host";
@@ -129,7 +130,7 @@ export function useNetplayPeerFactory({
         if (info.hostNickname) {
           setOpponentProfile({ nickname: info.hostNickname, avatar: info.hostAvatar || "🎮" });
         }
-        setStatus("방 참가 완료! 연결 중...");
+        setStatus(NETPLAY_COPY.roomJoined);
         roleRef.current = "guest";
         activeSessionRef.current = {
           romPath: info.romFilename,

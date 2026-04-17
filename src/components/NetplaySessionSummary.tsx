@@ -9,6 +9,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { UserBadge } from "@/components/UserBadge";
+import { NETPLAY_COPY } from "@/netplay/netplayCopy";
 
 export type SessionEndReason = "self-left" | "peer-left";
 
@@ -31,7 +32,7 @@ interface NetplaySessionSummaryProps {
 
 function formatDuration(durationMs: number, startedAt: number | null) {
   if (!startedAt || durationMs <= 0) {
-    return "동기화 단계에서 종료됨";
+    return NETPLAY_COPY.sessionEndedBeforeStart;
   }
 
   const totalSeconds = Math.max(1, Math.round(durationMs / 1000));
@@ -48,13 +49,13 @@ function formatDuration(durationMs: number, startedAt: number | null) {
 function getEndReasonCopy(endReason: SessionEndReason, startedAt: number | null) {
   if (!startedAt) {
     return endReason === "self-left"
-      ? "게임이 시작되기 전에 세션을 종료했습니다."
-      : "상대방이 게임 시작 전에 세션을 종료했습니다.";
+      ? NETPLAY_COPY.sessionEndedBySelfEarly
+      : NETPLAY_COPY.sessionEndedByPeerEarly;
   }
 
   return endReason === "self-left"
-    ? "플레이를 마무리했습니다. 같은 게임으로 바로 새 방을 만들 수 있어요."
-    : "상대방이 세션을 종료했습니다. 같은 게임으로 바로 새 방을 만들 수 있어요.";
+    ? NETPLAY_COPY.sessionEndedBySelf
+    : NETPLAY_COPY.sessionEndedByPeer;
 }
 
 export default function NetplaySessionSummary({
@@ -74,7 +75,7 @@ export default function NetplaySessionSummary({
     <Card className="w-full max-w-lg">
       <CardHeader className="items-center text-center">
         <Badge variant="secondary" className="text-[10px]">
-          {startedAt ? "세션 요약" : "준비 단계 종료"}
+          {startedAt ? "플레이 요약" : "준비 종료"}
         </Badge>
         <CardTitle className="text-lg">{gameName}</CardTitle>
         <CardDescription>{getEndReasonCopy(endReason, startedAt)}</CardDescription>
@@ -91,7 +92,9 @@ export default function NetplaySessionSummary({
           <div className="rounded-lg border border-border/70 bg-background/40 p-4">
             <p className="text-[11px] uppercase tracking-wide text-muted-foreground">종료 이유</p>
             <p className="mt-2 text-sm font-medium text-foreground">
-              {endReason === "self-left" ? "내가 세션 종료" : "상대방이 세션 종료"}
+              {endReason === "self-left"
+                ? NETPLAY_COPY.sessionReasonSelf
+                : NETPLAY_COPY.sessionReasonPeer}
             </p>
           </div>
 
@@ -104,7 +107,7 @@ export default function NetplaySessionSummary({
         </div>
 
         <div className="rounded-lg border border-dashed border-border/70 bg-background/20 p-4 text-xs text-muted-foreground">
-          같은 게임으로 새 방을 만들면 다음 화면에서 새 코드를 바로 복사해 다시 초대할 수 있습니다.
+          {NETPLAY_COPY.sessionHint}
         </div>
       </CardContent>
 

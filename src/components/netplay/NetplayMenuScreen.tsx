@@ -51,7 +51,7 @@ function formatRelativePlayedAt(playedAt: number) {
 }
 
 function getRecentOpponentEndReasonCopy(endReason: RecentOpponent["lastEndReason"]) {
-  return endReason === "self-left" ? "내가 종료" : "상대가 종료";
+  return endReason === "self-left" ? "내가 종료" : "상대방 종료";
 }
 
 export default function NetplayMenuScreen({
@@ -69,7 +69,7 @@ export default function NetplayMenuScreen({
   return (
     <Card className="w-full max-w-sm">
       <CardHeader className="text-center">
-        <CardTitle className="font-arcade text-sm text-primary">🌐 NETPLAY</CardTitle>
+        <CardTitle className="font-arcade text-sm text-primary">🌐 온라인 대전</CardTitle>
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
         <Button variant="outline" className="w-full" onClick={onOpenBrowse}>
@@ -110,7 +110,7 @@ export default function NetplayMenuScreen({
                       {parseRomName(getRomFilename(room.romPath), room.core)}
                     </p>
                     <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
-                      <span>{room.hostNickname || "호스트"}</span>
+                      <span>{room.hostNickname || "방장"}</span>
                       <span>코드 {room.code}</span>
                     </div>
                   </div>

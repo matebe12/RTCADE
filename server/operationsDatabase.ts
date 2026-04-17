@@ -32,12 +32,31 @@ export interface VisitorCounts {
   totalVisitors: number;
 }
 
+export interface PopularGameRecord {
+  gameName: string;
+  playCount: number;
+}
+
+export interface GameMetrics {
+  monthlyPopularGame: PopularGameRecord | null;
+  todayGames: number;
+  weeklyPopularGame: PopularGameRecord | null;
+}
+
+export interface RecordGameSessionInput {
+  core: string;
+  gameName: string;
+  romPath: string;
+}
+
 export interface OperationsDatabase {
   createNotice: (input: CreateNoticeInput) => Promise<NoticeRecord | null>;
+  getGameMetrics: () => Promise<GameMetrics>;
   isEnabled: boolean;
   getVisitorCounts: () => Promise<VisitorCounts>;
   initialize: () => Promise<void>;
   listNotices: (limit?: number) => Promise<NoticeRecord[]>;
+  recordGameSession: (input: RecordGameSessionInput) => Promise<void>;
   recordVisit: (visitorId: string) => Promise<void>;
   updateNotice: (id: number, input: UpdateNoticeInput) => Promise<NoticeRecord | null>;
 }
@@ -45,6 +64,12 @@ export interface OperationsDatabase {
 const DEFAULT_COUNTS: VisitorCounts = {
   todayVisitors: 0,
   totalVisitors: 0,
+};
+
+const DEFAULT_GAME_METRICS: GameMetrics = {
+  monthlyPopularGame: null,
+  todayGames: 0,
+  weeklyPopularGame: null,
 };
 
 const DEFAULT_NOTICES = [
@@ -110,9 +135,29 @@ const CREATE_NOTICES_TABLE_SQL = `
   )
 `;
 
+const CREATE_GAME_SESSIONS_TABLE_SQL = `
+  CREATE TABLE IF NOT EXISTS game_sessions (
+    id BIGSERIAL PRIMARY KEY,
+    game_name TEXT NOT NULL,
+    rom_path TEXT NOT NULL,
+    core TEXT NOT NULL,
+    started_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  )
+`;
+
 const CREATE_NOTICE_INDEX_SQL = `
   CREATE INDEX IF NOT EXISTS notices_published_at_idx
   ON notices (is_published, is_pinned, published_at DESC)
+`;
+
+const CREATE_GAME_SESSIONS_STARTED_AT_INDEX_SQL = `
+  CREATE INDEX IF NOT EXISTS game_sessions_started_at_idx
+  ON game_sessions (started_at DESC)
+`;
+
+const CREATE_GAME_SESSIONS_GAME_NAME_INDEX_SQL = `
+  CREATE INDEX IF NOT EXISTS game_sessions_game_name_started_at_idx
+  ON game_sessions (game_name, started_at DESC)
 `;
 
 function mapNoticeRow(row: {
@@ -139,6 +184,24 @@ function mapNoticeRow(row: {
 
 function normalizePublishedAt(value: string | undefined) {
   return value ? new Date(value) : new Date();
+}
+
+function mapPopularGameRow(
+  row:
+    | {
+        game_name: string;
+        play_count: string;
+      }
+    | undefined,
+): PopularGameRecord | null {
+  if (!row) {
+    return null;
+  }
+
+  return {
+    gameName: row.game_name,
+    playCount: Number(row.play_count || "0"),
+  };
 }
 
 async function seedDefaultNotices(pool: Pool) {
@@ -216,6 +279,44 @@ export function createOperationsDatabase(databaseUrl: string | null): Operations
 
         return mapNoticeRow(result.rows[0]);
       }, null),
+    getGameMetrics: async () =>
+      runSafely(async () => {
+        const todayGamesResult = await pool!.query<{ count: string }>(
+          "SELECT COUNT(*)::text AS count FROM game_sessions WHERE started_at::date = CURRENT_DATE",
+        );
+        const weeklyPopularGameResult = await pool!.query<{
+          game_name: string;
+          play_count: string;
+        }>(
+          `
+            SELECT game_name, COUNT(*)::text AS play_count
+            FROM game_sessions
+            WHERE started_at >= NOW() - INTERVAL '7 days'
+            GROUP BY game_name
+            ORDER BY COUNT(*) DESC, MAX(started_at) DESC
+            LIMIT 1
+          `,
+        );
+        const monthlyPopularGameResult = await pool!.query<{
+          game_name: string;
+          play_count: string;
+        }>(
+          `
+            SELECT game_name, COUNT(*)::text AS play_count
+            FROM game_sessions
+            WHERE started_at >= NOW() - INTERVAL '30 days'
+            GROUP BY game_name
+            ORDER BY COUNT(*) DESC, MAX(started_at) DESC
+            LIMIT 1
+          `,
+        );
+
+        return {
+          monthlyPopularGame: mapPopularGameRow(monthlyPopularGameResult.rows[0]),
+          todayGames: Number(todayGamesResult.rows[0]?.count || "0"),
+          weeklyPopularGame: mapPopularGameRow(weeklyPopularGameResult.rows[0]),
+        };
+      }, DEFAULT_GAME_METRICS),
     get isEnabled() {
       return pool !== null;
     },
@@ -242,7 +343,10 @@ export function createOperationsDatabase(databaseUrl: string | null): Operations
         await pool.query(CREATE_VISITORS_TABLE_SQL);
         await pool.query(CREATE_DAILY_VISITORS_TABLE_SQL);
         await pool.query(CREATE_NOTICES_TABLE_SQL);
+        await pool.query(CREATE_GAME_SESSIONS_TABLE_SQL);
         await pool.query(CREATE_NOTICE_INDEX_SQL);
+        await pool.query(CREATE_GAME_SESSIONS_STARTED_AT_INDEX_SQL);
+        await pool.query(CREATE_GAME_SESSIONS_GAME_NAME_INDEX_SQL);
         await seedDefaultNotices(pool);
       } catch (error) {
         console.error("[DB] Initialization failed, disabling DB-backed features:", error);
@@ -274,6 +378,17 @@ export function createOperationsDatabase(databaseUrl: string | null): Operations
 
         return result.rows.map(mapNoticeRow);
       }, []),
+    recordGameSession: async (input) => {
+      await runSafely(async () => {
+        await pool!.query(
+          `
+            INSERT INTO game_sessions (game_name, rom_path, core)
+            VALUES ($1, $2, $3)
+          `,
+          [input.gameName, input.romPath, input.core],
+        );
+      }, undefined);
+    },
     recordVisit: async (visitorId) => {
       await runSafely(async () => {
         await pool!.query(

@@ -3,6 +3,7 @@ import { useCallback } from "react";
 import type { SystemCore } from "@/components/EmulatorPlayer";
 import { appEnvironment } from "@/config/environment";
 import { getUserProfile, type RecentOpponent } from "@/lib/user-profile";
+import { NETPLAY_COPY } from "@/netplay/netplayCopy";
 import type { NetplayPeer } from "@/netplay/peer";
 import { type LobbyState, type RomInfo, type RoomVisibility } from "@/stores/useNetplayLobbyStore";
 import { toast } from "sonner";
@@ -54,12 +55,12 @@ export function useNetplayRoomEntry({
     }) => {
       resetSessionRuntime();
       setError("");
-      setStatus("방 생성 중...");
+      setStatus(NETPLAY_COPY.roomCreating);
       const peer = createPeer();
       try {
         await peer.connect(SERVER_URL);
       } catch {
-        const message = "시그널링 서버 연결 실패";
+        const message = NETPLAY_COPY.connectionStartFailed;
         setError(message);
         toast.error(message);
         return;
@@ -78,7 +79,7 @@ export function useNetplayRoomEntry({
           biosPath,
           isPublic,
         });
-        setStatus("대기 중... 상대방에게 코드를 알려주세요.");
+        setStatus(NETPLAY_COPY.waitingForOpponent);
       };
 
       peer.createRoom(
@@ -109,18 +110,18 @@ export function useNetplayRoomEntry({
   const joinRoomWithCode = useCallback(
     async (roomCode: string) => {
       if (roomCode.length !== 6) {
-        setError("6자리 코드를 입력하세요.");
+        setError(NETPLAY_COPY.invalidRoomCode);
         return;
       }
 
       resetSessionRuntime();
       setError("");
-      setStatus("방 참가 중...");
+      setStatus(NETPLAY_COPY.joiningRoom);
       const peer = createPeer();
       try {
         await peer.connect(SERVER_URL);
       } catch {
-        const message = "시그널링 서버 연결 실패";
+        const message = NETPLAY_COPY.connectionStartFailed;
         setError(message);
         toast.error(message);
         return;
@@ -132,7 +133,7 @@ export function useNetplayRoomEntry({
 
   const handleJoinRoom = useCallback(async () => {
     if (joinCode.length !== 6) {
-      setError("6자리 코드를 입력하세요.");
+      setError(NETPLAY_COPY.invalidRoomCode);
       return;
     }
 

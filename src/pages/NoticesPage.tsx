@@ -22,13 +22,11 @@ export default function NoticesPage() {
         <CardHeader>
           <div className="flex items-center gap-2 text-sm font-medium text-foreground">
             <Bell className="size-4 text-primary" />
-            공지사항 센터
+            공지사항
           </div>
-          <CardTitle className="text-2xl">
-            운영 공지와 제품 업데이트를 실제 데이터로 읽어옵니다.
-          </CardTitle>
+          <CardTitle className="text-2xl">중요한 안내와 새 소식을 모아봤어요.</CardTitle>
           <CardDescription className="text-sm leading-6">
-            중요한 공지는 상단에 고정되고, 나머지 소식은 시간순으로 확인할 수 있습니다.
+            중요한 공지는 먼저 보여드리고, 다른 소식은 최신순으로 정리해뒀어요.
           </CardDescription>
         </CardHeader>
       </Card>
@@ -67,7 +65,7 @@ export default function NoticesPage() {
         ) : notices.length === 0 ? (
           <Card className="border-border/70 bg-card/95">
             <CardContent className="p-6 text-sm text-muted-foreground">
-              아직 게시된 공지가 없습니다. 운영 공지가 발행되면 이 목록에 시간순으로 표시됩니다.
+              아직 올라온 공지가 없어요. 새로운 안내가 생기면 여기에서 바로 확인할 수 있어요.
             </CardContent>
           </Card>
         ) : (

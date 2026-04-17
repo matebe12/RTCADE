@@ -2,7 +2,9 @@ import { useCallback, type MutableRefObject } from "react";
 
 import type { SessionEndReason } from "@/components/NetplaySessionSummary";
 import { parseRomName } from "@/lib/game-names";
+import { recordGameSession } from "@/lib/operations-api";
 import {
+  incrementTotalPlayedCount,
   type RecentGame,
   type RecentOpponent,
   upsertRecentGame,
@@ -73,8 +75,21 @@ export function useNetplaySessionHistory({
     if (sessionStartedAtRef.current !== null) return;
 
     sessionStartedAtRef.current = Date.now();
-    if (activeSessionRef.current) {
-      recordRecentGame(activeSessionRef.current);
+    const activeSession = activeSessionRef.current;
+
+    if (activeSession) {
+      const gameName = parseRomName(getRomFilename(activeSession.romPath), activeSession.core);
+
+      recordRecentGame(activeSession);
+      incrementTotalPlayedCount();
+
+      if (activeSession.role === "host") {
+        void recordGameSession({
+          core: activeSession.core,
+          gameName,
+          romPath: activeSession.romPath,
+        }).catch(() => undefined);
+      }
     }
   }, [activeSessionRef, recordRecentGame, sessionStartedAtRef]);
 
