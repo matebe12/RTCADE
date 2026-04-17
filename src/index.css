@@ -180,8 +180,9 @@
   --color-sidebar-ring: var(--sidebar-ring);
   --radius: 0.625rem;
 
-  --font-sans: "Pretendard", -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo",
-    "Noto Sans KR", sans-serif;
+  --font-sans:
+    "Pretendard", -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR",
+    sans-serif;
   --font-arcade: "Press Start 2P", monospace;
 }
 

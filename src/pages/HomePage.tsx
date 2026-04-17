@@ -1,4 +1,13 @@
-import { Activity, ArrowRight, Bell, Gamepad2, Radio, Trophy } from "lucide-react";
+import {
+  Activity,
+  ArrowRight,
+  Bell,
+  CalendarDays,
+  Gamepad2,
+  Radio,
+  Trophy,
+  Users,
+} from "lucide-react";
 import { NavLink } from "react-router-dom";
 
 import { useOperationsNotices } from "@/hooks/useOperationsNotices";
@@ -46,6 +55,22 @@ export default function HomePage({ hasProfile }: HomePageProps) {
       : "프로필을 만들고 게임을 시작하면 최근 기록을 바로 볼 수 있어요.";
 
   const statCards = [
+    {
+      title: "총 방문자",
+      description: stats
+        ? `지금까지 ${numberFormatter.format(stats.totalVisitors)}명이 들렀어요.`
+        : "누적 방문자 수를 불러오는 중이에요.",
+      icon: Users,
+      value: stats ? `${numberFormatter.format(stats.totalVisitors)}명` : "--",
+    },
+    {
+      title: "오늘 방문자",
+      description: stats
+        ? `오늘은 ${numberFormatter.format(stats.todayVisitors)}명이 방문했어요.`
+        : "오늘 방문자 수를 불러오는 중이에요.",
+      icon: CalendarDays,
+      value: stats ? `${numberFormatter.format(stats.todayVisitors)}명` : "--",
+    },
     {
       title: "지금 게임 중",
       description: stats
@@ -191,7 +216,7 @@ export default function HomePage({ hasProfile }: HomePageProps) {
         </Card>
       </section>
 
-      <section className="grid gap-4 lg:grid-cols-4">
+      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         {statCards.map((card) => {
           const Icon = card.icon;
           return (
