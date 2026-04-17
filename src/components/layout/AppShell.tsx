@@ -1,4 +1,4 @@
-import { ArrowRight, Bell, Globe, Home, Pin, Settings } from "lucide-react";
+import { ArrowRight, Bell, Globe, Home, Moon, Pin, Settings, Sun } from "lucide-react";
 import { NavLink, Outlet } from "react-router-dom";
 
 import { appEnvironment } from "@/config/environment";
@@ -23,7 +23,7 @@ const navigationItems = [
 ];
 
 export default function AppShell({ profile, onOpenProfile }: AppShellProps) {
-  const { theme, resolvedTheme } = useTheme();
+  const { theme, resolvedTheme, setTheme } = useTheme();
   const { error: noticeError, notices } = useOperationsNotices();
   const pinnedNotice = noticeError ? null : (notices.find((notice) => notice.isPinned) ?? null);
   const themeLabel =
@@ -32,6 +32,9 @@ export default function AppShell({ profile, onOpenProfile }: AppShellProps) {
       : theme === "dark"
         ? "다크"
         : "라이트";
+  const isDarkMode = resolvedTheme === "dark";
+  const ThemeIcon = isDarkMode ? Sun : Moon;
+  const themeToggleLabel = isDarkMode ? "라이트 모드로 전환" : "다크 모드로 전환";
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -76,6 +79,18 @@ export default function AppShell({ profile, onOpenProfile }: AppShellProps) {
           </nav>
 
           <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              className="h-10 w-10 rounded-full"
+              onClick={() => setTheme(isDarkMode ? "light" : "dark")}
+              aria-label={themeToggleLabel}
+              title={themeToggleLabel}
+            >
+              <ThemeIcon className="size-4" />
+            </Button>
+
             <Button variant="outline" className="h-10 gap-2 px-3" onClick={onOpenProfile}>
               {profile ? (
                 <>
