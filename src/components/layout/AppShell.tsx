@@ -23,15 +23,9 @@ const navigationItems = [
 ];
 
 export default function AppShell({ profile, onOpenProfile }: AppShellProps) {
-  const { theme, resolvedTheme, setTheme } = useTheme();
+  const { resolvedTheme, setTheme } = useTheme();
   const { error: noticeError, notices } = useOperationsNotices();
   const pinnedNotice = noticeError ? null : (notices.find((notice) => notice.isPinned) ?? null);
-  const themeLabel =
-    theme === "system"
-      ? `시스템 · ${resolvedTheme === "dark" ? "다크" : "라이트"}`
-      : theme === "dark"
-        ? "다크"
-        : "라이트";
   const isDarkMode = resolvedTheme === "dark";
   const ThemeIcon = isDarkMode ? Sun : Moon;
   const themeToggleLabel = isDarkMode ? "라이트 모드로 전환" : "다크 모드로 전환";
