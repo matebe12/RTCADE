@@ -4,6 +4,7 @@ import { UserBadge } from "@/components/UserBadge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { usePageSeo } from "@/lib/seo";
 import type { UserProfile } from "@/lib/user-profile";
 import { useTheme, type ThemePreference } from "@/providers/ThemeProvider";
 
@@ -50,6 +51,12 @@ const themeOptions: Array<{
 ];
 
 export default function SettingsPage({ profile, onOpenProfile }: SettingsPageProps) {
+  usePageSeo({
+    title: "설정",
+    description: "RTCADE 프로필과 테마를 설정하고 플레이 환경을 원하는 방식으로 맞추세요.",
+    noIndex: true,
+  });
+
   const { theme, resolvedTheme, setTheme } = useTheme();
 
   return (

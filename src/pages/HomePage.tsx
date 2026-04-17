@@ -15,6 +15,7 @@ import { useOperationsStats } from "@/hooks/useOperationsStats";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { usePageSeo } from "@/lib/seo";
 import {
   getRecentGames,
   getRecentOpponents,
@@ -36,6 +37,12 @@ const relativeTimeFormatter = new Intl.DateTimeFormat("ko-KR", {
 });
 
 export default function HomePage({ hasProfile }: HomePageProps) {
+  usePageSeo({
+    title: "홈",
+    description:
+      "브라우저에서 레트로 게임을 P2P 넷플레이로 즐기고, 방문 통계와 인기 게임, 최근 플레이 기록을 확인하세요.",
+  });
+
   const { error: noticeError, isLoading: noticesLoading, notices } = useOperationsNotices();
   const { error: statsError, isLoading: statsLoading, stats, updatedAt } = useOperationsStats();
   const profile = getUserProfile();

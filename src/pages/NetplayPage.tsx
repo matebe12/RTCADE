@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import NetplayLobby from "@/components/NetplayLobby";
+import { usePageSeo } from "@/lib/seo";
 import { NETPLAY_HERO_COPY } from "@/netplay/netplayCopy";
 import { useNetplayLobbyStore } from "@/stores/useNetplayLobbyStore";
 
@@ -19,6 +20,12 @@ function detectMobileAccess() {
 }
 
 export default function NetplayPage() {
+  usePageSeo({
+    title: "넷플레이",
+    description:
+      "6자리 방 코드와 WebRTC P2P 연결로 레트로 게임 실시간 대전을 시작하세요. 호스트와 게스트가 브라우저에서 바로 이어집니다.",
+  });
+
   const currentStep = useNetplayLobbyStore((store) => store.state.step);
   const showHeroCard = currentStep === "menu";
   const [isMobileAccess, setIsMobileAccess] = useState(detectMobileAccess);

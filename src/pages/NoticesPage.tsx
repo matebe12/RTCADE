@@ -3,6 +3,7 @@ import { Bell, Pin } from "lucide-react";
 import { useOperationsNotices } from "@/hooks/useOperationsNotices";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { usePageSeo } from "@/lib/seo";
 
 const publishedAtFormatter = new Intl.DateTimeFormat("ko-KR", {
   year: "numeric",
@@ -13,6 +14,11 @@ const publishedAtFormatter = new Intl.DateTimeFormat("ko-KR", {
 });
 
 export default function NoticesPage() {
+  usePageSeo({
+    title: "공지사항",
+    description: "RTCADE의 운영 공지, 업데이트 소식, 점검 안내를 한곳에서 확인하세요.",
+  });
+
   const { error, isLoading, notices } = useOperationsNotices();
   const pinnedNotice = notices.find((notice) => notice.isPinned) ?? null;
 
