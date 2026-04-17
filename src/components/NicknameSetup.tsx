@@ -34,7 +34,11 @@ export function NicknameSetup({ open, onComplete }: NicknameSetupProps) {
 
   return (
     <Dialog open={open}>
-      <DialogContent className="sm:max-w-md" onInteractOutside={(e) => e.preventDefault()}>
+      <DialogContent
+        className="sm:max-w-md"
+        onInteractOutside={(e) => e.preventDefault()}
+        showCloseButton={false}
+      >
         <DialogHeader>
           <DialogTitle className="font-arcade text-sm text-center">프로필 설정</DialogTitle>
           <DialogDescription className="text-center">
