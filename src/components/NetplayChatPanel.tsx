@@ -68,7 +68,7 @@ export default function NetplayChatPanel({
   const isChatReady = chatChannelState === "open";
 
   return (
-    <Card className="w-full max-w-200 overflow-hidden border-border/70 bg-card/95 xl:w-[320px] xl:max-w-[320px]">
+    <Card className="flex w-full max-w-200 flex-col overflow-hidden border-border/70 bg-card/95 xl:h-150 xl:w-[320px] xl:max-w-[320px]">
       <CardHeader className="flex flex-row items-start justify-between gap-3 border-b px-4 py-3">
         <div className="min-w-0 space-y-2">
           <div className="flex items-center gap-2">
@@ -100,8 +100,8 @@ export default function NetplayChatPanel({
         </Button>
       </CardHeader>
 
-      <CardContent className="flex h-88 flex-col gap-3 p-3 xl:h-150">
-        <ScrollArea className="flex-1 rounded-md border border-border/60 bg-background/50">
+      <CardContent className="flex h-88 min-h-0 flex-1 flex-col gap-3 p-3">
+        <ScrollArea className="min-h-0 flex-1 rounded-md border border-border/60 bg-background/50">
           <div className="flex min-h-full flex-col gap-3 p-3">
             {messages.length === 0 ? (
               <div className="flex flex-1 flex-col items-center justify-center gap-3 py-10 text-center text-muted-foreground">
@@ -152,7 +152,7 @@ export default function NetplayChatPanel({
           </div>
         </ScrollArea>
 
-        <div className="space-y-2">
+        <div className="mt-auto space-y-2 border-t border-border/60 pt-3">
           <div className="min-h-4 text-[11px] text-muted-foreground">
             {isPeerTyping
               ? `${remoteDisplay.nickname} 입력 중...`
