@@ -1,10 +1,8 @@
 import { useCallback, useEffect } from "react";
 
-import { appEnvironment } from "@/config/environment";
+import { buildBackendUrl } from "@/lib/backend-url";
 import type { LobbyState, PublicRoomInfo, RomInfo } from "@/stores/useNetplayLobbyStore";
 import { toast } from "sonner";
-
-const API_BASE = appEnvironment.apiBaseUrl;
 
 type SetLobbyState = (next: LobbyState | ((previous: LobbyState) => LobbyState)) => void;
 
@@ -24,7 +22,7 @@ export function useNetplayDiscovery({
   const fetchRoms = useCallback(async () => {
     setError("");
     try {
-      const response = await fetch(`${API_BASE}/api/roms`);
+      const response = await fetch(buildBackendUrl("/api/roms"));
       const roms: RomInfo[] = await response.json();
       if (roms.length === 0) {
         const message = "서버에 ROM 파일이 없습니다. server/roms/에 파일을 넣어주세요.";
@@ -45,7 +43,7 @@ export function useNetplayDiscovery({
       setError("");
 
       try {
-        const response = await fetch(`${API_BASE}/api/rooms`);
+        const response = await fetch(buildBackendUrl("/api/rooms"));
         if (!response.ok) {
           throw new Error("failed");
         }
@@ -83,7 +81,7 @@ export function useNetplayDiscovery({
 
   const fetchMenuPublicRooms = useCallback(async () => {
     try {
-      const response = await fetch(`${API_BASE}/api/rooms`);
+      const response = await fetch(buildBackendUrl("/api/rooms"));
       if (!response.ok) return;
       const rooms: PublicRoomInfo[] = await response.json();
       setMenuPublicRooms(rooms.slice(0, 2));

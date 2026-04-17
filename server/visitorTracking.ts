@@ -5,6 +5,11 @@ import type { OperationsDatabase } from "./operationsDatabase";
 
 const VISITOR_COOKIE_NAME = "rtcade_visitor_id";
 const ONE_YEAR_IN_SECONDS = 60 * 60 * 24 * 365;
+const VISITOR_QUERY_PARAM = "visitorId";
+
+function isValidVisitorId(value: string) {
+  return /^[a-zA-Z0-9-]{8,128}$/.test(value);
+}
 
 function isSecureRequest(requestHeaders: Record<string, string | string[] | undefined>) {
   return requestHeaders["x-forwarded-proto"] === "https";
@@ -48,6 +53,15 @@ function serializeVisitorCookie(visitorId: string, secure: boolean) {
   return parts.join("; ");
 }
 
+function readVisitorIdFromQuery(rawValue: unknown) {
+  if (typeof rawValue !== "string") {
+    return null;
+  }
+
+  const visitorId = rawValue.trim();
+  return isValidVisitorId(visitorId) ? visitorId : null;
+}
+
 function shouldTrackPath(pathname: string) {
   return !pathname.startsWith("/roms/");
 }
@@ -63,7 +77,8 @@ export function createVisitorTrackingMiddleware(
 
     const cookies = parseCookies(req.headers.cookie);
     const existingVisitorId = cookies.get(VISITOR_COOKIE_NAME);
-    const visitorId = existingVisitorId || randomUUID();
+    const queryVisitorId = readVisitorIdFromQuery(req.query[VISITOR_QUERY_PARAM]);
+    const visitorId = queryVisitorId || existingVisitorId || randomUUID();
 
     if (!existingVisitorId) {
       res.append(

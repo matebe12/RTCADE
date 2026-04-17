@@ -1,6 +1,6 @@
 import { useEffect, useRef, forwardRef, useImperativeHandle } from "react";
 
-import { appEnvironment } from "@/config/environment";
+import { buildBackendUrl } from "@/lib/backend-url";
 
 export type SystemCore =
   | "nes"
@@ -47,8 +47,6 @@ interface EmulatorPlayerProps {
   onChatShortcut?: () => void;
 }
 
-const API_BASE = appEnvironment.apiBaseUrl;
-
 const EmulatorPlayer = forwardRef<HTMLIFrameElement, EmulatorPlayerProps>(function EmulatorPlayer(
   {
     romSource,
@@ -81,7 +79,7 @@ const EmulatorPlayer = forwardRef<HTMLIFrameElement, EmulatorPlayerProps>(functi
       const params = new URLSearchParams({ core, rom: romPath });
       if (role) params.set("role", role);
       if (biosPath) params.set("bios", biosPath);
-      iframe.src = `${API_BASE}/emulator?${params}`;
+      iframe.src = buildBackendUrl("/emulator", params);
       return undefined;
     } else {
       // Local file mode: use blob iframe + postMessage

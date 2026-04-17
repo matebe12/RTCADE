@@ -1,4 +1,4 @@
-import { appEnvironment } from "@/config/environment";
+import { buildBackendUrl } from "@/lib/backend-url";
 
 export interface OperationsStats {
   activeRooms: number;
@@ -25,16 +25,8 @@ interface NoticeResponse {
   items: NoticeItem[];
 }
 
-function buildApiUrl(pathname: string) {
-  const baseUrl = appEnvironment.apiBaseUrl.endsWith("/")
-    ? appEnvironment.apiBaseUrl
-    : `${appEnvironment.apiBaseUrl}/`;
-
-  return new URL(pathname.replace(/^\//, ""), baseUrl).toString();
-}
-
 async function fetchJson<T>(pathname: string): Promise<T> {
-  const response = await fetch(buildApiUrl(pathname));
+  const response = await fetch(buildBackendUrl(pathname));
 
   if (!response.ok) {
     throw new Error("요청을 처리하지 못했습니다.");
