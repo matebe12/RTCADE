@@ -44,6 +44,27 @@ export type PeerEventHandler = {
   onChatTyping?: (isTyping: boolean) => void;
 };
 
+type GameplayTransportState = "closed" | "connecting" | "open" | "closing";
+
+type PendingBinaryStream = {
+  totalBytes: number;
+  chunks: number;
+  received: ArrayBuffer[];
+  bytesReceived: number;
+};
+
+type PendingResyncStream = PendingBinaryStream & {
+  compressed: boolean;
+};
+
+const INPUT_CHANNEL_LABEL = "input";
+const STATE_CHANNEL_LABEL = "state";
+const CHAT_CHANNEL_LABEL = "chat";
+const SAVE_STATE_CHUNK_SIZE = 64 * 1024;
+const RESYNC_STATE_CHUNK_SIZE = 256 * 1024;
+const CHAT_BUFFER_THRESHOLD = 64 * 1024;
+const STATE_BUFFER_THRESHOLD = 512 * 1024;
+
 const RTC_CONFIG: RTCConfiguration = {
   iceServers: [{ urls: "stun:stun.l.google.com:19302" }, { urls: "stun:stun1.l.google.com:19302" }],
 };
@@ -51,12 +72,15 @@ const RTC_CONFIG: RTCConfiguration = {
 export class NetplayPeer {
   private signaling: SignalingClient;
   private pc: RTCPeerConnection | null = null;
-  private gameDc: RTCDataChannel | null = null;
+  private inputDc: RTCDataChannel | null = null;
+  private stateDc: RTCDataChannel | null = null;
   private chatDc: RTCDataChannel | null = null;
   private handler: PeerEventHandler;
   private _closing = false;
   private _chatSeq = 0;
   private _lastTypingState: boolean | null = null;
+  private _gameplayTransportState: GameplayTransportState = "closed";
+  private _gameplayConnected = false;
 
   constructor(handler: PeerEventHandler) {
     this.handler = handler;
@@ -93,37 +117,34 @@ export class NetplayPeer {
   private _inputSeq = 0;
 
   sendInput(button: number, down: boolean) {
-    if (this.gameDc?.readyState === "open") {
-      this.gameDc.send(JSON.stringify({ type: "input", button, down, seq: ++this._inputSeq }));
+    if (this.inputDc?.readyState === "open") {
+      this.inputDc.send(JSON.stringify({ type: "input", button, down, seq: ++this._inputSeq }));
     }
   }
 
   sendPeerReady() {
-    console.log("[PEER] sendPeerReady, dc:", this.gameDc?.readyState);
-    if (this.gameDc?.readyState === "open") {
-      this.gameDc.send(JSON.stringify({ type: "peer-ready" }));
+    console.log("[PEER] sendPeerReady, input dc:", this.inputDc?.readyState);
+    if (this.inputDc?.readyState === "open") {
+      this.inputDc.send(JSON.stringify({ type: "peer-ready" }));
     }
   }
 
   // Send save state as chunked binary over DataChannel
   sendSaveState(state: ArrayBuffer) {
-    if (this.gameDc?.readyState !== "open") {
-      console.warn("[PEER] sendSaveState: DC not open");
+    if (this.stateDc?.readyState !== "open") {
+      console.warn("[PEER] sendSaveState: state DC not open");
       return;
     }
-    const CHUNK = 64 * 1024; // 64KB chunks
     const total = state.byteLength;
-    const numChunks = Math.ceil(total / CHUNK);
+    const numChunks = Math.ceil(total / SAVE_STATE_CHUNK_SIZE);
     console.log(`[PEER] sendSaveState: ${total} bytes, ${numChunks} chunks`);
-    // Send header first
-    this.gameDc.send(
+    this.stateDc.send(
       JSON.stringify({ type: "save-state-header", totalBytes: total, chunks: numChunks }),
     );
-    // Send binary chunks
     for (let i = 0; i < numChunks; i++) {
-      const start = i * CHUNK;
-      const end = Math.min(start + CHUNK, total);
-      this.gameDc.send(state.slice(start, end));
+      const start = i * SAVE_STATE_CHUNK_SIZE;
+      const end = Math.min(start + SAVE_STATE_CHUNK_SIZE, total);
+      this.stateDc.send(state.slice(start, end));
     }
     console.log("[PEER] sendSaveState: all chunks sent");
   }
@@ -131,16 +152,22 @@ export class NetplayPeer {
   // Tell HOST that GUEST loaded the state
   sendStateLoaded() {
     console.log("[PEER] sendStateLoaded");
-    if (this.gameDc?.readyState === "open") {
-      this.gameDc.send(JSON.stringify({ type: "state-loaded" }));
+    if (this.inputDc?.readyState === "open") {
+      this.inputDc.send(JSON.stringify({ type: "state-loaded" }));
     }
   }
 
   // HOST tells GUEST to start the game
   sendStartSignal() {
     console.log("[PEER] sendStartSignal");
-    if (this.gameDc?.readyState === "open") {
-      this.gameDc.send(JSON.stringify({ type: "start-signal" }));
+    if (this.inputDc?.readyState === "open") {
+      this.inputDc.send(JSON.stringify({ type: "start-signal" }));
+    }
+  }
+
+  sendResyncFailed() {
+    if (this.inputDc?.readyState === "open") {
+      this.inputDc.send(JSON.stringify({ type: "resync-failed" }));
     }
   }
 
@@ -148,8 +175,7 @@ export class NetplayPeer {
     if (this.chatDc?.readyState !== "open") return null;
     const trimmed = text.trim().slice(0, 300);
     if (!trimmed) return null;
-    const BUFFER_THRESHOLD = 64 * 1024;
-    if (this.chatDc.bufferedAmount > BUFFER_THRESHOLD) {
+    if (this.chatDc.bufferedAmount > CHAT_BUFFER_THRESHOLD) {
       console.warn(`[PEER] sendChatMessage: backpressure, buffered=${this.chatDc.bufferedAmount}`);
       return null;
     }
@@ -179,21 +205,18 @@ export class NetplayPeer {
   private _resetSeqFlag = false;
 
   sendResyncState(state: ArrayBuffer): boolean {
-    if (this.gameDc?.readyState !== "open") return false;
-    // Backpressure: skip if DC buffer still has >512KB pending
-    const BUFFER_THRESHOLD = 512 * 1024;
-    if (this.gameDc.bufferedAmount > BUFFER_THRESHOLD) {
-      console.warn(`[PEER] sendResyncState: backpressure, buffered=${this.gameDc.bufferedAmount}`);
+    if (this.stateDc?.readyState !== "open") return false;
+    if (this.stateDc.bufferedAmount > STATE_BUFFER_THRESHOLD) {
+      console.warn(`[PEER] sendResyncState: backpressure, buffered=${this.stateDc.bufferedAmount}`);
       return false;
     }
     const compressed = deflate(new Uint8Array(state));
-    const CHUNK = 256 * 1024; // 256KB chunks
     const total = compressed.byteLength;
-    const numChunks = Math.ceil(total / CHUNK);
+    const numChunks = Math.ceil(total / RESYNC_STATE_CHUNK_SIZE);
     console.log(
       `[PEER] sendResyncState: raw=${state.byteLength}, compressed=${total} (${((1 - total / state.byteLength) * 100).toFixed(0)}% reduction)`,
     );
-    this.gameDc.send(
+    this.stateDc.send(
       JSON.stringify({
         type: "resync-state-header",
         totalBytes: total,
@@ -202,22 +225,26 @@ export class NetplayPeer {
       }),
     );
     for (let i = 0; i < numChunks; i++) {
-      const start = i * CHUNK;
-      const end = Math.min(start + CHUNK, total);
-      this.gameDc.send(compressed.slice(start, end).buffer);
+      const start = i * RESYNC_STATE_CHUNK_SIZE;
+      const end = Math.min(start + RESYNC_STATE_CHUNK_SIZE, total);
+      this.stateDc.send(compressed.slice(start, end).buffer);
     }
     return true;
   }
 
   close() {
     this._closing = true;
-    this.gameDc?.close();
+    this.inputDc?.close();
+    this.stateDc?.close();
     this.chatDc?.close();
     this.pc?.close();
     this.signaling.close();
-    this.gameDc = null;
+    this.inputDc = null;
+    this.stateDc = null;
     this.chatDc = null;
     this.pc = null;
+    this._gameplayConnected = false;
+    this._gameplayTransportState = "closed";
   }
 
   // --- Private ---
@@ -270,86 +297,71 @@ export class NetplayPeer {
 
     this.pc.onconnectionstatechange = () => {
       if (this.pc?.connectionState === "disconnected" || this.pc?.connectionState === "failed") {
-        if (!this._closing) this.handler.onDisconnected();
+        if (!this._closing && this._gameplayConnected) {
+          this._gameplayConnected = false;
+          this.handler.onDisconnected();
+        }
       }
     };
   }
 
-  private setupGameDataChannel(dc: RTCDataChannel) {
-    this.gameDc = dc;
-    dc.binaryType = "arraybuffer";
-    this.handler.onDataChannelState?.(dc.readyState);
+  private emitGameplayTransportState() {
+    const inputState = this.inputDc?.readyState ?? "closed";
+    const stateState = this.stateDc?.readyState ?? "closed";
 
-    // State for receiving chunked save state
-    let pendingState: {
-      totalBytes: number;
-      chunks: number;
-      received: ArrayBuffer[];
-      bytesReceived: number;
-    } | null = null;
+    let nextState: GameplayTransportState = "closed";
+    if (inputState === "open" && stateState === "open") {
+      nextState = "open";
+    } else if (inputState === "closing" || stateState === "closing") {
+      nextState = "closing";
+    } else if (
+      inputState === "connecting" ||
+      stateState === "connecting" ||
+      inputState === "open" ||
+      stateState === "open"
+    ) {
+      nextState = "connecting";
+    }
 
-    // State for receiving chunked resync state (separate stream)
-    let pendingResync: {
-      totalBytes: number;
-      chunks: number;
-      received: ArrayBuffer[];
-      bytesReceived: number;
-      compressed: boolean;
-    } | null = null;
+    if (nextState !== this._gameplayTransportState) {
+      this._gameplayTransportState = nextState;
+      this.handler.onDataChannelState?.(nextState);
+    }
 
-    // Input sequence tracking for gap detection
+    if (!this._gameplayConnected && nextState === "open") {
+      this._gameplayConnected = true;
+      this.handler.onConnected();
+      return;
+    }
+
+    if (this._gameplayConnected && nextState !== "open" && !this._closing) {
+      this._gameplayConnected = false;
+      this.handler.onDisconnected();
+      return;
+    }
+
+    this._gameplayConnected = nextState === "open";
+  }
+
+  private setupInputDataChannel(dc: RTCDataChannel) {
+    this.inputDc = dc;
+    this.emitGameplayTransportState();
+
     let expectedSeq = 1;
 
     dc.onopen = () => {
-      this.handler.onDataChannelState?.("open");
-      this.handler.onConnected();
+      this.emitGameplayTransportState();
     };
+
     dc.onclose = () => {
-      this.handler.onDataChannelState?.("closed");
-      if (!this._closing) this.handler.onDisconnected();
+      this.emitGameplayTransportState();
     };
+
     dc.onmessage = (e) => {
-      // Binary data = save state chunk (initial or resync)
-      if (e.data instanceof ArrayBuffer) {
-        if (pendingResync) {
-          pendingResync.received.push(e.data);
-          pendingResync.bytesReceived += e.data.byteLength;
-          if (pendingResync.received.length >= pendingResync.chunks) {
-            const full = new Uint8Array(pendingResync.totalBytes);
-            let offset = 0;
-            for (const chunk of pendingResync.received) {
-              full.set(new Uint8Array(chunk), offset);
-              offset += chunk.byteLength;
-            }
-            const wasCompressed = pendingResync.compressed;
-            pendingResync = null;
-            if (wasCompressed) {
-              const decompressed = inflate(full);
-              this.handler.onResyncState?.(decompressed.buffer);
-            } else {
-              this.handler.onResyncState?.(full.buffer);
-            }
-          }
-          return;
-        }
-        if (pendingState) {
-          pendingState.received.push(e.data);
-          pendingState.bytesReceived += e.data.byteLength;
-          if (pendingState.received.length >= pendingState.chunks) {
-            // Reassemble
-            const full = new Uint8Array(pendingState.totalBytes);
-            let offset = 0;
-            for (const chunk of pendingState.received) {
-              full.set(new Uint8Array(chunk), offset);
-              offset += chunk.byteLength;
-            }
-            pendingState = null;
-            this.handler.onSaveState?.(full.buffer);
-          }
-        }
+      if (typeof e.data !== "string") {
         return;
       }
-      // JSON messages
+
       try {
         const msg = JSON.parse(e.data);
         if (msg.type === "input") {
@@ -373,7 +385,77 @@ export class NetplayPeer {
         } else if (msg.type === "start-signal") {
           console.log("[PEER] received start-signal");
           this.handler.onStartSignal?.();
-        } else if (msg.type === "save-state-header") {
+        } else if (msg.type === "resync-failed") {
+          this.handler.onResyncFailed?.();
+        }
+      } catch {
+        /* ignore */
+      }
+    };
+  }
+
+  private setupStateDataChannel(dc: RTCDataChannel) {
+    this.stateDc = dc;
+    dc.binaryType = "arraybuffer";
+    this.emitGameplayTransportState();
+
+    let pendingState: PendingBinaryStream | null = null;
+    let pendingResync: PendingResyncStream | null = null;
+
+    dc.onopen = () => {
+      this.emitGameplayTransportState();
+    };
+
+    dc.onclose = () => {
+      this.emitGameplayTransportState();
+    };
+
+    dc.onmessage = (e) => {
+      if (e.data instanceof ArrayBuffer) {
+        if (pendingResync) {
+          pendingResync.received.push(e.data);
+          pendingResync.bytesReceived += e.data.byteLength;
+          if (pendingResync.received.length >= pendingResync.chunks) {
+            const full = new Uint8Array(pendingResync.totalBytes);
+            let offset = 0;
+            for (const chunk of pendingResync.received) {
+              full.set(new Uint8Array(chunk), offset);
+              offset += chunk.byteLength;
+            }
+            const wasCompressed = pendingResync.compressed;
+            pendingResync = null;
+            if (wasCompressed) {
+              const decompressed = inflate(full);
+              this.handler.onResyncState?.(decompressed.buffer);
+            } else {
+              this.handler.onResyncState?.(full.buffer);
+            }
+          }
+          return;
+        }
+
+        if (!pendingState) return;
+
+        pendingState.received.push(e.data);
+        pendingState.bytesReceived += e.data.byteLength;
+        if (pendingState.received.length >= pendingState.chunks) {
+          const full = new Uint8Array(pendingState.totalBytes);
+          let offset = 0;
+          for (const chunk of pendingState.received) {
+            full.set(new Uint8Array(chunk), offset);
+            offset += chunk.byteLength;
+          }
+          pendingState = null;
+          this.handler.onSaveState?.(full.buffer);
+        }
+        return;
+      }
+
+      if (typeof e.data !== "string") return;
+
+      try {
+        const msg = JSON.parse(e.data);
+        if (msg.type === "save-state-header") {
           console.log(
             `[PEER] received save-state-header: ${msg.totalBytes} bytes, ${msg.chunks} chunks`,
           );
@@ -391,8 +473,6 @@ export class NetplayPeer {
             bytesReceived: 0,
             compressed: !!msg.compressed,
           };
-        } else if (msg.type === "resync-failed") {
-          this.handler.onResyncFailed?.();
         }
       } catch {
         /* ignore */
@@ -441,9 +521,11 @@ export class NetplayPeer {
 
   private async startAsHost() {
     this.setupPeerConnection();
-    const gameDc = this.pc!.createDataChannel("game");
-    const chatDc = this.pc!.createDataChannel("chat");
-    this.setupGameDataChannel(gameDc);
+    const inputDc = this.pc!.createDataChannel(INPUT_CHANNEL_LABEL);
+    const stateDc = this.pc!.createDataChannel(STATE_CHANNEL_LABEL);
+    const chatDc = this.pc!.createDataChannel(CHAT_CHANNEL_LABEL);
+    this.setupInputDataChannel(inputDc);
+    this.setupStateDataChannel(stateDc);
     this.setupChatDataChannel(chatDc);
 
     const offer = await this.pc!.createOffer();
@@ -455,12 +537,19 @@ export class NetplayPeer {
     this.setupPeerConnection();
 
     this.pc!.ondatachannel = (e) => {
-      if (e.channel.label === "chat") {
+      if (e.channel.label === CHAT_CHANNEL_LABEL) {
         this.setupChatDataChannel(e.channel);
         return;
       }
 
-      this.setupGameDataChannel(e.channel);
+      if (e.channel.label === INPUT_CHANNEL_LABEL) {
+        this.setupInputDataChannel(e.channel);
+        return;
+      }
+
+      if (e.channel.label === STATE_CHANNEL_LABEL) {
+        this.setupStateDataChannel(e.channel);
+      }
     };
 
     await this.pc!.setRemoteDescription(sdp);

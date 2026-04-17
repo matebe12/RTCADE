@@ -122,6 +122,7 @@ export function useNetplayResyncLoop({
   }, []);
 
   const handleResyncFailed = useCallback(() => {
+    peerRef.current?.sendResyncFailed();
     resyncInProgressRef.current = false;
     if (resyncTimeoutRef.current) {
       clearTimeout(resyncTimeoutRef.current);
@@ -129,7 +130,7 @@ export function useNetplayResyncLoop({
     }
     console.warn("[LOBBY] Resync failed locally, scheduling retry");
     scheduleNextResync();
-  }, [scheduleNextResync]);
+  }, [peerRef, scheduleNextResync]);
 
   return {
     handlePeerResyncFailed,
