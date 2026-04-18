@@ -8,6 +8,19 @@ function isNonEmptyString(value: unknown) {
   return typeof value === "string" && value.trim().length > 0;
 }
 
+function getQueryString(value: unknown) {
+  if (typeof value === "string") {
+    return value;
+  }
+
+  if (Array.isArray(value)) {
+    const firstString = value.find((entry) => typeof entry === "string");
+    return typeof firstString === "string" ? firstString : "";
+  }
+
+  return "";
+}
+
 export function registerStatsRoutes(
   app: Express,
   operationsDatabase: OperationsDatabase,
@@ -33,7 +46,7 @@ export function registerStatsRoutes(
 
   app.post("/api/active-play-sessions", (req, res) => {
     const { core, gameName, mode, romPath, sessionId } = req.body ?? {};
-    const visitorId = req.query.visitorId;
+    const visitorId = getQueryString(req.query.visitorId);
 
     if (
       !isNonEmptyString(core) ||

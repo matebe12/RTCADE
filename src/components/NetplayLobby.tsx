@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { type ReactElement, useCallback } from "react";
 
 import NetplaySessionSummary from "./NetplaySessionSummary";
 import NetplayBrowseRomsScreen from "@/components/netplay/NetplayBrowseRomsScreen";
@@ -175,7 +175,7 @@ export default function NetplayLobby() {
 
   const myProfile = getUserProfile();
 
-  let content: JSX.Element | null = null;
+  let content: ReactElement | null = null;
 
   if (state.step === "menu") {
     content = (
