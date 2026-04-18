@@ -5,7 +5,7 @@
     "buildCommand": "echo 'Server-only deploy'"
   },
   "deploy": {
-    "startCommand": "npx tsx server/index.ts",
+    "startCommand": "node --import tsx server/index.ts",
     "healthcheckPath": "/api/roms",
     "restartPolicyType": "ON_FAILURE"
   }

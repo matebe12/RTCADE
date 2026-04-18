@@ -35,6 +35,31 @@ async function bootstrap() {
   registerStatsRoutes(app, operationsDatabase, roomStore, playSessionStore);
   attachSignalingServer(wss, roomStore);
 
+  let isShuttingDown = false;
+
+  const shutdown = (signal: NodeJS.Signals) => {
+    if (isShuttingDown) {
+      return;
+    }
+
+    isShuttingDown = true;
+    console.log(`[Server] Received ${signal}, shutting down gracefully...`);
+
+    wss.close();
+    server.close(() => {
+      console.log("[Server] HTTP server closed.");
+      process.exit(0);
+    });
+
+    setTimeout(() => {
+      console.error("[Server] Graceful shutdown timed out. Forcing exit.");
+      process.exit(1);
+    }, 10_000).unref();
+  };
+
+  process.on("SIGTERM", () => shutdown("SIGTERM"));
+  process.on("SIGINT", () => shutdown("SIGINT"));
+
   server.listen(config.port, "0.0.0.0", () => {
     console.log(`Server running on http://0.0.0.0:${config.port}`);
     console.log(`ROM directory: ${config.romsDir}`);

@@ -2,10 +2,10 @@
 nixPkgs = ["nodejs_22"]
 
 [phases.install]
-cmds = ["npm ci --omit=dev=false"]
+cmds = ["npm ci --include=dev"]
 
 [phases.build]
 cmds = ["echo 'Server-only deploy, skip frontend build'"]
 
 [start]
-cmd = "npx tsx server/index.ts"
+cmd = "node --import tsx server/index.ts"
