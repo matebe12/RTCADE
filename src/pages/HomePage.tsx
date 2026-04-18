@@ -352,7 +352,7 @@ export default function HomePage({ hasProfile }: HomePageProps) {
 
           </div>
 
-          <div className="rounded-[24px] bg-gradient-to-br from-primary/10 via-background/70 to-background/40 px-5 py-5 lg:px-6">
+          <div className="flex h-full flex-col rounded-[24px] bg-gradient-to-br from-primary/10 via-background/70 to-background/40 px-5 py-5 lg:px-6">
             <div className="flex items-center justify-between gap-3">
               <div>
                 <div className="text-xs font-medium uppercase tracking-[0.2em] text-primary">
@@ -363,8 +363,8 @@ export default function HomePage({ hasProfile }: HomePageProps) {
               <Trophy className="size-5 text-primary" />
             </div>
 
-            <div className="mt-4 space-y-3">
-              <div className="rounded-[24px] border border-primary/20 bg-background/80 p-4 shadow-sm shadow-primary/5">
+            <div className="mt-4 flex flex-1 flex-col gap-3">
+              <div className="flex-1 rounded-[24px] border border-primary/20 bg-background/80 p-4 shadow-sm shadow-primary/5">
                 <div className="text-xs text-muted-foreground">오늘 가장 많이 플레이된 게임</div>
                 <div className="mt-2 text-xl font-semibold leading-snug text-foreground lg:text-2xl">
                   {todayPopularGame?.gameName ?? "아직 없어요."}
@@ -376,7 +376,7 @@ export default function HomePage({ hasProfile }: HomePageProps) {
                 </div>
               </div>
 
-              <div className="rounded-[24px] border border-primary/20 bg-background/80 p-4 shadow-sm shadow-primary/5">
+              <div className="flex-1 rounded-[24px] border border-primary/20 bg-background/80 p-4 shadow-sm shadow-primary/5">
                 <div className="text-xs text-muted-foreground">이번 주 가장 많이 플레이된 게임</div>
                 <div className="mt-2 text-xl font-semibold leading-snug text-foreground lg:text-2xl">
                   {weeklyPopularGame?.gameName ?? "아직 없어요."}
@@ -388,7 +388,7 @@ export default function HomePage({ hasProfile }: HomePageProps) {
                 </div>
               </div>
 
-              <div className="rounded-[24px] border border-border/70 bg-background/70 p-4">
+              <div className="flex-1 rounded-[24px] border border-border/70 bg-background/70 p-4">
                 <div className="text-xs text-muted-foreground">이번 달 가장 많이 플레이된 게임</div>
                 <div className="mt-2 text-xl font-semibold leading-snug text-foreground lg:text-2xl">
                   {monthlyPopularGame?.gameName ?? "아직 없어요."}
