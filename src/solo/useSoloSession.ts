@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { SystemCore } from "@/components/EmulatorPlayer";
 import { parseRomName } from "@/lib/game-names";
 import {
   endActivePlaySession,
+  notifyOperationsStatsRefresh,
   recordGameSession,
   upsertActivePlaySession,
 } from "@/lib/operations-api";
@@ -20,6 +21,7 @@ interface UseSoloSessionOptions {
 }
 
 const SOLO_HEARTBEAT_MS = 15_000;
+const SOLO_START_DELAY_MS = 180;
 
 function getRomFilename(romPath: string) {
   return romPath.split("/").pop() ?? romPath;
@@ -41,6 +43,7 @@ export function useSoloSession({
 }: UseSoloSessionOptions) {
   const emulatorRef = useRef<HTMLIFrameElement>(null);
   const activeSoloSessionIdRef = useRef<string | null>(null);
+  const pendingStartTimeoutRef = useRef<number | null>(null);
   const activeSessionRef = useRef<{
     biosPath?: string;
     core: SystemCore;
@@ -48,6 +51,17 @@ export function useSoloSession({
     romPath: string;
   } | null>(null);
   const sessionStartedAtRef = useRef<number | null>(null);
+  const [startingRomPath, setStartingRomPath] = useState<string | null>(null);
+
+  const clearPendingStart = useCallback(() => {
+    if (pendingStartTimeoutRef.current === null) {
+      return;
+    }
+
+    window.clearTimeout(pendingStartTimeoutRef.current);
+    pendingStartTimeoutRef.current = null;
+    setStartingRomPath(null);
+  }, []);
 
   const stopSoloTracking = useCallback(() => {
     const activeSessionId = activeSoloSessionIdRef.current;
@@ -61,57 +75,72 @@ export function useSoloSession({
   }, []);
 
   const resetSoloRuntime = useCallback(() => {
+    clearPendingStart();
     stopSoloTracking();
     activeSessionRef.current = null;
     sessionStartedAtRef.current = null;
-  }, [stopSoloTracking]);
+  }, [clearPendingStart, stopSoloTracking]);
 
   const startSoloGame = useCallback(
     (rom: RomInfo) => {
-      const startedAt = Date.now();
-      const nextSessionId = createSessionId();
-      const gameName = parseRomName(getRomFilename(rom.path), rom.core);
+      if (pendingStartTimeoutRef.current !== null || startingRomPath !== null) {
+        return;
+      }
 
-      activeSessionRef.current = {
-        mode: "solo",
-        romPath: rom.path,
-        core: rom.core as SystemCore,
-        biosPath: rom.bios,
-      };
-      activeSoloSessionIdRef.current = nextSessionId;
-      sessionStartedAtRef.current = startedAt;
+      stopSoloTracking();
+      setStartingRomPath(rom.path);
 
-      const nextRecentGames = upsertRecentGame({
-        romPath: rom.path,
-        core: rom.core,
-        displayName: gameName,
-        playedAt: startedAt,
-      });
-      setRecentGames(nextRecentGames);
-      incrementTotalPlayedCount();
+      pendingStartTimeoutRef.current = window.setTimeout(() => {
+        pendingStartTimeoutRef.current = null;
 
-      void recordGameSession({
-        core: rom.core,
-        gameName,
-        romPath: rom.path,
-      }).catch(() => undefined);
+        const startedAt = Date.now();
+        const nextSessionId = createSessionId();
+        const gameName = parseRomName(getRomFilename(rom.path), rom.core);
 
-      void upsertActivePlaySession({
-        core: rom.core,
-        gameName,
-        mode: "solo",
-        romPath: rom.path,
-        sessionId: nextSessionId,
-      }).catch(() => undefined);
+        activeSessionRef.current = {
+          mode: "solo",
+          romPath: rom.path,
+          core: rom.core as SystemCore,
+          biosPath: rom.bios,
+        };
+        activeSoloSessionIdRef.current = nextSessionId;
+        sessionStartedAtRef.current = startedAt;
 
-      setLobbyState({
-        step: "solo-playing",
-        romPath: rom.path,
-        core: rom.core as SystemCore,
-        biosPath: rom.bios,
-      });
+        const nextRecentGames = upsertRecentGame({
+          romPath: rom.path,
+          core: rom.core,
+          displayName: gameName,
+          playedAt: startedAt,
+        });
+        setRecentGames(nextRecentGames);
+        incrementTotalPlayedCount();
+
+        void recordGameSession({
+          core: rom.core,
+          gameName,
+          romPath: rom.path,
+        }).catch(() => undefined);
+
+        void upsertActivePlaySession({
+          core: rom.core,
+          gameName,
+          mode: "solo",
+          romPath: rom.path,
+          sessionId: nextSessionId,
+        }).catch(() => undefined);
+
+        notifyOperationsStatsRefresh();
+        setStartingRomPath(null);
+
+        setLobbyState({
+          step: "solo-playing",
+          romPath: rom.path,
+          core: rom.core as SystemCore,
+          biosPath: rom.bios,
+        });
+      }, SOLO_START_DELAY_MS);
     },
-    [setLobbyState, setRecentGames],
+    [pendingStartTimeoutRef, setLobbyState, setRecentGames, startingRomPath, stopSoloTracking],
   );
 
   const resetToMenu = useCallback(() => {
@@ -162,6 +191,28 @@ export function useSoloSession({
       return undefined;
     }
 
+    const handlePageHide = () => {
+      const activeSessionId = activeSoloSessionIdRef.current;
+
+      if (!activeSessionId) {
+        return;
+      }
+
+      void endActivePlaySession(activeSessionId).catch(() => undefined);
+    };
+
+    window.addEventListener("pagehide", handlePageHide);
+
+    return () => {
+      window.removeEventListener("pagehide", handlePageHide);
+    };
+  }, [currentStep]);
+
+  useEffect(() => {
+    if (currentStep !== "solo-playing") {
+      return undefined;
+    }
+
     const activeSessionId = activeSoloSessionIdRef.current;
     const activeSession = activeSessionRef.current;
 
@@ -194,6 +245,7 @@ export function useSoloSession({
     handleBack,
     handleChooseAnotherGame,
     resetToMenu,
+    startingRomPath,
     startSoloGame,
   };
 }

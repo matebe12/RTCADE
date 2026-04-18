@@ -9,6 +9,7 @@ interface GameCardProps {
   core: string;
   systemLabel: string;
   displayName?: string;
+  disabled?: boolean;
   selected?: boolean;
   onClick?: () => void;
   favorite?: boolean;
@@ -20,6 +21,7 @@ export function GameCard({
   core,
   systemLabel,
   displayName,
+  disabled = false,
   selected,
   onClick,
   favorite = false,
@@ -31,13 +33,15 @@ export function GameCard({
     <div
       className={cn(
         "flex w-full items-start gap-3 rounded-lg border p-4 text-left transition-all",
-        "hover:bg-accent hover:border-primary/30",
+        !disabled && "hover:bg-accent hover:border-primary/30",
+        disabled && "cursor-not-allowed opacity-70",
         selected ? "bg-primary/10 border-primary/50" : "bg-card border-border",
       )}
     >
       <button
         type="button"
         onClick={onClick}
+        disabled={disabled}
         className="flex min-w-0 flex-1 flex-col items-start gap-2 text-left"
       >
         <span className="text-sm font-medium text-card-foreground leading-tight">
@@ -57,6 +61,7 @@ export function GameCard({
           variant="ghost"
           size="icon"
           className="size-8 shrink-0 rounded-full"
+          disabled={disabled}
           aria-label={favorite ? "즐겨찾기 해제" : "즐겨찾기 추가"}
           onClick={onToggleFavorite}
         >

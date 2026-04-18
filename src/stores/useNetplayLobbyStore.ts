@@ -152,6 +152,7 @@ type NetplayLobbyStoreActions = {
   setChatChannelState: (chatChannelState: string) => void;
   setSyncDisplay: (syncDisplay: string) => void;
   resetChatState: () => void;
+  resetLobby: () => void;
   resetSessionUiState: () => void;
 };
 
@@ -246,5 +247,6 @@ export const useNetplayLobbyStore = create<NetplayLobbyStore>((set) => ({
   setChatChannelState: (chatChannelState) => set({ chatChannelState }),
   setSyncDisplay: (syncDisplay) => set({ syncDisplay }),
   resetChatState: () => set(getDefaultChatState()),
+  resetLobby: () => set(createInitialStoreState()),
   resetSessionUiState: () => set(getDefaultSessionUiState()),
 }));

@@ -1,4 +1,5 @@
 import { type ReactElement, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 
 import NetplaySessionSummary from "./NetplaySessionSummary";
 import NetplayBrowseRomsScreen from "@/components/netplay/NetplayBrowseRomsScreen";
@@ -17,6 +18,7 @@ import { useSoloSession } from "@/solo/useSoloSession";
 import { useNetplayLobbyStore } from "@/stores/useNetplayLobbyStore";
 
 export default function NetplayLobby() {
+  const navigate = useNavigate();
   const {
     mode,
     setMode,
@@ -78,6 +80,7 @@ export default function NetplayLobby() {
     emulatorRef: soloEmulatorRef,
     handleBack: handleSoloBack,
     handleChooseAnotherGame: handleSoloChooseAnotherGame,
+    startingRomPath,
     startSoloGame,
   } = useSoloSession({
     currentStep: state.step,
@@ -175,6 +178,18 @@ export default function NetplayLobby() {
 
   const myProfile = getUserProfile();
 
+  const handleGoHome = useCallback(() => {
+    if (state.step === "session-summary" && state.mode === "solo") {
+      setMode("netplay");
+      setState({ step: "menu" });
+      navigate("/");
+      return;
+    }
+
+    resetToMenu();
+    navigate("/");
+  }, [navigate, resetToMenu, setMode, setState, state]);
+
   let content: ReactElement | null = null;
 
   if (state.step === "menu") {
@@ -239,6 +254,7 @@ export default function NetplayLobby() {
         onSearchQueryChange={setSearchQuery}
         onToggleFavoriteGame={handleToggleFavoriteGame}
         onStartSoloGame={startSoloGame}
+        startingRomPath={startingRomPath}
       />
     );
   }
@@ -285,7 +301,7 @@ export default function NetplayLobby() {
         onChooseAnotherGame={
           state.mode === "solo" ? handleSoloChooseAnotherGame : handleSummaryChooseAnotherGame
         }
-        onGoHome={state.mode === "solo" ? () => handleModeChange("netplay") : resetToMenu}
+        onGoHome={handleGoHome}
       />
     );
   }

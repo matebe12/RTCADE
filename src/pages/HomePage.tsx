@@ -95,6 +95,14 @@ export default function HomePage({ hasProfile }: HomePageProps) {
       value: stats ? `${numberFormatter.format(stats.todayGames)}판` : "--",
     },
     {
+      title: "총 플레이 게임",
+      description: stats
+        ? `모든 사용자 기준으로 기록된 게임 시작은 ${numberFormatter.format(stats.totalGames)}판이에요.`
+        : "누적 플레이 수를 불러오는 중이에요.",
+      icon: Gamepad2,
+      value: stats ? `${numberFormatter.format(stats.totalGames)}판` : "--",
+    },
+    {
       title: "주간 인기 게임",
       description: stats?.weeklyPopularGame
         ? `이번 주에 ${numberFormatter.format(stats.weeklyPopularGame.playCount)}번 플레이됐어요.`
@@ -151,12 +159,12 @@ export default function HomePage({ hasProfile }: HomePageProps) {
               </div>
 
               <div className="rounded-lg border border-border/70 bg-background/50 p-4">
-                <div className="text-xs text-muted-foreground">지금까지 한 판</div>
+                <div className="text-xs text-muted-foreground">내 브라우저 플레이</div>
                 <div className="mt-2 text-2xl font-semibold text-foreground">
                   {numberFormatter.format(totalPlayedCount)}판
                 </div>
                 <div className="mt-1 text-xs text-muted-foreground">
-                  플레이할 때마다 자동으로 기록돼요.
+                  이 기기에서 플레이할 때마다 개인 기록으로 쌓여요.
                 </div>
               </div>
 

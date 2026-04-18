@@ -1,4 +1,4 @@
-import { ArrowLeft, Search } from "lucide-react";
+import { ArrowLeft, Loader2, Search } from "lucide-react";
 
 import { SYSTEM_OPTIONS } from "@/components/EmulatorPlayer";
 import { GameCard } from "@/components/GameCard";
@@ -20,6 +20,7 @@ interface SoloBrowseRomsScreenProps {
   recentGames: RecentGame[];
   roms: RomInfo[];
   searchQuery: string;
+  startingRomPath: string | null;
 }
 
 function getDisplayName(rom: RomInfo, recentGames: RecentGame[]) {
@@ -36,7 +37,9 @@ export default function SoloBrowseRomsScreen({
   recentGames,
   roms,
   searchQuery,
+  startingRomPath,
 }: SoloBrowseRomsScreenProps) {
+  const isStarting = startingRomPath !== null;
   const filteredRoms = roms.filter((rom) => {
     if (!searchQuery) return true;
 
@@ -92,6 +95,13 @@ export default function SoloBrowseRomsScreen({
           서버에 올라온 ROM으로 바로 실행합니다. 상대방 연결 없이 혼자 플레이합니다.
         </div>
 
+        {isStarting && (
+          <div className="flex items-center gap-2 rounded-lg border border-primary/20 bg-primary/5 p-3 text-[11px] text-muted-foreground">
+            <Loader2 className="size-3 animate-spin text-primary" />
+            선택한 게임을 불러오는 중입니다...
+          </div>
+        )}
+
         <div className="relative">
           <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
@@ -99,6 +109,7 @@ export default function SoloBrowseRomsScreen({
             value={searchQuery}
             onChange={(event) => onSearchQueryChange(event.target.value)}
             className="pl-9"
+            disabled={isStarting}
           />
         </div>
 
@@ -120,6 +131,8 @@ export default function SoloBrowseRomsScreen({
                       systemLabel={sys?.label || rom.core}
                       displayName={rom.displayName}
                       favorite={favoriteGames.includes(rom.path)}
+                      disabled={isStarting}
+                      selected={startingRomPath === rom.path}
                       onToggleFavorite={() => onToggleFavoriteGame(rom.path)}
                       onClick={() => onStartSoloGame(rom)}
                     />
@@ -142,6 +155,8 @@ export default function SoloBrowseRomsScreen({
                       filename={rom.filename}
                       core={rom.core}
                       systemLabel={sys?.label || rom.core}
+                      disabled={isStarting}
+                      selected={startingRomPath === rom.path}
                       favorite={true}
                       onToggleFavorite={() => onToggleFavoriteGame(rom.path)}
                       onClick={() => onStartSoloGame(rom)}
@@ -166,6 +181,8 @@ export default function SoloBrowseRomsScreen({
                   filename={rom.filename}
                   core={rom.core}
                   systemLabel={sys?.label || rom.core}
+                  disabled={isStarting}
+                  selected={startingRomPath === rom.path}
                   favorite={favoriteGames.includes(rom.path)}
                   onToggleFavorite={() => onToggleFavoriteGame(rom.path)}
                   onClick={() => onStartSoloGame(rom)}

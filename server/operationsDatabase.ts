@@ -40,6 +40,7 @@ export interface PopularGameRecord {
 export interface GameMetrics {
   monthlyPopularGame: PopularGameRecord | null;
   todayGames: number;
+  totalGames: number;
   weeklyPopularGame: PopularGameRecord | null;
 }
 
@@ -69,6 +70,7 @@ const DEFAULT_COUNTS: VisitorCounts = {
 const DEFAULT_GAME_METRICS: GameMetrics = {
   monthlyPopularGame: null,
   todayGames: 0,
+  totalGames: 0,
   weeklyPopularGame: null,
 };
 
@@ -284,6 +286,9 @@ export function createOperationsDatabase(databaseUrl: string | null): Operations
         const todayGamesResult = await pool!.query<{ count: string }>(
           "SELECT COUNT(*)::text AS count FROM game_sessions WHERE started_at::date = CURRENT_DATE",
         );
+        const totalGamesResult = await pool!.query<{ count: string }>(
+          "SELECT COUNT(*)::text AS count FROM game_sessions",
+        );
         const weeklyPopularGameResult = await pool!.query<{
           game_name: string;
           play_count: string;
@@ -314,6 +319,7 @@ export function createOperationsDatabase(databaseUrl: string | null): Operations
         return {
           monthlyPopularGame: mapPopularGameRow(monthlyPopularGameResult.rows[0]),
           todayGames: Number(todayGamesResult.rows[0]?.count || "0"),
+          totalGames: Number(totalGamesResult.rows[0]?.count || "0"),
           weeklyPopularGame: mapPopularGameRow(weeklyPopularGameResult.rows[0]),
         };
       }, DEFAULT_GAME_METRICS),

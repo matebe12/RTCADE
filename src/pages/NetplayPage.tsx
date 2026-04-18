@@ -28,6 +28,7 @@ export default function NetplayPage() {
 
   const currentStep = useNetplayLobbyStore((store) => store.state.step);
   const mode = useNetplayLobbyStore((store) => store.mode);
+  const resetLobby = useNetplayLobbyStore((store) => store.resetLobby);
   const showHeroCard = currentStep === "menu";
   const [isMobileAccess, setIsMobileAccess] = useState(detectMobileAccess);
 
@@ -48,6 +49,12 @@ export default function NetplayPage() {
       widthQuery.removeEventListener("change", updateMobileAccess);
     };
   }, []);
+
+  useEffect(() => {
+    return () => {
+      resetLobby();
+    };
+  }, [resetLobby]);
 
   if (isMobileAccess) {
     return (

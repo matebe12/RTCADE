@@ -1,5 +1,7 @@
 import { buildBackendUrl } from "@/lib/backend-url";
 
+const OPERATIONS_STATS_REFRESH_EVENT = "rtcade:operations-stats-refresh";
+
 export interface PopularGameSummary {
   gameName: string;
   playCount: number;
@@ -14,6 +16,7 @@ export interface OperationsStats {
   openRooms: number;
   soloSessions: number;
   todayGames: number;
+  totalGames: number;
   todayVisitors: number;
   totalVisitors: number;
   waitingRooms: number;
@@ -82,6 +85,7 @@ function normalizeOperationsStats(value: unknown): OperationsStats {
     openRooms: toNumber(candidate.openRooms),
     soloSessions: toNumber(candidate.soloSessions),
     todayGames: toNumber(candidate.todayGames),
+    totalGames: toNumber(candidate.totalGames),
     todayVisitors: toNumber(candidate.todayVisitors),
     totalVisitors: toNumber(candidate.totalVisitors),
     waitingRooms: toNumber(candidate.waitingRooms),
@@ -105,6 +109,18 @@ async function fetchJson<T>(pathname: string, init?: RequestInit): Promise<T> {
   return (await response.json()) as T;
 }
 
+export function notifyOperationsStatsRefresh() {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.dispatchEvent(new Event(OPERATIONS_STATS_REFRESH_EVENT));
+}
+
+export function getOperationsStatsRefreshEventName() {
+  return OPERATIONS_STATS_REFRESH_EVENT;
+}
+
 export function fetchOperationsStats() {
   return fetchJson<unknown>("/api/stats").then(normalizeOperationsStats);
 }
@@ -117,6 +133,8 @@ export async function recordGameSession(input: RecordGameSessionInput) {
     },
     body: JSON.stringify(input),
   });
+
+  notifyOperationsStatsRefresh();
 }
 
 export async function upsertActivePlaySession(input: ActivePlaySessionInput) {
@@ -132,7 +150,10 @@ export async function upsertActivePlaySession(input: ActivePlaySessionInput) {
 export async function endActivePlaySession(sessionId: string) {
   await request(`/api/active-play-sessions/${encodeURIComponent(sessionId)}`, {
     method: "DELETE",
+    keepalive: true,
   });
+
+  notifyOperationsStatsRefresh();
 }
 
 export async function fetchNotices() {

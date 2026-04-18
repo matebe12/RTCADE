@@ -1,6 +1,10 @@
 import { startTransition, useEffect, useEffectEvent, useState } from "react";
 
-import { fetchOperationsStats, type OperationsStats } from "@/lib/operations-api";
+import {
+  fetchOperationsStats,
+  getOperationsStatsRefreshEventName,
+  type OperationsStats,
+} from "@/lib/operations-api";
 
 export function useOperationsStats(pollIntervalMs = 15000) {
   const [stats, setStats] = useState<OperationsStats | null>(null);
@@ -30,12 +34,19 @@ export function useOperationsStats(pollIntervalMs = 15000) {
   useEffect(() => {
     void loadStats();
 
+    const handleRefresh = () => {
+      void loadStats();
+    };
+
+    window.addEventListener(getOperationsStatsRefreshEventName(), handleRefresh);
+
     const intervalId = window.setInterval(() => {
       void loadStats();
     }, pollIntervalMs);
 
     return () => {
       window.clearInterval(intervalId);
+      window.removeEventListener(getOperationsStatsRefreshEventName(), handleRefresh);
     };
   }, [pollIntervalMs]);
 
