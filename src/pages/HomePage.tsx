@@ -90,40 +90,40 @@ export default function HomePage({ hasProfile }: HomePageProps) {
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid gap-3 sm:grid-cols-3">
-              <div className="rounded-lg border border-border/70 bg-background/50 p-4">
-                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <div className="grid gap-3 sm:grid-cols-3 sm:items-stretch">
+              <div className="flex h-full flex-col rounded-lg border border-border/70 bg-background/50 p-4">
+                <div className="flex min-h-4 items-center gap-2 text-xs text-muted-foreground">
                   <Gamepad2 className="size-3.5 text-primary" />
                   최근 한 게임
                 </div>
-                <div className="mt-2 text-sm font-medium text-foreground">
+                <div className="mt-2 min-h-[2.75rem] text-sm font-medium text-foreground">
                   {recentGame ? recentGame.displayName : "아직 기록이 없어요."}
                 </div>
-                <div className="mt-1 text-xs text-muted-foreground">
+                <div className="mt-auto pt-1 text-xs text-muted-foreground">
                   {recentGame
                     ? `${relativeTimeFormatter.format(recentGame.playedAt)}에 플레이`
                     : "첫 플레이를 시작해보세요."}
                 </div>
               </div>
 
-              <div className="rounded-lg border border-border/70 bg-background/50 p-4">
-                <div className="text-xs text-muted-foreground">내 브라우저 플레이</div>
-                <div className="mt-2 text-2xl font-semibold text-foreground">
+              <div className="flex h-full flex-col rounded-lg border border-border/70 bg-background/50 p-4">
+                <div className="min-h-4 text-xs text-muted-foreground">내 브라우저 플레이</div>
+                <div className="mt-2 min-h-[2.75rem] text-2xl font-semibold text-foreground">
                   {numberFormatter.format(totalPlayedCount)}판
                 </div>
-                <div className="mt-1 text-xs text-muted-foreground">
+                <div className="mt-auto pt-1 text-xs text-muted-foreground">
                   이 기기에서 플레이할 때마다 개인 기록으로 쌓여요.
                 </div>
               </div>
 
-              <div className="rounded-lg border border-border/70 bg-background/50 p-4">
-                <div className="text-xs text-muted-foreground">최근 함께한 상대</div>
-                <div className="mt-2 text-sm font-medium text-foreground">
+              <div className="flex h-full flex-col rounded-lg border border-border/70 bg-background/50 p-4">
+                <div className="min-h-4 text-xs text-muted-foreground">최근 함께한 상대</div>
+                <div className="mt-2 min-h-[2.75rem] text-sm font-medium text-foreground">
                   {recentOpponent
                     ? `${recentOpponent.avatar} ${recentOpponent.nickname}`
                     : "아직 없어요."}
                 </div>
-                <div className="mt-1 text-xs text-muted-foreground">
+                <div className="mt-auto pt-1 text-xs text-muted-foreground">
                   {recentOpponent
                     ? `${recentOpponent.playCount}번 함께 플레이했어요.`
                     : "대전을 시작하면 상대 기록도 남아요."}

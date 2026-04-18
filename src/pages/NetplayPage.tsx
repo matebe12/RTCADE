@@ -90,12 +90,12 @@ export default function NetplayPage() {
       <div
         className={
           showHeroCard
-            ? "grid w-full gap-4 lg:grid-cols-[0.8fr_1.2fr] lg:items-start"
+            ? "grid w-full gap-4 lg:grid-cols-[0.8fr_1.2fr] lg:items-stretch"
             : "flex justify-center"
         }
       >
         {showHeroCard && (
-          <Card className="w-full border-border/70 bg-card/95 lg:sticky lg:top-6">
+          <Card className="h-full w-full border-border/70 bg-card/95 lg:sticky lg:top-6">
             <CardHeader className="space-y-4">
               <Badge variant="secondary" className="w-fit text-[10px]">
                 {mode === "solo" ? "혼자하기" : NETPLAY_HERO_COPY.badge}
@@ -132,7 +132,7 @@ export default function NetplayPage() {
           </Card>
         )}
 
-        <div className="min-w-0">
+        <div className="min-w-0 lg:h-full">
           <NetplayLobby />
         </div>
       </div>

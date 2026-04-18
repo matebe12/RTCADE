@@ -13,6 +13,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { parseRomName } from "@/lib/game-names";
+import { cn } from "@/lib/utils";
 import type { RecentOpponent } from "@/lib/user-profile";
 import type { PublicRoomInfo } from "@/stores/useNetplayLobbyStore";
 
@@ -66,21 +67,42 @@ export default function NetplayMenuScreen({
   onReplayTargetChange,
   onReplayRecentOpponent,
 }: NetplayMenuScreenProps) {
+  const hasSecondarySections = quickJoinRooms.length > 0 || recentOpponentPreview.length > 0;
+
   return (
-    <Card className="w-full border-border/70 bg-card/95">
+    <Card className="flex h-full w-full flex-col border-border/70 bg-card/95">
       <CardHeader className="text-center">
         <CardTitle className="font-arcade text-sm text-primary">🌐 온라인 대전</CardTitle>
       </CardHeader>
-      <CardContent className="flex flex-col gap-3">
-        <Button variant="outline" className="w-full" onClick={onOpenBrowse}>
-          방 만들기
-        </Button>
-        <Button variant="outline" className="w-full" onClick={onOpenPublicRooms}>
-          공개 방 둘러보기
-        </Button>
-        <Button variant="outline" className="w-full" onClick={onOpenJoinInput}>
-          방 참가
-        </Button>
+      <CardContent className="flex flex-1 flex-col gap-3">
+        <div
+          className={cn(
+            "flex flex-col gap-3",
+            !hasSecondarySections && "flex-1 justify-between",
+          )}
+        >
+          <Button
+            variant="outline"
+            className={cn("w-full", !hasSecondarySections && "min-h-13")}
+            onClick={onOpenBrowse}
+          >
+            방 만들기
+          </Button>
+          <Button
+            variant="outline"
+            className={cn("w-full", !hasSecondarySections && "min-h-13")}
+            onClick={onOpenPublicRooms}
+          >
+            공개 방 둘러보기
+          </Button>
+          <Button
+            variant="outline"
+            className={cn("w-full", !hasSecondarySections && "min-h-13")}
+            onClick={onOpenJoinInput}
+          >
+            방 참가
+          </Button>
+        </div>
 
         {quickJoinRooms.length > 0 && (
           <div className="rounded-lg border border-border/70 bg-card px-3 py-3">

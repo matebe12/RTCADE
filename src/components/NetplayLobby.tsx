@@ -355,7 +355,7 @@ export default function NetplayLobby() {
     state.step === "playing" || state.step === "waiting" || state.step === "solo-playing";
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex h-full flex-col gap-4">
       <NetplayModeTabs mode={mode} disabled={disableModeSwitch} onModeChange={handleModeChange} />
       {content}
     </div>
