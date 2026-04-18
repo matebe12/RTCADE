@@ -12,6 +12,7 @@ import { UserBadge } from "@/components/UserBadge";
 import { NETPLAY_COPY } from "@/netplay/netplayCopy";
 
 export type SessionEndReason = "self-left" | "peer-left";
+export type SessionMode = "netplay" | "solo";
 
 interface SessionUser {
   nickname: string;
@@ -19,6 +20,7 @@ interface SessionUser {
 }
 
 interface NetplaySessionSummaryProps {
+  mode?: SessionMode;
   gameName: string;
   localUser: SessionUser;
   opponentProfile: SessionUser | null;
@@ -58,7 +60,16 @@ function getEndReasonCopy(endReason: SessionEndReason, startedAt: number | null)
     : NETPLAY_COPY.sessionEndedByPeer;
 }
 
+function getSoloEndReasonCopy(startedAt: number | null) {
+  if (!startedAt) {
+    return "게임을 시작하기 전에 나갔습니다.";
+  }
+
+  return "혼자 플레이를 마무리했습니다. 같은 게임으로 바로 다시 시작할 수 있어요.";
+}
+
 export default function NetplaySessionSummary({
+  mode = "netplay",
   gameName,
   localUser,
   opponentProfile,
@@ -70,6 +81,7 @@ export default function NetplaySessionSummary({
   onGoHome,
 }: NetplaySessionSummaryProps) {
   const remoteUser = opponentProfile ?? { nickname: "상대방", avatar: "🎮" };
+  const isSolo = mode === "solo";
 
   return (
     <Card className="w-full max-w-lg">
@@ -78,23 +90,33 @@ export default function NetplaySessionSummary({
           {startedAt ? "플레이 요약" : "준비 종료"}
         </Badge>
         <CardTitle className="text-lg">{gameName}</CardTitle>
-        <CardDescription>{getEndReasonCopy(endReason, startedAt)}</CardDescription>
+        <CardDescription>
+          {isSolo ? getSoloEndReasonCopy(startedAt) : getEndReasonCopy(endReason, startedAt)}
+        </CardDescription>
       </CardHeader>
 
       <CardContent className="space-y-5">
-        <div className="flex items-center justify-center gap-3 rounded-lg border border-border/70 bg-background/40 px-4 py-3">
-          <UserBadge nickname={localUser.nickname} avatar={localUser.avatar} size="sm" />
-          <span className="text-xs font-medium text-muted-foreground">VS</span>
-          <UserBadge nickname={remoteUser.nickname} avatar={remoteUser.avatar} size="sm" />
-        </div>
+        {isSolo ? (
+          <div className="flex items-center justify-center rounded-lg border border-border/70 bg-background/40 px-4 py-3">
+            <UserBadge nickname={localUser.nickname} avatar={localUser.avatar} size="sm" />
+          </div>
+        ) : (
+          <div className="flex items-center justify-center gap-3 rounded-lg border border-border/70 bg-background/40 px-4 py-3">
+            <UserBadge nickname={localUser.nickname} avatar={localUser.avatar} size="sm" />
+            <span className="text-xs font-medium text-muted-foreground">VS</span>
+            <UserBadge nickname={remoteUser.nickname} avatar={remoteUser.avatar} size="sm" />
+          </div>
+        )}
 
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="rounded-lg border border-border/70 bg-background/40 p-4">
             <p className="text-[11px] uppercase tracking-wide text-muted-foreground">종료 이유</p>
             <p className="mt-2 text-sm font-medium text-foreground">
-              {endReason === "self-left"
-                ? NETPLAY_COPY.sessionReasonSelf
-                : NETPLAY_COPY.sessionReasonPeer}
+              {isSolo
+                ? "혼자 플레이 종료"
+                : endReason === "self-left"
+                  ? NETPLAY_COPY.sessionReasonSelf
+                  : NETPLAY_COPY.sessionReasonPeer}
             </p>
           </div>
 
@@ -107,13 +129,13 @@ export default function NetplaySessionSummary({
         </div>
 
         <div className="rounded-lg border border-dashed border-border/70 bg-background/20 p-4 text-xs text-muted-foreground">
-          {NETPLAY_COPY.sessionHint}
+          {isSolo ? "같은 게임을 바로 다시 실행하거나 다른 게임을 선택할 수 있어요." : NETPLAY_COPY.sessionHint}
         </div>
       </CardContent>
 
       <CardFooter className="flex flex-col gap-2 sm:flex-row sm:justify-between">
         <Button className="w-full sm:flex-1" onClick={onRematch}>
-          같은 게임으로 새 방 만들기
+          {isSolo ? "같은 게임 다시하기" : "같은 게임으로 새 방 만들기"}
         </Button>
         <Button variant="outline" className="w-full sm:flex-1" onClick={onChooseAnotherGame}>
           다른 게임 선택

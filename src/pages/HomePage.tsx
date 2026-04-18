@@ -40,7 +40,7 @@ export default function HomePage({ hasProfile }: HomePageProps) {
   usePageSeo({
     title: "홈",
     description:
-      "브라우저에서 레트로 게임을 P2P 넷플레이로 즐기고, 방문 통계와 인기 게임, 최근 플레이 기록을 확인하세요.",
+      "브라우저에서 레트로 게임을 같이하거나 혼자 플레이하고, 방문 통계와 인기 게임, 최근 플레이 기록을 확인하세요.",
   });
 
   const { error: noticeError, isLoading: noticesLoading, notices } = useOperationsNotices();
@@ -81,7 +81,7 @@ export default function HomePage({ hasProfile }: HomePageProps) {
     {
       title: "지금 게임 중",
       description: stats
-        ? `지금 ${stats.connectedPlayers}명이 ${stats.activeRooms}개 방에서 플레이 중이에요.`
+        ? `지금 ${stats.connectedPlayers}명이 ${stats.activeRooms}개 세션에서 플레이 중이에요.`
         : "지금 플레이 중인 게임 수를 불러오는 중이에요.",
       icon: Activity,
       value: stats ? `${numberFormatter.format(stats.activeRooms)}개` : "--",
@@ -179,7 +179,7 @@ export default function HomePage({ hasProfile }: HomePageProps) {
               <div className="flex flex-wrap gap-3">
                 <Button asChild size="lg" className="font-arcade text-[11px]">
                   <NavLink to="/netplay">
-                    넷플레이 시작
+                    플레이 시작
                     <ArrowRight className="size-4" />
                   </NavLink>
                 </Button>
@@ -210,13 +210,14 @@ export default function HomePage({ hasProfile }: HomePageProps) {
             </div>
             <div className="rounded-lg border border-border/70 bg-background/50 p-4">
               {hasProfile
-                ? "프로필 설정이 끝나 있어 바로 넷플레이를 시작할 수 있어요."
+                ? "프로필 설정이 끝나 있어 바로 같이하기나 혼자하기를 시작할 수 있어요."
                 : "아직 프로필이 없으면 시작 전에 닉네임과 아바타를 먼저 정하게 돼요."}
             </div>
             {stats && (
               <div className="rounded-lg border border-border/70 bg-background/50 p-4">
-                지금 열린 방은 {stats.openRooms}개이고, 그중 {stats.activeRooms}개는 플레이 중,{" "}
-                {stats.waitingRooms}개는 대기 중이에요.
+                지금 플레이 중인 세션은 {stats.activeRooms}개이고, 이 중 넷플레이 대전은{" "}
+                {stats.activeNetplayRooms}개, 혼자하기는 {stats.soloSessions}개예요. 열린 넷플레이 방은{" "}
+                {stats.openRooms}개이고, {stats.waitingRooms}개는 대기 중이에요.
               </div>
             )}
           </CardContent>
@@ -307,20 +308,20 @@ export default function HomePage({ hasProfile }: HomePageProps) {
           <CardHeader>
             <div className="flex items-center gap-2 text-sm font-medium text-foreground">
               <Radio className="size-4 text-primary" />
-              넷플레이 현황
+              실시간 플레이 현황
             </div>
             <CardDescription>
-              지금 몇 명이 접속해 있고 몇 개의 방이 진행 중인지 보여드려요.
+              같이하기와 혼자하기를 합친 현재 플레이 현황을 보여드려요.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="rounded-lg border border-border/70 bg-background/50 p-4 text-sm text-muted-foreground">
               {stats
-                ? `지금 ${stats.connectedPlayers}명이 접속 중이고 ${stats.activeRooms}개 방에서 플레이하고 있어요.`
+                ? `지금 ${stats.connectedPlayers}명이 플레이 중이고 ${stats.activeRooms}개 세션이 진행 중이에요. 넷플레이 ${stats.activeNetplayRooms}개, 혼자하기 ${stats.soloSessions}개예요.`
                 : "지금 접속 현황을 불러오는 중이에요."}
             </div>
             <Button asChild className="w-full">
-              <NavLink to="/netplay">넷플레이 로비로 이동</NavLink>
+              <NavLink to="/netplay">플레이 로비로 이동</NavLink>
             </Button>
           </CardContent>
         </Card>

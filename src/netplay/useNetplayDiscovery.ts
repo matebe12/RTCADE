@@ -14,13 +14,15 @@ interface UseNetplayDiscoveryOptions {
   setMenuPublicRooms: (rooms: PublicRoomInfo[]) => void;
 }
 
+type DiscoveryMode = "netplay" | "solo";
+
 export function useNetplayDiscovery({
   currentStep,
   setLobbyState,
   setError,
   setMenuPublicRooms,
 }: UseNetplayDiscoveryOptions) {
-  const fetchRoms = useCallback(async () => {
+  const fetchRoms = useCallback(async (mode: DiscoveryMode = "netplay") => {
     setError("");
     try {
       const response = await fetch(buildBackendUrl("/api/roms"));
@@ -31,7 +33,7 @@ export function useNetplayDiscovery({
         toast.error(message);
         return;
       }
-      setLobbyState({ step: "browse", roms });
+      setLobbyState({ step: mode === "solo" ? "solo-browse" : "browse", roms });
     } catch {
       const message = NETPLAY_COPY.romsLoadFailed;
       setError(message);

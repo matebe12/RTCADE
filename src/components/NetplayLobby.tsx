@@ -4,16 +4,22 @@ import NetplaySessionSummary from "./NetplaySessionSummary";
 import NetplayBrowseRomsScreen from "@/components/netplay/NetplayBrowseRomsScreen";
 import NetplayJoinRoomScreen from "@/components/netplay/NetplayJoinRoomScreen";
 import NetplayMenuScreen from "@/components/netplay/NetplayMenuScreen";
+import NetplayModeTabs from "@/components/netplay/NetplayModeTabs";
 import NetplayPlayingScreen from "@/components/netplay/NetplayPlayingScreen";
 import NetplayPublicRoomsScreen from "@/components/netplay/NetplayPublicRoomsScreen";
 import NetplayWaitingScreen from "@/components/netplay/NetplayWaitingScreen";
+import SoloBrowseRomsScreen from "@/components/netplay/SoloBrowseRomsScreen";
+import SoloPlayingScreen from "@/components/netplay/SoloPlayingScreen";
 import { getUserProfile, toggleFavoriteGame } from "@/lib/user-profile";
 import { useNetplayDiscovery } from "@/netplay/useNetplayDiscovery";
 import { useNetplaySession } from "@/netplay/useNetplaySession";
+import { useSoloSession } from "@/solo/useSoloSession";
 import { useNetplayLobbyStore } from "@/stores/useNetplayLobbyStore";
 
 export default function NetplayLobby() {
   const {
+    mode,
+    setMode,
     state,
     setLobbyState: setState,
     joinCode,
@@ -66,6 +72,18 @@ export default function NetplayLobby() {
     setLobbyState: setState,
     setError,
     setMenuPublicRooms,
+  });
+
+  const {
+    emulatorRef: soloEmulatorRef,
+    handleBack: handleSoloBack,
+    handleChooseAnotherGame: handleSoloChooseAnotherGame,
+    startSoloGame,
+  } = useSoloSession({
+    currentStep: state.step,
+    setLobbyState: setState,
+    setRecentGames,
+    fetchSoloRoms: () => fetchRoms("solo"),
   });
 
   const {
@@ -132,10 +150,35 @@ export default function NetplayLobby() {
     [setFavoriteGames],
   );
 
+  const handleModeChange = useCallback(
+    (nextMode: typeof mode) => {
+      if (mode === nextMode) return;
+      if (state.step === "playing" || state.step === "waiting" || state.step === "solo-playing") {
+        return;
+      }
+
+      setMode(nextMode);
+      setError("");
+      setStatus("");
+      setSearchQuery("");
+
+      if (nextMode === "solo") {
+        setState({ step: "solo-browse", roms: [] });
+        void fetchRoms("solo");
+        return;
+      }
+
+      setState({ step: "menu" });
+    },
+    [fetchRoms, mode, setError, setMode, setSearchQuery, setState, setStatus, state.step],
+  );
+
   const myProfile = getUserProfile();
 
+  let content: JSX.Element | null = null;
+
   if (state.step === "menu") {
-    return (
+    content = (
       <NetplayMenuScreen
         quickJoinRooms={menuPublicRooms.slice(0, 2)}
         recentOpponentPreview={recentOpponents.slice(0, 3)}
@@ -154,7 +197,7 @@ export default function NetplayLobby() {
   }
 
   if (state.step === "public-rooms") {
-    return (
+    content = (
       <NetplayPublicRoomsScreen
         rooms={state.rooms}
         status={status}
@@ -167,7 +210,7 @@ export default function NetplayLobby() {
   }
 
   if (state.step === "browse") {
-    return (
+    content = (
       <NetplayBrowseRomsScreen
         roms={state.roms}
         searchQuery={searchQuery}
@@ -184,8 +227,24 @@ export default function NetplayLobby() {
     );
   }
 
+  if (state.step === "solo-browse") {
+    content = (
+      <SoloBrowseRomsScreen
+        roms={state.roms}
+        searchQuery={searchQuery}
+        recentGames={recentGames}
+        favoriteGames={favoriteGames}
+        error={error}
+        onBack={() => handleModeChange("netplay")}
+        onSearchQueryChange={setSearchQuery}
+        onToggleFavoriteGame={handleToggleFavoriteGame}
+        onStartSoloGame={startSoloGame}
+      />
+    );
+  }
+
   if (state.step === "waiting") {
-    return (
+    content = (
       <NetplayWaitingScreen
         roomCode={state.code}
         romFilename={state.romFilename}
@@ -198,7 +257,7 @@ export default function NetplayLobby() {
   }
 
   if (state.step === "join-input") {
-    return (
+    content = (
       <NetplayJoinRoomScreen
         joinCode={joinCode}
         status={status}
@@ -213,7 +272,7 @@ export default function NetplayLobby() {
   if (state.step === "session-summary") {
     const localSummaryUser = myProfile ?? { nickname: "나", avatar: "🎮" };
 
-    return (
+    content = (
       <NetplaySessionSummary
         gameName={state.gameName}
         localUser={localSummaryUser}
@@ -221,15 +280,18 @@ export default function NetplayLobby() {
         durationMs={state.durationMs}
         startedAt={state.startedAt}
         endReason={state.endReason}
-        onRematch={handleSummaryRematch}
-        onChooseAnotherGame={handleSummaryChooseAnotherGame}
-        onGoHome={resetToMenu}
+        mode={state.mode}
+        onRematch={state.mode === "solo" ? handleSoloChooseAnotherGame : handleSummaryRematch}
+        onChooseAnotherGame={
+          state.mode === "solo" ? handleSoloChooseAnotherGame : handleSummaryChooseAnotherGame
+        }
+        onGoHome={state.mode === "solo" ? () => handleModeChange("netplay") : resetToMenu}
       />
     );
   }
 
   if (state.step === "playing") {
-    return (
+    content = (
       <NetplayPlayingScreen
         session={state}
         myProfile={myProfile}
@@ -263,5 +325,23 @@ export default function NetplayLobby() {
     );
   }
 
-  return null;
+  if (state.step === "solo-playing") {
+    content = (
+      <SoloPlayingScreen session={state} emulatorRef={soloEmulatorRef} onBack={handleSoloBack} />
+    );
+  }
+
+  if (!content) {
+    return null;
+  }
+
+  const disableModeSwitch =
+    state.step === "playing" || state.step === "waiting" || state.step === "solo-playing";
+
+  return (
+    <div className="flex flex-col gap-4">
+      <NetplayModeTabs mode={mode} disabled={disableModeSwitch} onModeChange={handleModeChange} />
+      {content}
+    </div>
+  );
 }

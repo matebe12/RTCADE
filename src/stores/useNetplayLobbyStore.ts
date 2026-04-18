@@ -35,12 +35,15 @@ export interface PublicRoomInfo {
   hostAvatar?: string;
 }
 
+export type LobbyMode = "netplay" | "solo";
+
 export type RoomVisibility = "private" | "public";
 
 export interface ActiveSession {
+  mode: LobbyMode;
   romPath: string;
   core: SystemCore;
-  role: "host" | "guest";
+  role?: "host" | "guest";
   biosPath?: string;
   isPublic?: boolean;
 }
@@ -55,9 +58,10 @@ export interface HostRoomConfig {
 
 export type SessionSummaryState = {
   step: "session-summary";
+  mode: LobbyMode;
   romPath: string;
   core: SystemCore;
-  role: "host" | "guest";
+  role?: "host" | "guest";
   biosPath?: string;
   isPublic?: boolean;
   gameName: string;
@@ -71,6 +75,7 @@ export type SessionSummaryState = {
 export type LobbyState =
   | { step: "menu" }
   | { step: "browse"; roms: RomInfo[] }
+  | { step: "solo-browse"; roms: RomInfo[] }
   | { step: "public-rooms"; rooms: PublicRoomInfo[] }
   | {
       step: "waiting";
@@ -89,9 +94,16 @@ export type LobbyState =
       role: "host" | "guest";
       biosPath?: string;
     }
+  | {
+      step: "solo-playing";
+      romPath: string;
+      core: SystemCore;
+      biosPath?: string;
+    }
   | SessionSummaryState;
 
 type NetplayLobbyStoreState = {
+  mode: LobbyMode;
   state: LobbyState;
   joinCode: string;
   status: string;
@@ -116,6 +128,7 @@ type NetplayLobbyStoreState = {
 };
 
 type NetplayLobbyStoreActions = {
+  setMode: (mode: LobbyMode) => void;
   setLobbyState: (next: LobbyState | ((previous: LobbyState) => LobbyState)) => void;
   setJoinCode: (joinCode: string) => void;
   setStatus: (status: string) => void;
@@ -185,6 +198,7 @@ function getDefaultSessionUiState() {
 
 function createInitialStoreState(): NetplayLobbyStoreState {
   return {
+    mode: "netplay",
     state: { step: "menu" },
     searchQuery: "",
     roomVisibility: "private",
@@ -199,6 +213,7 @@ function createInitialStoreState(): NetplayLobbyStoreState {
 
 export const useNetplayLobbyStore = create<NetplayLobbyStore>((set) => ({
   ...createInitialStoreState(),
+  setMode: (mode) => set({ mode }),
   setLobbyState: (next) =>
     set((store) => ({
       state: typeof next === "function" ? next(store.state) : next,

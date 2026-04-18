@@ -81,7 +81,7 @@ white-space:pre-wrap;overflow-y:auto;font-size:14px}
   var _isNetplay = ${isNetplay};
   var _localPlayer = ${localPlayer};
   var _remotePlayer = ${remotePlayer};
-  var _gameRunning = false;
+  var _gameRunning = !_isNetplay;
 
   if (_isNetplay) {
     window.EJS_onGameStart = function() {
@@ -127,6 +127,11 @@ white-space:pre-wrap;overflow-y:auto;font-size:14px}
     "KeyA": 0, "KeyS": 8, "KeyD": 1, "KeyF": 9,
     "Digit1": 3, "Digit5": 2, "KeyQ": 10, "KeyE": 11
   };
+  function applyLocalInput(button, value) {
+    if (window.EJS_emulator && window.EJS_emulator.gameManager) {
+      window.EJS_emulator.gameManager.simulateInput(_localPlayer, button, value);
+    }
+  }
   window.addEventListener("keydown", function(e) {
     if (_isNetplay && e.code === "Enter" && !e.repeat && !e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
       e.stopImmediatePropagation();
@@ -134,31 +139,23 @@ white-space:pre-wrap;overflow-y:auto;font-size:14px}
       parent.postMessage({ type: "chat-shortcut" }, "*");
       return;
     }
-    if (_isNetplay && _gameRunning) {
+    var btn = KEY_TO_BUTTON[e.code];
+    if (btn !== undefined) {
       e.stopImmediatePropagation();
       e.preventDefault();
     }
-    var btn = KEY_TO_BUTTON[e.code];
     if (btn === undefined || !_gameRunning && _isNetplay) return;
-    if (_isNetplay) {
-      if (window.EJS_emulator && window.EJS_emulator.gameManager) {
-        window.EJS_emulator.gameManager.simulateInput(_localPlayer, btn, 1);
-      }
-    }
+    applyLocalInput(btn, 1);
     parent.postMessage({ type: "localInput", button: btn, down: true }, "*");
   }, true);
   window.addEventListener("keyup", function(e) {
-    if (_isNetplay && _gameRunning) {
+    var btn = KEY_TO_BUTTON[e.code];
+    if (btn !== undefined) {
       e.stopImmediatePropagation();
       e.preventDefault();
     }
-    var btn = KEY_TO_BUTTON[e.code];
     if (btn === undefined || !_gameRunning && _isNetplay) return;
-    if (_isNetplay) {
-      if (window.EJS_emulator && window.EJS_emulator.gameManager) {
-        window.EJS_emulator.gameManager.simulateInput(_localPlayer, btn, 0);
-      }
-    }
+    applyLocalInput(btn, 0);
     parent.postMessage({ type: "localInput", button: btn, down: false }, "*");
   }, true);
   window.addEventListener("message", function(e) {

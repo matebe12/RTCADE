@@ -17,7 +17,7 @@ interface AppShellProps {
 
 const navigationItems = [
   { to: "/", label: "홈", icon: Home, end: true },
-  { to: "/netplay", label: "넷플레이", icon: Globe },
+  { to: "/netplay", label: "플레이", icon: Globe },
   { to: "/notices", label: "공지사항", icon: Bell },
   { to: "/settings", label: "설정", icon: Settings },
 ];

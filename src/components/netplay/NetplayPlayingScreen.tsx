@@ -2,6 +2,7 @@ import type { RefObject } from "react";
 
 import EmulatorPlayer, { type SystemCore } from "@/components/EmulatorPlayer";
 import NetplayChatPanel, { type NetplayChatMessage } from "@/components/NetplayChatPanel";
+import PlayControlsGuide from "@/components/netplay/PlayControlsGuide";
 import { UserBadge } from "@/components/UserBadge";
 import {
   AlertDialog,
@@ -164,6 +165,10 @@ export default function NetplayPlayingScreen({
           </span>
         </div>
       )}
+
+      <div className="flex w-full justify-center">
+        <PlayControlsGuide mode="netplay" />
+      </div>
 
       <div className="flex w-full flex-col items-center gap-3 xl:flex-row xl:items-start xl:justify-center">
         <EmulatorPlayer

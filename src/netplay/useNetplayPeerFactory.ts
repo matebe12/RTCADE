@@ -108,6 +108,7 @@ export function useNetplayPeerFactory({
           if (previous.step === "waiting") {
             roleRef.current = "host";
             activeSessionRef.current = {
+              mode: "netplay",
               romPath: previous.romPath,
               core: previous.core,
               role: "host",
@@ -133,6 +134,7 @@ export function useNetplayPeerFactory({
         setStatus(NETPLAY_COPY.roomJoined);
         roleRef.current = "guest";
         activeSessionRef.current = {
+          mode: "netplay",
           romPath: info.romFilename,
           core: info.core as SystemCore,
           role: "guest",

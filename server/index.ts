@@ -6,6 +6,7 @@ import { createCorsMiddleware, getServerConfig } from "./config";
 import { createOperationsDatabase } from "./operationsDatabase";
 import { registerEmulatorRoute } from "./emulator";
 import { registerNoticeRoutes } from "./noticeApi";
+import { createPlaySessionStore } from "./playSessionStore";
 import { registerPublicRoomRoutes } from "./publicRoomApi";
 import { registerRomRoutes } from "./romApi";
 import { createRoomStore } from "./roomStore";
@@ -16,6 +17,7 @@ import { createVisitorTrackingMiddleware } from "./visitorTracking";
 async function bootstrap() {
   const config = getServerConfig();
   const roomStore = createRoomStore();
+  const playSessionStore = createPlaySessionStore();
   const operationsDatabase = createOperationsDatabase(config.databaseUrl);
   const app = express();
   const server = createServer(app);
@@ -30,7 +32,7 @@ async function bootstrap() {
   registerEmulatorRoute(app);
   registerPublicRoomRoutes(app, roomStore);
   registerNoticeRoutes(app, operationsDatabase, config.noticeAdminToken);
-  registerStatsRoutes(app, operationsDatabase, roomStore);
+  registerStatsRoutes(app, operationsDatabase, roomStore, playSessionStore);
   attachSignalingServer(wss, roomStore);
 
   server.listen(config.port, "0.0.0.0", () => {

@@ -7,10 +7,12 @@ export interface PopularGameSummary {
 
 export interface OperationsStats {
   activeRooms: number;
+  activeNetplayRooms: number;
   connectedPlayers: number;
   dbEnabled: boolean;
   monthlyPopularGame: PopularGameSummary | null;
   openRooms: number;
+  soloSessions: number;
   todayGames: number;
   todayVisitors: number;
   totalVisitors: number;
@@ -22,6 +24,14 @@ export interface RecordGameSessionInput {
   core: string;
   gameName: string;
   romPath: string;
+}
+
+export interface ActivePlaySessionInput {
+  core: string;
+  gameName: string;
+  mode: "solo";
+  romPath: string;
+  sessionId: string;
 }
 
 export interface NoticeItem {
@@ -65,10 +75,12 @@ function normalizeOperationsStats(value: unknown): OperationsStats {
 
   return {
     activeRooms: toNumber(candidate.activeRooms),
+    activeNetplayRooms: toNumber(candidate.activeNetplayRooms),
     connectedPlayers: toNumber(candidate.connectedPlayers),
     dbEnabled: candidate.dbEnabled === true,
     monthlyPopularGame: toPopularGameSummary(candidate.monthlyPopularGame),
     openRooms: toNumber(candidate.openRooms),
+    soloSessions: toNumber(candidate.soloSessions),
     todayGames: toNumber(candidate.todayGames),
     todayVisitors: toNumber(candidate.todayVisitors),
     totalVisitors: toNumber(candidate.totalVisitors),
@@ -104,6 +116,22 @@ export async function recordGameSession(input: RecordGameSessionInput) {
       "Content-Type": "application/json",
     },
     body: JSON.stringify(input),
+  });
+}
+
+export async function upsertActivePlaySession(input: ActivePlaySessionInput) {
+  await request("/api/active-play-sessions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(input),
+  });
+}
+
+export async function endActivePlaySession(sessionId: string) {
+  await request(`/api/active-play-sessions/${encodeURIComponent(sessionId)}`, {
+    method: "DELETE",
   });
 }
 

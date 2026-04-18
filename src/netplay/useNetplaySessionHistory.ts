@@ -53,7 +53,14 @@ export function useNetplaySessionHistory({
       const activeSession = activeSessionRef.current;
       const opponentProfile = opponentProfileRef.current;
 
-      if (!activeSession || !opponentProfile || sessionStartedAtRef.current === null) return;
+      if (
+        !activeSession ||
+        activeSession.mode !== "netplay" ||
+        !opponentProfile ||
+        sessionStartedAtRef.current === null
+      ) {
+        return;
+      }
 
       const nextRecentOpponents = upsertRecentOpponent({
         nickname: opponentProfile.nickname,
@@ -83,7 +90,7 @@ export function useNetplaySessionHistory({
       recordRecentGame(activeSession);
       incrementTotalPlayedCount();
 
-      if (activeSession.role === "host") {
+      if (activeSession.mode === "solo" || activeSession.role === "host") {
         void recordGameSession({
           core: activeSession.core,
           gameName,
