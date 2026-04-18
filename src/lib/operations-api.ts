@@ -16,6 +16,7 @@ export interface OperationsStats {
   openRooms: number;
   soloSessions: number;
   todayGames: number;
+  todayPopularGame: PopularGameSummary | null;
   totalGames: number;
   todayVisitors: number;
   totalVisitors: number;
@@ -85,6 +86,7 @@ function normalizeOperationsStats(value: unknown): OperationsStats {
     openRooms: toNumber(candidate.openRooms),
     soloSessions: toNumber(candidate.soloSessions),
     todayGames: toNumber(candidate.todayGames),
+    todayPopularGame: toPopularGameSummary(candidate.todayPopularGame),
     totalGames: toNumber(candidate.totalGames),
     todayVisitors: toNumber(candidate.todayVisitors),
     totalVisitors: toNumber(candidate.totalVisitors),

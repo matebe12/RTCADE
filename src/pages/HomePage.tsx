@@ -52,6 +52,15 @@ export default function HomePage({ hasProfile }: HomePageProps) {
   const previewNotices = notices.slice(0, 3);
   const recentGame = recentGames[0] ?? null;
   const recentOpponent = recentOpponents[0] ?? null;
+  const activeRooms = stats?.activeRooms ?? 0;
+  const connectedPlayers = stats?.connectedPlayers ?? 0;
+  const activeNetplayRooms = stats?.activeNetplayRooms ?? 0;
+  const soloSessions = stats?.soloSessions ?? 0;
+  const openRooms = stats?.openRooms ?? 0;
+  const waitingRooms = stats?.waitingRooms ?? 0;
+  const todayPopularGame = stats?.todayPopularGame;
+  const weeklyPopularGame = stats?.weeklyPopularGame;
+  const monthlyPopularGame = stats?.monthlyPopularGame;
 
   const recentPlayDescription = recentGame
     ? recentOpponent
@@ -60,67 +69,6 @@ export default function HomePage({ hasProfile }: HomePageProps) {
     : hasProfile
       ? "첫 게임을 시작하면 최근 플레이 기록이 여기에 쌓여요."
       : "프로필을 만들고 게임을 시작하면 최근 기록을 바로 볼 수 있어요.";
-
-  const statCards = [
-    {
-      title: "총 방문자",
-      description: stats
-        ? `지금까지 ${numberFormatter.format(stats.totalVisitors)}명이 들렀어요.`
-        : "누적 방문자 수를 불러오는 중이에요.",
-      icon: Users,
-      value: stats ? `${numberFormatter.format(stats.totalVisitors)}명` : "--",
-    },
-    {
-      title: "오늘 방문자",
-      description: stats
-        ? `오늘은 ${numberFormatter.format(stats.todayVisitors)}명이 방문했어요.`
-        : "오늘 방문자 수를 불러오는 중이에요.",
-      icon: CalendarDays,
-      value: stats ? `${numberFormatter.format(stats.todayVisitors)}명` : "--",
-    },
-    {
-      title: "지금 게임 중",
-      description: stats
-        ? `지금 ${stats.connectedPlayers}명이 ${stats.activeRooms}개 세션에서 플레이 중이에요.`
-        : "지금 플레이 중인 게임 수를 불러오는 중이에요.",
-      icon: Activity,
-      value: stats ? `${numberFormatter.format(stats.activeRooms)}개` : "--",
-    },
-    {
-      title: "오늘 총 게임",
-      description: stats
-        ? `오늘 시작된 게임은 모두 ${numberFormatter.format(stats.todayGames)}판이에요.`
-        : "오늘 기록된 게임 수를 불러오는 중이에요.",
-      icon: Gamepad2,
-      value: stats ? `${numberFormatter.format(stats.todayGames)}판` : "--",
-    },
-    {
-      title: "총 플레이 게임",
-      description: stats
-        ? `모든 사용자 기준으로 기록된 게임 시작은 ${numberFormatter.format(stats.totalGames)}판이에요.`
-        : "누적 플레이 수를 불러오는 중이에요.",
-      icon: Gamepad2,
-      value: stats ? `${numberFormatter.format(stats.totalGames)}판` : "--",
-    },
-    {
-      title: "주간 인기 게임",
-      description: stats?.weeklyPopularGame
-        ? `이번 주에 ${numberFormatter.format(stats.weeklyPopularGame.playCount)}번 플레이됐어요.`
-        : "이번 주 기록이 쌓이면 가장 많이 한 게임을 보여드릴게요.",
-      icon: Trophy,
-      value: stats?.weeklyPopularGame?.gameName ?? "아직 없어요.",
-      valueClassName: "line-clamp-2 text-xl leading-snug lg:text-2xl",
-    },
-    {
-      title: "월간 인기 게임",
-      description: stats?.monthlyPopularGame
-        ? `이번 달에 ${numberFormatter.format(stats.monthlyPopularGame.playCount)}번 플레이됐어요.`
-        : "이번 달 기록이 쌓이면 가장 많이 한 게임을 보여드릴게요.",
-      icon: Trophy,
-      value: stats?.monthlyPopularGame?.gameName ?? "아직 없어요.",
-      valueClassName: "line-clamp-2 text-xl leading-snug lg:text-2xl",
-    },
-  ];
 
   return (
     <div className="flex w-full flex-col gap-6 lg:gap-8">
@@ -205,63 +153,6 @@ export default function HomePage({ hasProfile }: HomePageProps) {
 
         <Card className="border-border/70 bg-card/95">
           <CardHeader>
-            <CardTitle className="text-lg">시작하기 전에</CardTitle>
-            <CardDescription>프로필 설정과 현재 방 상황을 먼저 확인해보세요.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3 text-sm text-muted-foreground">
-            <div className="rounded-lg border border-border/70 bg-background/50 p-4">
-              {statsLoading
-                ? "이용 현황을 불러오는 중이에요."
-                : statsError
-                  ? statsError
-                  : `마지막으로 반영된 시각은 ${updatedAt ? relativeTimeFormatter.format(updatedAt) : "방금 전"}이에요.`}
-            </div>
-            <div className="rounded-lg border border-border/70 bg-background/50 p-4">
-              {hasProfile
-                ? "프로필 설정이 끝나 있어 바로 같이하기나 혼자하기를 시작할 수 있어요."
-                : "아직 프로필이 없으면 시작 전에 닉네임과 아바타를 먼저 정하게 돼요."}
-            </div>
-            {stats && (
-              <div className="rounded-lg border border-border/70 bg-background/50 p-4">
-                지금 플레이 중인 세션은 {stats.activeRooms}개이고, 이 중 넷플레이 대전은{" "}
-                {stats.activeNetplayRooms}개, 혼자하기는 {stats.soloSessions}개예요. 열린 넷플레이 방은{" "}
-                {stats.openRooms}개이고, {stats.waitingRooms}개는 대기 중이에요.
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </section>
-
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {statCards.map((card) => {
-          const Icon = card.icon;
-          return (
-            <Card key={card.title} className="border-border/70 bg-card/95">
-              <CardHeader className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-sm font-medium text-foreground">
-                    <Icon className="size-4 text-primary" />
-                    {card.title}
-                  </div>
-                  <Badge variant="secondary" className="text-[10px]">
-                    {statsLoading ? "로딩 중" : "업데이트"}
-                  </Badge>
-                </div>
-                <div
-                  className={`font-semibold tracking-tight text-foreground ${card.valueClassName ?? "text-3xl"}`}
-                >
-                  {card.value}
-                </div>
-                <CardDescription>{card.description}</CardDescription>
-              </CardHeader>
-            </Card>
-          );
-        })}
-      </section>
-
-      <section className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
-        <Card className="border-border/70 bg-card/95">
-          <CardHeader>
             <div className="flex items-center gap-2 text-sm font-medium text-foreground">
               <Bell className="size-4 text-primary" />
               공지사항
@@ -269,6 +160,11 @@ export default function HomePage({ hasProfile }: HomePageProps) {
             <CardDescription>최근 올라온 공지를 먼저 보여드릴게요.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
+            <div className="rounded-lg border border-primary/20 bg-primary/5 p-4 text-sm leading-6 text-muted-foreground">
+              {stats
+                ? `현재 이용 현황은 방문 ${numberFormatter.format(stats.totalVisitors)}명, 실시간 세션 ${numberFormatter.format(activeRooms)}개, 누적 플레이 ${numberFormatter.format(stats.totalGames)}판 기준으로 갱신되고 있어요.`
+                : "실시간 운영 지표를 불러오는 중이에요."}
+            </div>
             {noticesLoading ? (
               <div className="rounded-lg border border-dashed border-border/70 bg-background/40 p-4 text-sm text-muted-foreground">
                 공지 목록을 불러오는 중입니다.
@@ -290,7 +186,7 @@ export default function HomePage({ hasProfile }: HomePageProps) {
                   <div className="flex items-start justify-between gap-3">
                     <div className="space-y-2">
                       <div className="text-sm font-medium text-foreground">{notice.title}</div>
-                      <div className="text-sm leading-6 text-muted-foreground line-clamp-2">
+                      <div className="line-clamp-2 text-sm leading-6 text-muted-foreground">
                         {notice.body}
                       </div>
                     </div>
@@ -311,29 +207,203 @@ export default function HomePage({ hasProfile }: HomePageProps) {
             </Button>
           </CardContent>
         </Card>
-
-        <Card className="border-border/70 bg-card/95">
-          <CardHeader>
-            <div className="flex items-center gap-2 text-sm font-medium text-foreground">
-              <Radio className="size-4 text-primary" />
-              실시간 플레이 현황
-            </div>
-            <CardDescription>
-              같이하기와 혼자하기를 합친 현재 플레이 현황을 보여드려요.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="rounded-lg border border-border/70 bg-background/50 p-4 text-sm text-muted-foreground">
-              {stats
-                ? `지금 ${stats.connectedPlayers}명이 플레이 중이고 ${stats.activeRooms}개 세션이 진행 중이에요. 넷플레이 ${stats.activeNetplayRooms}개, 혼자하기 ${stats.soloSessions}개예요.`
-                : "지금 접속 현황을 불러오는 중이에요."}
-            </div>
-            <Button asChild className="w-full">
-              <NavLink to="/netplay">플레이 로비로 이동</NavLink>
-            </Button>
-          </CardContent>
-        </Card>
       </section>
+
+      <section className="overflow-hidden rounded-[28px] border border-border/70 bg-card/95">
+        <div className="flex flex-col gap-3 border-b border-border/70 px-5 py-5 lg:flex-row lg:items-end lg:justify-between lg:px-6">
+          <div className="space-y-2">
+            <Badge variant="secondary" className="w-fit text-[10px]">
+              실시간 운영
+            </Badge>
+            <div className="space-y-1">
+              <h2 className="text-2xl font-semibold tracking-tight text-foreground lg:text-3xl">
+                실시간 이용 현황
+              </h2>
+              <p className="text-sm leading-6 text-muted-foreground">
+                방문, 플레이, 인기 게임 흐름을 한 번에 확인할 수 있어요.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 self-start rounded-full border border-primary/20 bg-primary/5 px-3 py-1.5 text-xs text-muted-foreground lg:self-auto">
+            <span className="size-2 rounded-full bg-primary" />
+            {statsLoading
+              ? "데이터 동기화 중"
+              : statsError
+                ? statsError
+                : `마지막 반영 ${updatedAt ? relativeTimeFormatter.format(updatedAt) : "방금 전"}`}
+          </div>
+        </div>
+
+        <div className="grid gap-4 p-4 lg:grid-cols-[1.45fr_0.95fr]">
+          <div className="flex h-full flex-col gap-4 rounded-[24px] bg-gradient-to-br from-primary/10 via-background/70 to-background/40 p-4 lg:p-5">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <div className="text-xs font-medium uppercase tracking-[0.2em] text-primary">
+                  Live Overview
+                </div>
+                <div className="mt-1 text-lg font-semibold text-foreground">실시간 이용 현황</div>
+              </div>
+              <Activity className="size-5 text-primary" />
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-3">
+              <div className="rounded-[22px] border border-primary/15 bg-background/80 px-5 py-5 shadow-sm shadow-primary/5 lg:px-6">
+                <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                  <Users className="size-3.5 text-primary" />
+                  총 방문자
+                </div>
+                <div className="mt-3 text-4xl font-semibold tracking-tight text-foreground lg:text-5xl">
+                  {stats ? `${numberFormatter.format(stats.totalVisitors)}명` : "--"}
+                </div>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  {stats
+                    ? `오늘 신규 방문은 ${numberFormatter.format(stats.todayVisitors)}명이에요.`
+                    : "방문 지표를 불러오는 중이에요."}
+                </p>
+              </div>
+
+              <div className="rounded-[22px] border border-primary/15 bg-background/80 px-5 py-5 shadow-sm shadow-primary/5 lg:px-6">
+                <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                  <Activity className="size-3.5 text-primary" />
+                  지금 게임 중
+                </div>
+                <div className="mt-3 text-4xl font-semibold tracking-tight text-foreground lg:text-5xl">
+                  {stats ? `${numberFormatter.format(activeRooms)}개` : "--"}
+                </div>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  {stats
+                    ? `${connectedPlayers}명이 ${activeRooms}개 세션에서 플레이 중이에요.`
+                    : "실시간 세션을 불러오는 중이에요."}
+                </p>
+              </div>
+
+              <div className="rounded-[22px] border border-primary/15 bg-background/80 px-5 py-5 shadow-sm shadow-primary/5 lg:px-6">
+                <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                  <Gamepad2 className="size-3.5 text-primary" />
+                  총 플레이 게임
+                </div>
+                <div className="mt-3 text-4xl font-semibold tracking-tight text-foreground lg:text-5xl">
+                  {stats ? `${numberFormatter.format(stats.totalGames)}판` : "--"}
+                </div>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  {stats
+                    ? `오늘 시작된 게임은 ${numberFormatter.format(stats.todayGames)}판이에요.`
+                    : "플레이 기록을 불러오는 중이에요."}
+                </p>
+              </div>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-4 rounded-[22px] border border-primary/15 bg-background/75 px-5 py-5 shadow-sm shadow-primary/5 lg:px-6">
+                <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+                  <Radio className="size-4 text-primary" />
+                  실시간 모드 분포
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="rounded-2xl border border-border/70 bg-card/80 p-4">
+                    <div className="text-xs text-muted-foreground">넷플레이 세션</div>
+                    <div className="mt-2 text-3xl font-semibold text-foreground">
+                      {stats ? `${numberFormatter.format(activeNetplayRooms)}개` : "--"}
+                    </div>
+                    <div className="mt-1 text-xs text-muted-foreground">
+                      열린 방 {numberFormatter.format(openRooms)}개 · 대기 {numberFormatter.format(waitingRooms)}개
+                    </div>
+                  </div>
+                  <div className="rounded-2xl border border-border/70 bg-card/80 p-4">
+                    <div className="text-xs text-muted-foreground">혼자하기 세션</div>
+                    <div className="mt-2 text-3xl font-semibold text-foreground">
+                      {stats ? `${numberFormatter.format(soloSessions)}개` : "--"}
+                    </div>
+                    <div className="mt-1 text-xs text-muted-foreground">
+                      상대 연결 없이 바로 실행된 플레이예요.
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-4 rounded-[22px] border border-primary/15 bg-background/75 px-5 py-5 shadow-sm shadow-primary/5 lg:px-6">
+                <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+                  <CalendarDays className="size-4 text-primary" />
+                  오늘 흐름
+                </div>
+                <div className="space-y-3">
+                  <div className="flex items-start justify-between gap-3 border-b border-border/70 pb-3">
+                    <div>
+                      <div className="text-sm font-medium text-foreground">오늘 방문자</div>
+                      <div className="text-xs text-muted-foreground">오늘 들어온 사용자 수</div>
+                    </div>
+                    <div className="text-right text-2xl font-semibold text-foreground">
+                      {stats ? `${numberFormatter.format(stats.todayVisitors)}명` : "--"}
+                    </div>
+                  </div>
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className="text-sm font-medium text-foreground">오늘 시작된 게임</div>
+                      <div className="text-xs text-muted-foreground">기록된 전체 시작 수</div>
+                    </div>
+                    <div className="text-right text-2xl font-semibold text-foreground">
+                      {stats ? `${numberFormatter.format(stats.todayGames)}판` : "--"}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+          <div className="rounded-[24px] bg-gradient-to-br from-primary/10 via-background/70 to-background/40 px-5 py-5 lg:px-6">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <div className="text-xs font-medium uppercase tracking-[0.2em] text-primary">
+                  Popular Now
+                </div>
+                <div className="mt-1 text-lg font-semibold text-foreground">인기 게임 스포트라이트</div>
+              </div>
+              <Trophy className="size-5 text-primary" />
+            </div>
+
+            <div className="mt-4 space-y-3">
+              <div className="rounded-[24px] border border-primary/20 bg-background/80 p-4 shadow-sm shadow-primary/5">
+                <div className="text-xs text-muted-foreground">오늘 가장 많이 플레이된 게임</div>
+                <div className="mt-2 text-xl font-semibold leading-snug text-foreground lg:text-2xl">
+                  {todayPopularGame?.gameName ?? "아직 없어요."}
+                </div>
+                <div className="mt-2 text-sm text-muted-foreground">
+                  {todayPopularGame
+                    ? `오늘 ${numberFormatter.format(todayPopularGame.playCount)}번 플레이됐어요.`
+                    : "오늘 기록이 쌓이면 자동으로 보여드려요."}
+                </div>
+              </div>
+
+              <div className="rounded-[24px] border border-primary/20 bg-background/80 p-4 shadow-sm shadow-primary/5">
+                <div className="text-xs text-muted-foreground">이번 주 가장 많이 플레이된 게임</div>
+                <div className="mt-2 text-xl font-semibold leading-snug text-foreground lg:text-2xl">
+                  {weeklyPopularGame?.gameName ?? "아직 없어요."}
+                </div>
+                <div className="mt-2 text-sm text-muted-foreground">
+                  {weeklyPopularGame
+                    ? `${numberFormatter.format(weeklyPopularGame.playCount)}번 플레이됐어요.`
+                    : "주간 기록이 쌓이면 자동으로 보여드려요."}
+                </div>
+              </div>
+
+              <div className="rounded-[24px] border border-border/70 bg-background/70 p-4">
+                <div className="text-xs text-muted-foreground">이번 달 가장 많이 플레이된 게임</div>
+                <div className="mt-2 text-xl font-semibold leading-snug text-foreground lg:text-2xl">
+                  {monthlyPopularGame?.gameName ?? "아직 없어요."}
+                </div>
+                <div className="mt-2 text-sm text-muted-foreground">
+                  {monthlyPopularGame
+                    ? `${numberFormatter.format(monthlyPopularGame.playCount)}번 플레이됐어요.`
+                    : "월간 기록이 쌓이면 자동으로 보여드려요."}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
     </div>
   );
 }
