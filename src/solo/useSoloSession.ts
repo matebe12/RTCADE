@@ -4,6 +4,7 @@ import type { SystemCore } from "@/components/EmulatorPlayer";
 import { parseRomName } from "@/lib/game-names";
 import {
   endActivePlaySession,
+  endActivePlaySessionWithBeacon,
   notifyOperationsStatsRefresh,
   recordGameSession,
   upsertActivePlaySession,
@@ -51,6 +52,7 @@ export function useSoloSession({
     romPath: string;
   } | null>(null);
   const sessionStartedAtRef = useRef<number | null>(null);
+  const previousStepRef = useRef<LobbyState["step"]>(currentStep);
   const [startingRomPath, setStartingRomPath] = useState<string | null>(null);
 
   const clearPendingStart = useCallback(() => {
@@ -72,6 +74,21 @@ export function useSoloSession({
     }
 
     void endActivePlaySession(activeSessionId).catch(() => undefined);
+  }, []);
+
+  const stopSoloTrackingImmediately = useCallback(() => {
+    const activeSessionId = activeSoloSessionIdRef.current;
+    activeSoloSessionIdRef.current = null;
+
+    if (!activeSessionId) {
+      return;
+    }
+
+    const beaconSent = endActivePlaySessionWithBeacon(activeSessionId);
+
+    if (!beaconSent) {
+      void endActivePlaySession(activeSessionId).catch(() => undefined);
+    }
   }, []);
 
   const resetSoloRuntime = useCallback(() => {
@@ -182,9 +199,21 @@ export function useSoloSession({
 
   useEffect(() => {
     return () => {
-      stopSoloTracking();
+      stopSoloTrackingImmediately();
     };
-  }, [stopSoloTracking]);
+  }, [stopSoloTrackingImmediately]);
+
+  useEffect(() => {
+    const previousStep = previousStepRef.current;
+    previousStepRef.current = currentStep;
+
+    if (previousStep === "solo-playing" && currentStep !== "solo-playing") {
+      stopSoloTrackingImmediately();
+      activeSessionRef.current = null;
+      sessionStartedAtRef.current = null;
+      clearPendingStart();
+    }
+  }, [clearPendingStart, currentStep, stopSoloTrackingImmediately]);
 
   useEffect(() => {
     if (currentStep !== "solo-playing") {
@@ -192,21 +221,23 @@ export function useSoloSession({
     }
 
     const handlePageHide = () => {
-      const activeSessionId = activeSoloSessionIdRef.current;
+      stopSoloTrackingImmediately();
+    };
 
-      if (!activeSessionId) {
-        return;
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "hidden") {
+        stopSoloTrackingImmediately();
       }
-
-      void endActivePlaySession(activeSessionId).catch(() => undefined);
     };
 
     window.addEventListener("pagehide", handlePageHide);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
 
     return () => {
       window.removeEventListener("pagehide", handlePageHide);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, [currentStep]);
+  }, [currentStep, stopSoloTrackingImmediately]);
 
   useEffect(() => {
     if (currentStep !== "solo-playing") {
