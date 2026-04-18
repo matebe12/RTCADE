@@ -77,6 +77,11 @@ export function registerStatsRoutes(
     res.status(202).json({ ok: true });
   });
 
+  app.post("/api/active-play-sessions/:sessionId/end", (req, res) => {
+    playSessionStore.endSession(req.params.sessionId ?? "");
+    res.status(202).json({ ok: true });
+  });
+
   app.get("/api/stats", async (_req, res) => {
     const visitorCounts = await operationsDatabase.getVisitorCounts();
     const gameMetrics = await operationsDatabase.getGameMetrics();

@@ -121,6 +121,28 @@ export function getOperationsStatsRefreshEventName() {
   return OPERATIONS_STATS_REFRESH_EVENT;
 }
 
+export function endActivePlaySessionWithBeacon(sessionId: string) {
+  if (
+    typeof window === "undefined" ||
+    typeof navigator === "undefined" ||
+    typeof navigator.sendBeacon !== "function"
+  ) {
+    return false;
+  }
+
+  const trimmedSessionId = sessionId.trim();
+
+  if (trimmedSessionId.length === 0) {
+    return false;
+  }
+
+  const targetUrl = buildBackendUrl(
+    `/api/active-play-sessions/${encodeURIComponent(trimmedSessionId)}/end`,
+  );
+
+  return navigator.sendBeacon(targetUrl);
+}
+
 export function fetchOperationsStats() {
   return fetchJson<unknown>("/api/stats").then(normalizeOperationsStats);
 }
