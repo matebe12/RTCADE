@@ -4,7 +4,9 @@ import { requestResyncGetState, requestResyncLoadState } from "@/components/Emul
 import type { SystemCore } from "@/components/EmulatorPlayer";
 import type { NetplayPeer } from "@/netplay/peer";
 
-const DEFAULT_RESYNC_PROFILE = {
+const CONTINUOUS_RESYNC_TRIAL = true;
+
+const BALANCED_DEFAULT_RESYNC_PROFILE = {
   ackTimeoutMs: 4500,
   backoffStepMs: 500,
   baseIntervalMs: 1000,
@@ -14,7 +16,7 @@ const DEFAULT_RESYNC_PROFILE = {
   veryLargeStatePenaltyMs: 1600,
 };
 
-const ARCADE_RESYNC_PROFILE = {
+const BALANCED_ARCADE_RESYNC_PROFILE = {
   ackTimeoutMs: 6500,
   backoffStepMs: 900,
   baseIntervalMs: 1800,
@@ -24,7 +26,7 @@ const ARCADE_RESYNC_PROFILE = {
   veryLargeStatePenaltyMs: 2200,
 };
 
-const MAME2003_RESYNC_PROFILE = {
+const BALANCED_MAME2003_RESYNC_PROFILE = {
   ackTimeoutMs: 7500,
   backoffStepMs: 1200,
   baseIntervalMs: 2600,
@@ -34,16 +36,74 @@ const MAME2003_RESYNC_PROFILE = {
   veryLargeStatePenaltyMs: 2800,
 };
 
-function getResyncProfile(core: SystemCore | null) {
+const CONTINUOUS_DEFAULT_RESYNC_PROFILE = {
+  ackTimeoutMs: 4500,
+  backoffStepMs: 300,
+  baseIntervalMs: 400,
+  largeStatePenaltyMs: 350,
+  maxIntervalMs: 2800,
+  startDelayMs: 900,
+  veryLargeStatePenaltyMs: 900,
+};
+
+const CONTINUOUS_ARCADE_RESYNC_PROFILE = {
+  ackTimeoutMs: 6500,
+  backoffStepMs: 500,
+  baseIntervalMs: 650,
+  largeStatePenaltyMs: 450,
+  maxIntervalMs: 4200,
+  startDelayMs: 1400,
+  veryLargeStatePenaltyMs: 1200,
+};
+
+const CONTINUOUS_MAME2003_RESYNC_PROFILE = {
+  ackTimeoutMs: 7500,
+  backoffStepMs: 700,
+  baseIntervalMs: 900,
+  largeStatePenaltyMs: 700,
+  maxIntervalMs: 5200,
+  startDelayMs: 1800,
+  veryLargeStatePenaltyMs: 1600,
+};
+
+type ResyncProfile = {
+  ackTimeoutMs: number;
+  backoffStepMs: number;
+  baseIntervalMs: number;
+  largeStatePenaltyMs: number;
+  maxIntervalMs: number;
+  startDelayMs: number;
+  veryLargeStatePenaltyMs: number;
+};
+
+function getBalancedResyncProfile(core: SystemCore | null): ResyncProfile {
   if (core === "mame2003" || core === "mame2003_plus") {
-    return MAME2003_RESYNC_PROFILE;
+    return BALANCED_MAME2003_RESYNC_PROFILE;
   }
 
   if (core === "arcade" || core === "fbneo") {
-    return ARCADE_RESYNC_PROFILE;
+    return BALANCED_ARCADE_RESYNC_PROFILE;
   }
 
-  return DEFAULT_RESYNC_PROFILE;
+  return BALANCED_DEFAULT_RESYNC_PROFILE;
+}
+
+function getContinuousResyncProfile(core: SystemCore | null): ResyncProfile {
+  if (core === "mame2003" || core === "mame2003_plus") {
+    return CONTINUOUS_MAME2003_RESYNC_PROFILE;
+  }
+
+  if (core === "arcade" || core === "fbneo") {
+    return CONTINUOUS_ARCADE_RESYNC_PROFILE;
+  }
+
+  return CONTINUOUS_DEFAULT_RESYNC_PROFILE;
+}
+
+function getResyncProfile(core: SystemCore | null): ResyncProfile {
+  return CONTINUOUS_RESYNC_TRIAL
+    ? getContinuousResyncProfile(core)
+    : getBalancedResyncProfile(core);
 }
 
 function getIntervalForStateSize(core: SystemCore | null, stateBuffer: ArrayBuffer) {
@@ -79,9 +139,13 @@ export function useNetplayResyncLoop({
   const resyncIntervalRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const resyncInProgressRef = useRef(false);
   const resyncActiveRef = useRef(false);
-  const resyncIntervalMsRef = useRef(DEFAULT_RESYNC_PROFILE.baseIntervalMs);
+  const resyncIntervalMsRef = useRef(CONTINUOUS_DEFAULT_RESYNC_PROFILE.baseIntervalMs);
   const resyncTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const resyncStartedAtRef = useRef<number | null>(null);
+  const resyncAttemptCountRef = useRef(0);
+  const resyncAppliedCountRef = useRef(0);
+  const resyncBackpressureCountRef = useRef(0);
+  const resyncFailureCountRef = useRef(0);
 
   const clearResyncTimeout = useCallback(() => {
     if (resyncTimeoutRef.current) {
@@ -108,11 +172,16 @@ export function useNetplayResyncLoop({
       const nextDelay = delayMs ?? resyncIntervalMsRef.current;
       resyncIntervalRef.current = setTimeout(() => {
         if (resyncActiveRef.current && gameStartedRef.current && !resyncInProgressRef.current) {
+          resyncAttemptCountRef.current += 1;
           resyncInProgressRef.current = true;
           resyncStartedAtRef.current = Date.now();
           const profile = getResyncProfile(sessionCoreRef.current);
+          console.log(
+            `[LOBBY] Resync attempt #${resyncAttemptCountRef.current} for ${sessionCoreRef.current ?? "default"} (delay=${nextDelay}ms, trial=${CONTINUOUS_RESYNC_TRIAL ? "continuous" : "balanced"})`,
+          );
           resyncTimeoutRef.current = setTimeout(() => {
             if (resyncInProgressRef.current) {
+              resyncFailureCountRef.current += 1;
               resyncInProgressRef.current = false;
               resyncStartedAtRef.current = null;
               clearResyncTimeout();
@@ -153,7 +222,7 @@ export function useNetplayResyncLoop({
     resyncActiveRef.current = true;
     resyncIntervalMsRef.current = profile.baseIntervalMs;
     console.log(
-      `[LOBBY] Starting paced resync pipeline for ${sessionCoreRef.current ?? "default"} (delay=${profile.startDelayMs}ms, interval=${profile.baseIntervalMs}ms)`,
+      `[LOBBY] Starting ${CONTINUOUS_RESYNC_TRIAL ? "continuous" : "balanced"} resync pipeline for ${sessionCoreRef.current ?? "default"} (delay=${profile.startDelayMs}ms, interval=${profile.baseIntervalMs}ms)`,
     );
     scheduleNextResync(profile.startDelayMs);
   }, [scheduleNextResync, sessionCoreRef]);
@@ -175,7 +244,11 @@ export function useNetplayResyncLoop({
     resyncInProgressRef.current = false;
     resyncStartedAtRef.current = null;
     clearResyncTimeout();
-    resyncIntervalMsRef.current = DEFAULT_RESYNC_PROFILE.baseIntervalMs;
+    resyncAttemptCountRef.current = 0;
+    resyncAppliedCountRef.current = 0;
+    resyncBackpressureCountRef.current = 0;
+    resyncFailureCountRef.current = 0;
+    resyncIntervalMsRef.current = getResyncProfile(sessionCoreRef.current).baseIntervalMs;
   }, [clearResyncTimeout]);
 
   const handlePeerResyncState = useCallback(
@@ -191,9 +264,10 @@ export function useNetplayResyncLoop({
   const handlePeerResyncLoaded = useCallback(() => {
     if (roleRef.current !== "host" || !resyncInProgressRef.current) return;
 
+    resyncAppliedCountRef.current += 1;
     const elapsedMs = resyncStartedAtRef.current ? Date.now() - resyncStartedAtRef.current : 0;
     console.log(
-      `[LOBBY] Guest resync load complete in ${elapsedMs}ms, next=${resyncIntervalMsRef.current}ms`,
+      `[LOBBY] Guest resync load complete in ${elapsedMs}ms (attempts=${resyncAttemptCountRef.current}, applied=${resyncAppliedCountRef.current}, failures=${resyncFailureCountRef.current}, backpressure=${resyncBackpressureCountRef.current}, next=${resyncIntervalMsRef.current}ms)`,
     );
     completeHostResync("success");
   }, [completeHostResync, roleRef]);
@@ -201,6 +275,7 @@ export function useNetplayResyncLoop({
   const handlePeerResyncFailed = useCallback(() => {
     if (roleRef.current !== "host") return;
 
+    resyncFailureCountRef.current += 1;
     console.warn("[LOBBY] Peer reported resync failure");
     completeHostResync("failed");
   }, [completeHostResync, roleRef]);
@@ -215,6 +290,7 @@ export function useNetplayResyncLoop({
         );
         const sent = peerRef.current?.sendResyncState(stateBuffer);
         if (!sent) {
+          resyncBackpressureCountRef.current += 1;
           console.warn("[LOBBY] Resync skipped (backpressure)");
           completeHostResync("backpressure");
           return;
@@ -225,7 +301,7 @@ export function useNetplayResyncLoop({
   );
 
   const handleResyncLoaded = useCallback(() => {
-    console.log("[LOBBY] GUEST resync load complete");
+    console.log("[LOBBY] GUEST resync load complete, sending ack to host");
     peerRef.current?.sendResyncLoaded();
   }, [peerRef]);
 
