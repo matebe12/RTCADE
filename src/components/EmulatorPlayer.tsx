@@ -544,9 +544,32 @@ const EmulatorPlayer = forwardRef<HTMLDivElement, EmulatorPlayerProps>(function 
       window.addEventListener("keydown", windowKeyDown, true);
       window.addEventListener("keyup", windowKeyUp, true);
     } else {
-      // Solo mode: no interception, let EmulatorJS handle natively
-      container.addEventListener("keydown", handleKeyDown, true);
-      container.addEventListener("keyup", handleKeyUp, true);
+      // Solo mode: intercept keys and use same KEY_TO_BUTTON mapping
+      // so controls are consistent with netplay (1/5/A/S/D/F).
+      windowKeyDown = (e: KeyboardEvent) => {
+        if (!container.contains(document.activeElement)) return;
+        const btn = KEY_TO_BUTTON[e.code];
+        if (btn === undefined) return;
+        e.stopImmediatePropagation();
+        e.preventDefault();
+        const ejs = (window as unknown as Record<string, unknown>).EJS_emulator as
+          | { gameManager?: { simulateInput: (p: number, b: number, v: number) => void } }
+          | undefined;
+        ejs?.gameManager?.simulateInput(0, btn, 1);
+      };
+      windowKeyUp = (e: KeyboardEvent) => {
+        if (!container.contains(document.activeElement)) return;
+        const btn = KEY_TO_BUTTON[e.code];
+        if (btn === undefined) return;
+        e.stopImmediatePropagation();
+        e.preventDefault();
+        const ejs = (window as unknown as Record<string, unknown>).EJS_emulator as
+          | { gameManager?: { simulateInput: (p: number, b: number, v: number) => void } }
+          | undefined;
+        ejs?.gameManager?.simulateInput(0, btn, 0);
+      };
+      window.addEventListener("keydown", windowKeyDown, true);
+      window.addEventListener("keyup", windowKeyUp, true);
     }
 
     return () => {
