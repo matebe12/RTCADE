@@ -1,9 +1,13 @@
-import { useEffect, useRef, forwardRef, useImperativeHandle } from "react";
+import { useEffect, useRef, forwardRef, useImperativeHandle, useCallback } from "react";
 
 import { appEnvironment } from "@/config/environment";
 import { createEmulatorRuntimeBridge } from "@/lib/emulator-runtime-bridge";
+import {
+  CORE_REMAP,
+  EJS_BUTTONS_CONFIG,
+  KEY_TO_BUTTON,
+} from "../../shared/emulator-protocol";
 import { buildBackendUrl } from "@/lib/backend-url";
-import { EMULATOR_MESSAGE_TYPE } from "../../shared/emulator-protocol";
 
 export type SystemCore =
   | "nes"
@@ -37,10 +41,9 @@ interface EmulatorPlayerProps {
   romSource: File | string; // File (local) or URL string (server)
   core: SystemCore;
   role?: "host" | "guest"; // undefined = solo mode
-  romPath?: string; // e.g. "mame2003/mslug3.zip" for server-served emulator page
+  romPath?: string; // e.g. "mame2003/mslug3.zip" for server-served ROM
   biosPath?: string; // e.g. "mame2003/neogeo.zip"
   onLocalInput?: (button: number, down: boolean) => void;
-  onEmulatorPublicReady?: () => void;
   onEmulatorReady?: () => void;
   onSaveState?: (state: ArrayBuffer) => void;
   onStateLoaded?: () => void;
@@ -52,7 +55,140 @@ interface EmulatorPlayerProps {
   onCanvasStreamReady?: (stream: MediaStream) => void;
 }
 
-const EmulatorPlayer = forwardRef<HTMLIFrameElement, EmulatorPlayerProps>(function EmulatorPlayer(
+/** CSS to hide EmulatorJS UI buttons we don't want */
+const EJS_HIDE_BUTTONS_CSS = [
+  "playPause", "play", "pause", "restart", "mute", "unmute",
+  "screenshot", "saveState", "loadState", "quickSave", "quickLoad",
+  "screenRecord", "saveSavFiles", "loadSavFiles", "cacheManager",
+  "cheat", "exitEmulation", "volume",
+].map((btn) => `[data-btn="${btn}"]{display:none!important}`).join("");
+
+/**
+ * Install an AudioContext monkey-patch BEFORE EmulatorJS loads.
+ * This captures the AudioContext it creates and taps into the audio output
+ * for WebRTC streaming.
+ *
+ * Strategy: Replace the AudioContext constructor. When EmulatorJS (via
+ * Emscripten SDL2) creates its AudioContext, we intercept it and override
+ * the `destination` property to return a GainNode that fans out audio to
+ * BOTH the real speakers AND a MediaStreamDestination (for WebRTC capture).
+ *
+ * This avoids patching AudioNode.prototype.connect (which is fragile and
+ * causes issues when multiple AudioContexts exist).
+ */
+function installAudioCapture(): void {
+  if ((window as Record<string, unknown>).__rtcade_audio_patched) return;
+  (window as Record<string, unknown>).__rtcade_audio_patched = true;
+
+  const OrigAudioContext = window.AudioContext;
+  // Save original so we can restore it on cleanup
+  (window as Record<string, unknown>).__rtcade_orig_audio_context = OrigAudioContext;
+
+  const patchedCtor = function (this: AudioContext, ...args: ConstructorParameters<typeof AudioContext>) {
+    const ctx = new OrigAudioContext(...args);
+
+    try {
+      // Create a MediaStreamDestination to capture audio for WebRTC
+      const dest = ctx.createMediaStreamDestination();
+      // Create a GainNode that serves as a "fake destination"
+      // Anything connecting to this node will be routed to BOTH
+      // the real ctx.destination (speakers) and the MediaStreamDestination (WebRTC)
+      const fakeDestination = ctx.createGain();
+      fakeDestination.gain.value = 1;
+      fakeDestination.connect(ctx.destination);  // speakers
+      fakeDestination.connect(dest);              // WebRTC capture
+
+      // Override the `destination` getter so EmulatorJS connects to our fakeDestination
+      Object.defineProperty(ctx, "destination", {
+        get() {
+          return fakeDestination;
+        },
+        configurable: true,
+      });
+
+      // Store the capture stream for later retrieval
+      (window as Record<string, unknown>).__rtcade_audio_splitter = {
+        stream: dest.stream,
+        ctx,
+        dest,
+        fakeDestination,
+      };
+
+      console.log("[EMULATOR] Audio capture installed via destination override");
+    } catch (e) {
+      console.warn("[EMULATOR] Audio capture setup failed:", e);
+    }
+
+    return ctx;
+  } as unknown as typeof AudioContext;
+
+  // Copy static properties so instanceof checks still work
+  Object.setPrototypeOf(patchedCtor, OrigAudioContext);
+  Object.setPrototypeOf(patchedCtor.prototype, OrigAudioContext.prototype);
+  (window as Record<string, unknown>).AudioContext = patchedCtor;
+}
+
+/**
+ * Remove audio capture monkey-patch and clean up.
+ */
+function removeAudioCapture(): void {
+  // Restore original AudioContext constructor
+  const orig = (window as Record<string, unknown>).__rtcade_orig_audio_context;
+  if (orig) {
+    (window as Record<string, unknown>).AudioContext = orig;
+    delete (window as Record<string, unknown>).__rtcade_orig_audio_context;
+  }
+  delete (window as Record<string, unknown>).__rtcade_audio_splitter;
+  delete (window as Record<string, unknown>).__rtcade_audio_patched;
+}
+
+/**
+ * Globals that WE set before loading loader.js.
+ * We only clean these up — NOT the ones EmulatorJS sets internally
+ * (EJS_STORAGE, EJS_emulator, etc.) to avoid race conditions with
+ * React Strict Mode double-invoke.
+ */
+const OUR_EJS_GLOBALS = [
+  "EJS_player", "EJS_core", "EJS_pathtodata", "EJS_color",
+  "EJS_startOnLoaded", "EJS_language", "EJS_disableAutoLang",
+  "EJS_gameID", "EJS_Buttons", "EJS_ready", "EJS_onGameStart",
+  "EJS_gameUrl", "EJS_biosUrl",
+] as const;
+
+/**
+ * Clean up EJS globals that we set, and destroy the EmulatorJS instance.
+ * Preserves EJS_STORAGE (class defined by loader.js) so subsequent
+ * mounts don't hit "EJS_STORAGE is not a constructor".
+ */
+function cleanupEJSGlobals() {
+  const win = window as Record<string, unknown>;
+
+  // Destroy the running EmulatorJS instance if it exists and has a gameManager
+  // (partially initialized instances don't have callEvent and crash on exit)
+  const emu = win.EJS_emulator as {
+    callEvent?: (name: string) => void;
+    gameManager?: unknown;
+  } | undefined;
+  if (emu?.gameManager) {
+    try { emu.callEvent?.("exit"); } catch { /* best-effort */ }
+  }
+  delete win.EJS_emulator;
+
+  // Only delete the globals WE explicitly set
+  for (const key of OUR_EJS_GLOBALS) {
+    try {
+      delete win[key];
+    } catch {
+      win[key] = undefined;
+    }
+  }
+
+  // Clean up our custom globals
+  delete win._videoCaptureActive;
+  delete win._videoCaptureInFlight;
+}
+
+const EmulatorPlayer = forwardRef<HTMLDivElement, EmulatorPlayerProps>(function EmulatorPlayer(
   {
     romSource,
     core,
@@ -60,309 +196,514 @@ const EmulatorPlayer = forwardRef<HTMLIFrameElement, EmulatorPlayerProps>(functi
     romPath,
     biosPath,
     onLocalInput,
-    onEmulatorPublicReady,
     onEmulatorReady,
-    onSaveState,
-    onStateLoaded,
-    onSaveStateError,
-    onResyncState,
-    onResyncLoaded,
-    onResyncFailed,
+    onSaveState: _onSaveState,
+    onStateLoaded: _onStateLoaded,
+    onSaveStateError: _onSaveStateError,
+    onResyncState: _onResyncState,
+    onResyncLoaded: _onResyncLoaded,
+    onResyncFailed: _onResyncFailed,
     onChatShortcut,
     onCanvasStreamReady,
   },
   ref,
 ) {
-  const iframeRef = useRef<HTMLIFrameElement>(null);
-  const bridgeCanvasRef = useRef<HTMLCanvasElement | null>(null);
-  const bridgeCtxRef = useRef<CanvasRenderingContext2D | null>(null);
-  const bridgeStreamRef = useRef<MediaStream | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const scriptRef = useRef<HTMLScriptElement | null>(null);
+  const styleRef = useRef<HTMLStyleElement | null>(null);
   const streamReadyFiredRef = useRef(false);
-  const runtimeBridge = createEmulatorRuntimeBridge(iframeRef);
+  const gameRunningRef = useRef(false);
+  const isNetplay = role === "host" || role === "guest";
+  const localPlayer = role === "guest" ? 1 : 0;
 
-  useImperativeHandle(ref, () => iframeRef.current!, []);
+  // Stable refs for callback props so the main effect doesn't depend on them
+  const onEmulatorReadyRef = useRef(onEmulatorReady);
+  onEmulatorReadyRef.current = onEmulatorReady;
 
-  // Cleanup video bridge on unmount
-  useEffect(() => {
-    return () => {
-      if (bridgeStreamRef.current) {
-        bridgeStreamRef.current.getTracks().forEach((t) => t.stop());
-        bridgeStreamRef.current = null;
-      }
-      bridgeCanvasRef.current = null;
-      bridgeCtxRef.current = null;
-      streamReadyFiredRef.current = false;
-    };
-  }, []);
+  useImperativeHandle(ref, () => containerRef.current!, []);
 
-  useEffect(() => {
-    const iframe = iframeRef.current;
-    if (!iframe) return undefined;
-
-    if (romPath) {
-      // Server mode: use /emulator endpoint (same-origin with ROMs)
-      const params = new URLSearchParams({ core, rom: romPath });
-      if (role) params.set("role", role);
-      if (biosPath) params.set("bios", biosPath);
-      iframe.src = buildBackendUrl("/emulator", params);
-      return undefined;
-    } else {
-      // Local file mode: use blob iframe + postMessage
-      const html = buildLocalEmulatorHTML(core);
-      const blob = new Blob([html], { type: "text/html" });
-      const blobUrl = URL.createObjectURL(blob);
-      iframe.src = blobUrl;
-
-      const onLoad = () => {
-        if (typeof romSource !== "string") {
-          romSource.arrayBuffer().then((buffer) => {
-            iframe.contentWindow?.postMessage(
-              { type: EMULATOR_MESSAGE_TYPE.ROM_DATA, buffer },
-              "*",
-              [buffer],
-            );
-          });
-        }
-      };
-      iframe.addEventListener("load", onLoad, { once: true });
-
-      return () => {
-        iframe.removeEventListener("load", onLoad);
-        URL.revokeObjectURL(blobUrl);
-      };
-    }
-  }, [romSource, core, role, romPath, biosPath]);
-
-  // Listen for events forwarded from inside the iframe via postMessage
-  useEffect(() => {
-    const handleMessage = (e: MessageEvent) => {
-      if (!runtimeBridge.events.isMessageFromFrame(e)) {
+  // Setup keyboard handler for netplay input capture
+  const handleKeyDown = useCallback(
+    (e: KeyboardEvent) => {
+      // Chat shortcut (Enter key)
+      if (
+        isNetplay &&
+        e.code === "Enter" &&
+        !e.repeat &&
+        !e.altKey &&
+        !e.ctrlKey &&
+        !e.metaKey &&
+        !e.shiftKey
+      ) {
+        e.stopPropagation();
+        e.preventDefault();
+        onChatShortcut?.();
         return;
       }
 
-      switch (e.data.type) {
-        case EMULATOR_MESSAGE_TYPE.LOCAL_INPUT:
-          onLocalInput?.(e.data.button, e.data.down);
-          return;
-        case EMULATOR_MESSAGE_TYPE.EMULATOR_PUBLIC_READY:
-          onEmulatorPublicReady?.();
-          return;
-        case EMULATOR_MESSAGE_TYPE.EMULATOR_READY:
-          onEmulatorReady?.();
-          return;
-        case EMULATOR_MESSAGE_TYPE.SAVE_STATE:
-          onSaveState?.(e.data.state);
-          return;
-        case EMULATOR_MESSAGE_TYPE.STATE_LOADED:
-          onStateLoaded?.();
-          return;
-        case EMULATOR_MESSAGE_TYPE.SAVE_STATE_ERROR:
-          onSaveStateError?.(e.data.error);
-          return;
-        case EMULATOR_MESSAGE_TYPE.RESYNC_STATE:
-          onResyncState?.(e.data.state);
-          return;
-        case EMULATOR_MESSAGE_TYPE.RESYNC_LOADED:
-          onResyncLoaded?.();
-          return;
-        case EMULATOR_MESSAGE_TYPE.RESYNC_FAILED:
-          onResyncFailed?.();
-          return;
-        case EMULATOR_MESSAGE_TYPE.CHAT_SHORTCUT:
+      const btn = KEY_TO_BUTTON[e.code];
+      if (btn === undefined) return;
+
+      if (isNetplay) {
+        e.stopPropagation();
+        e.preventDefault();
+
+        // Check window-level flag set by sendStartGame / markGameRunning
+        if (!(window as Record<string, unknown>).__rtcade_game_running) return;
+
+        // Apply local input directly
+        const ejs = (window as Record<string, unknown>).EJS_emulator as
+          | { gameManager?: { simulateInput: (p: number, b: number, v: number) => void } }
+          | undefined;
+        ejs?.gameManager?.simulateInput(localPlayer, btn, 1);
+        onLocalInput?.(btn, true);
+      }
+      // Solo mode: let EmulatorJS handle it natively (don't intercept)
+    },
+    [isNetplay, localPlayer, onChatShortcut, onLocalInput],
+  );
+
+  const handleKeyUp = useCallback(
+    (e: KeyboardEvent) => {
+      const btn = KEY_TO_BUTTON[e.code];
+      if (btn === undefined) return;
+
+      if (isNetplay) {
+        e.stopPropagation();
+        e.preventDefault();
+
+        if (!(window as Record<string, unknown>).__rtcade_game_running) return;
+
+        const ejs = (window as Record<string, unknown>).EJS_emulator as
+          | { gameManager?: { simulateInput: (p: number, b: number, v: number) => void } }
+          | undefined;
+        ejs?.gameManager?.simulateInput(localPlayer, btn, 0);
+        onLocalInput?.(btn, false);
+      }
+    },
+    [isNetplay, localPlayer, onLocalInput],
+  );
+
+  // Mount EmulatorJS directly in the container div
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return undefined;
+
+    // Aborted flag — prevents async script callbacks from running
+    // after React Strict Mode cleanup.
+    let aborted = false;
+
+    // Install audio capture before EJS loads
+    installAudioCapture();
+
+    // Create the game mount point
+    const gameDiv = document.createElement("div");
+    gameDiv.id = "game";
+    gameDiv.style.width = "100%";
+    gameDiv.style.height = "100%";
+    container.appendChild(gameDiv);
+
+    // Inject CSS to hide unwanted EmulatorJS buttons
+    const style = document.createElement("style");
+    style.textContent = EJS_HIDE_BUTTONS_CSS;
+    document.head.appendChild(style);
+    styleRef.current = style;
+
+    const ejsCore = CORE_REMAP[core] || core;
+    const win = window as Record<string, unknown>;
+
+    // Suppress WakeLock
+    try {
+      Object.defineProperty(navigator, "wakeLock", {
+        value: {
+          request: () =>
+            Promise.resolve({
+              released: false,
+              release: () => Promise.resolve(),
+              addEventListener: () => {},
+              removeEventListener: () => {},
+              onrelease: null,
+              type: "screen",
+            }),
+        },
+        writable: true,
+        configurable: true,
+      });
+    } catch {
+      /* already defined */
+    }
+
+    // Set EJS globals
+    win.EJS_player = "#game";
+    win.EJS_core = ejsCore;
+    win.EJS_pathtodata = appEnvironment.emulatorJsDataUrl;
+    win.EJS_color = "#00d4ff";
+    win.EJS_startOnLoaded = true;
+    win.EJS_language = "en";
+    win.EJS_disableAutoLang = true;
+    win.EJS_gameID = 1;
+    win.EJS_Buttons = { ...EJS_BUTTONS_CONFIG };
+
+    // EJS_ready — fires when EmulatorJS UI is loaded
+    win.EJS_ready = () => {
+      console.log("[EMULATOR] EJS_ready fired");
+    };
+
+    // For netplay: intercept game start to pause and verify gameManager
+    if (isNetplay) {
+      gameRunningRef.current = false;
+      win.EJS_onGameStart = () => {
+        if (aborted) return;
+        const ejs = win.EJS_emulator as
+          | { pause: () => void; play: () => void; gameManager?: { getState: () => unknown } }
+          | undefined;
+        if (!ejs) return;
+
+        console.log("[EMULATOR] EJS_onGameStart fired (netplay), pausing...");
+        ejs.pause();
+
+        let attempt = 0;
+        function tryReady() {
+          if (aborted) return;
+          attempt++;
+          console.log("[EMULATOR] Ready attempt", attempt);
+          const ejsInner = win.EJS_emulator as
+            | { pause: () => void; play: () => void; gameManager?: { getState: () => Uint8Array } }
+            | undefined;
+          if (ejsInner?.gameManager) {
+            try {
+              const testState = ejsInner.gameManager.getState();
+              if (testState && testState.byteLength > 0) {
+                console.log("[EMULATOR] getState() works, state size:", testState.byteLength);
+                ejsInner.pause();
+                onEmulatorReadyRef.current?.();
+                return;
+              }
+            } catch (e) {
+              console.warn("[EMULATOR] getState() failed:", e);
+            }
+          }
+          if (attempt < 10) {
+            ejsInner?.play();
+            setTimeout(() => {
+              ejsInner?.pause();
+              setTimeout(tryReady, 200);
+            }, 200);
+          } else {
+            console.warn("[EMULATOR] Max attempts reached, sending ready anyway");
+            ejsInner?.pause();
+            onEmulatorReadyRef.current?.();
+          }
+        }
+        setTimeout(tryReady, 500);
+      };
+    }
+
+    // Set game URL
+    if (romPath) {
+      // Server ROM
+      win.EJS_gameUrl = buildBackendUrl(`/roms/${romPath}`);
+      if (biosPath) {
+        win.EJS_biosUrl = buildBackendUrl(`/roms/${biosPath}`);
+      }
+    } else if (romSource instanceof File) {
+      // Local file — read and create blob URL
+      romSource.arrayBuffer().then((buffer) => {
+        if (aborted) return;
+        const blob = new Blob([buffer]);
+        win.EJS_gameUrl = URL.createObjectURL(blob);
+        // Load the script after setting the URL
+        loadEJSScript();
+      });
+      // Return early; script will be loaded after file read
+      return () => cleanup();
+    }
+
+    // Load EmulatorJS loader script (idempotent — skips if already loaded)
+    function loadEJSScript() {
+      if (aborted) return;
+
+      // If loader.js was already evaluated on a previous mount (EJS_STORAGE exists),
+      // we cannot re-evaluate it — `class EJS_STORAGE` is a block-scoped declaration
+      // that throws on redeclaration. Instead, call the EmulatorJS constructor
+      // directly which was made available globally by emulator.min.js.
+      const win = window as Record<string, unknown>;
+      if (win.EJS_STORAGE && typeof win.EmulatorJS === "function") {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const EmulatorJSCtor = win.EmulatorJS as new (el: Element) => any;
+        const el = document.querySelector("#game");
+        if (el) {
+          win.EJS_emulator = new EmulatorJSCtor(el);
+        }
+        return;
+      }
+
+      const script = document.createElement("script");
+      script.src = appEnvironment.emulatorJsLoaderUrl;
+      script.async = true;
+      document.body.appendChild(script);
+      scriptRef.current = script;
+    }
+
+    // For server ROM, load script immediately
+    if (romPath || typeof romSource === "string") {
+      loadEJSScript();
+    }
+
+    function cleanup() {
+      aborted = true;
+
+      // Remove injected elements
+      if (scriptRef.current) {
+        scriptRef.current.remove();
+        scriptRef.current = null;
+      }
+      if (styleRef.current) {
+        styleRef.current.remove();
+        styleRef.current = null;
+      }
+
+      // Stop any video streams
+      streamReadyFiredRef.current = false;
+
+      // Clear the container
+      if (container) {
+        container.innerHTML = "";
+      }
+
+      // Clean up EJS globals (preserves EJS_STORAGE for next mount)
+      cleanupEJSGlobals();
+      removeAudioCapture();
+
+      // Reset game-running flag
+      (window as Record<string, unknown>).__rtcade_game_running = false;
+      gameRunningRef.current = false;
+    }
+
+    return () => cleanup();
+  }, [romSource, core, role, romPath, biosPath, isNetplay, localPlayer]);
+
+  // Keyboard event listeners on the container
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return undefined;
+
+    // For netplay, add a window-level capture listener to intercept
+    // keys BEFORE EmulatorJS's own document/window-level listeners can
+    // handle them with default key mappings, AND before our container
+    // handler (which does the actual simulateInput call).
+    let windowKeyDown: ((e: KeyboardEvent) => void) | null = null;
+    let windowKeyUp: ((e: KeyboardEvent) => void) | null = null;
+
+    if (isNetplay) {
+      windowKeyDown = (e: KeyboardEvent) => {
+        // Only intercept when our container (or a descendant) has focus
+        if (!container.contains(document.activeElement)) return;
+
+        // Chat shortcut
+        if (
+          e.code === "Enter" &&
+          !e.repeat &&
+          !e.altKey &&
+          !e.ctrlKey &&
+          !e.metaKey &&
+          !e.shiftKey
+        ) {
+          e.stopImmediatePropagation();
+          e.preventDefault();
           onChatShortcut?.();
           return;
-        case EMULATOR_MESSAGE_TYPE.VIDEO_FRAME: {
-          // ImageBitmap bridge: draw to hidden canvas for captureStream
-          if (!onCanvasStreamReady || role !== "host") return;
-
-          const bitmap = e.data.bitmap as ImageBitmap;
-
-          // Lazily create bridge canvas on first frame
-          if (!bridgeCanvasRef.current) {
-            const canvas = document.createElement("canvas");
-            canvas.width = bitmap.width;
-            canvas.height = bitmap.height;
-            bridgeCanvasRef.current = canvas;
-            bridgeCtxRef.current = canvas.getContext("2d");
-            // captureStream(0): only capture when requestFrame() is called
-            bridgeStreamRef.current = canvas.captureStream(0);
-          }
-
-          const ctx = bridgeCtxRef.current;
-          const stream = bridgeStreamRef.current;
-          if (!ctx || !stream) {
-            bitmap.close();
-            return;
-          }
-
-          // Resize canvas if emulator resolution changed
-          if (
-            bridgeCanvasRef.current!.width !== bitmap.width ||
-            bridgeCanvasRef.current!.height !== bitmap.height
-          ) {
-            bridgeCanvasRef.current!.width = bitmap.width;
-            bridgeCanvasRef.current!.height = bitmap.height;
-          }
-
-          ctx.drawImage(bitmap, 0, 0);
-          bitmap.close();
-
-          // Request a new frame from captureStream
-          const videoTrack = stream.getVideoTracks()[0] as
-            | (MediaStreamTrack & { requestFrame?: () => void })
-            | undefined;
-          videoTrack?.requestFrame?.();
-
-          // Fire the stream-ready callback once
-          if (!streamReadyFiredRef.current) {
-            streamReadyFiredRef.current = true;
-            onCanvasStreamReady(stream);
-          }
-          return;
         }
-      }
+
+        const btn = KEY_TO_BUTTON[e.code];
+        if (btn === undefined) return;
+        e.stopImmediatePropagation();
+        e.preventDefault();
+
+        if (!(window as Record<string, unknown>).__rtcade_game_running) return;
+        const ejs = (window as Record<string, unknown>).EJS_emulator as
+          | { gameManager?: { simulateInput: (p: number, b: number, v: number) => void } }
+          | undefined;
+        ejs?.gameManager?.simulateInput(localPlayer, btn, 1);
+        onLocalInput?.(btn, true);
+      };
+      windowKeyUp = (e: KeyboardEvent) => {
+        if (!container.contains(document.activeElement)) return;
+        const btn = KEY_TO_BUTTON[e.code];
+        if (btn === undefined) return;
+        e.stopImmediatePropagation();
+        e.preventDefault();
+
+        if (!(window as Record<string, unknown>).__rtcade_game_running) return;
+        const ejs = (window as Record<string, unknown>).EJS_emulator as
+          | { gameManager?: { simulateInput: (p: number, b: number, v: number) => void } }
+          | undefined;
+        ejs?.gameManager?.simulateInput(localPlayer, btn, 0);
+        onLocalInput?.(btn, false);
+      };
+      window.addEventListener("keydown", windowKeyDown, true);
+      window.addEventListener("keyup", windowKeyUp, true);
+    } else {
+      // Solo mode: no interception, let EmulatorJS handle natively
+      container.addEventListener("keydown", handleKeyDown, true);
+      container.addEventListener("keyup", handleKeyUp, true);
+    }
+
+    return () => {
+      container.removeEventListener("keydown", handleKeyDown, true);
+      container.removeEventListener("keyup", handleKeyUp, true);
+      if (windowKeyDown) window.removeEventListener("keydown", windowKeyDown, true);
+      if (windowKeyUp) window.removeEventListener("keyup", windowKeyUp, true);
     };
-    window.addEventListener("message", handleMessage);
-    return () => window.removeEventListener("message", handleMessage);
-  }, [
-    onLocalInput,
-    onEmulatorPublicReady,
-    onEmulatorReady,
-    onSaveState,
-    onStateLoaded,
-    onSaveStateError,
-    onResyncState,
-    onResyncLoaded,
-    onResyncFailed,
-    onChatShortcut,
-    onCanvasStreamReady,
-    role,
-    runtimeBridge,
-  ]);
+  }, [handleKeyDown, handleKeyUp, isNetplay, localPlayer, onChatShortcut, onLocalInput]);
+
+  // HOST: capture canvas stream after emulator is ready
+  useEffect(() => {
+    if (role !== "host" || !onCanvasStreamReady || streamReadyFiredRef.current) return undefined;
+
+    // Poll for canvas availability (EmulatorJS creates it asynchronously)
+    const interval = setInterval(() => {
+      if (streamReadyFiredRef.current) {
+        clearInterval(interval);
+        return;
+      }
+
+      const canvas = containerRef.current?.querySelector("canvas");
+      if (!canvas) return;
+
+      try {
+        const videoStream = canvas.captureStream(60);
+
+        // Try to get audio stream and combine
+        const audioSplitter = (window as Record<string, unknown>).__rtcade_audio_splitter as {
+          stream?: MediaStream;
+        } | undefined;
+        if (audioSplitter?.stream) {
+          for (const track of audioSplitter.stream.getAudioTracks()) {
+            videoStream.addTrack(track);
+          }
+          console.log("[EMULATOR] Combined A/V stream ready");
+        } else {
+          console.log("[EMULATOR] Video-only stream ready (no audio capture)");
+        }
+
+        streamReadyFiredRef.current = true;
+        clearInterval(interval);
+        onCanvasStreamReady(videoStream);
+      } catch (e) {
+        console.warn("[EMULATOR] captureStream failed, will retry:", e);
+      }
+    }, 500);
+
+    return () => clearInterval(interval);
+  }, [role, onCanvasStreamReady]);
 
   return (
-    <iframe
-      ref={iframeRef}
-      title="emulator"
+    <div
+      ref={containerRef}
       tabIndex={0}
-      className="w-[800px] h-[600px] max-w-[95vw] max-h-[70vh] bg-neutral-900 rounded-lg border-none"
+      className="relative w-[800px] h-[600px] max-w-[95vw] max-h-[70vh] bg-neutral-900 rounded-lg overflow-hidden outline-none focus:ring-2 focus:ring-primary/60"
+      style={{ contain: "layout style paint" }}
     />
   );
 });
 
-// Start video capture on the HOST emulator iframe
-export function startEmulatorVideoCapture(
-  iframeRef: React.RefObject<HTMLIFrameElement | null>,
-) {
-  createEmulatorRuntimeBridge(iframeRef).sync.startVideoCapture();
+/**
+ * Notify EmulatorPlayer that the game should start (netplay).
+ * Directly calls EJS_emulator.play() and marks game as running.
+ */
+export function sendStartGame(containerRef: React.RefObject<HTMLDivElement | null>) {
+  const bridge = createEmulatorRuntimeBridge(containerRef);
+  bridge.sync.startGame();
+  // Mark game as running so the keyboard handler starts processing input
+  (window as Record<string, unknown>).__rtcade_game_running = true;
 }
 
-// Stop video capture
-export function stopEmulatorVideoCapture(
-  iframeRef: React.RefObject<HTMLIFrameElement | null>,
-) {
-  createEmulatorRuntimeBridge(iframeRef).sync.stopVideoCapture();
+export function focusEmulator(containerRef: React.RefObject<HTMLDivElement | null>) {
+  const bridge = createEmulatorRuntimeBridge(containerRef);
+  bridge.ui.focus();
 }
 
-// Minimal blob HTML for local file mode only (solo play with local ROM file)
-function buildLocalEmulatorHTML(core: string): string {
-  const emulatorJsDataUrl = appEnvironment.emulatorJsDataUrl;
-  const emulatorJsLoaderUrl = appEnvironment.emulatorJsLoaderUrl;
+/**
+ * Get a save state from the emulator (HOST).
+ * Returns the state buffer or null on failure.
+ * Retries up to `maxRetries` times for MAME cores.
+ */
+export async function requestSaveState(
+  containerRef: React.RefObject<HTMLDivElement | null>,
+  maxRetries = 5,
+): Promise<ArrayBuffer | null> {
+  const bridge = createEmulatorRuntimeBridge(containerRef);
 
-  return `<!DOCTYPE html>
-<html><head>
-<style>body{margin:0;background:#111;overflow:hidden}#game{width:100vw;height:100vh}</style>
-</head><body>
-<div id="game"></div>
-<script>
-  Object.defineProperty(navigator, 'wakeLock', {
-    value: { request: function() { return Promise.resolve({ released: false, release: function() { return Promise.resolve(); }, addEventListener: function(){}, removeEventListener: function(){}, onrelease: null, type: 'screen' }); } },
-    writable: true, configurable: true
-  });
-  window.EJS_player = "#game";
-  window.EJS_core = "${core}";
-  window.EJS_pathtodata = "${emulatorJsDataUrl}";
-  window.EJS_color = "#00d4ff";
-  window.EJS_startOnLoaded = true;
-  window.EJS_language = "en";
-  window.EJS_disableAutoLang = true;
-  window.EJS_gameID = 1;
-  window.EJS_ready = function() {
-    parent.postMessage({ type: "${EMULATOR_MESSAGE_TYPE.EMULATOR_PUBLIC_READY}" }, "*");
-  };
-  var KEY_TO_BUTTON = {
-    "ArrowUp": 4, "ArrowDown": 5, "ArrowLeft": 6, "ArrowRight": 7,
-    "KeyA": 0, "KeyS": 8, "KeyD": 1, "KeyF": 9,
-    "Digit1": 3, "Digit5": 2, "KeyQ": 10, "KeyE": 11
-  };
-  window.addEventListener("keydown", function(e) {
-    var btn = KEY_TO_BUTTON[e.code];
-    if (btn !== undefined) parent.postMessage({ type: "${EMULATOR_MESSAGE_TYPE.LOCAL_INPUT}", button: btn, down: true }, "*");
-  }, true);
-  window.addEventListener("keyup", function(e) {
-    var btn = KEY_TO_BUTTON[e.code];
-    if (btn !== undefined) parent.postMessage({ type: "${EMULATOR_MESSAGE_TYPE.LOCAL_INPUT}", button: btn, down: false }, "*");
-  }, true);
-  function startEmulator(url) {
-    window.EJS_gameUrl = url;
-    var s = document.createElement("script");
-    s.src = "${emulatorJsLoaderUrl}";
-    document.body.appendChild(s);
-  }
-  window.addEventListener("message", function(e) {
-    if (e.data && e.data.type === "${EMULATOR_MESSAGE_TYPE.ROM_DATA}") {
-      var blob = new Blob([e.data.buffer]);
-      startEmulator(URL.createObjectURL(blob));
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    const state = bridge.sync.getSaveState();
+    if (state && state.byteLength > 0) {
+      console.log(`[EMULATOR] getState() success on attempt ${attempt}, size: ${state.byteLength}`);
+      return state;
     }
-  });
-<\\/script>
-</body></html>`;
+    console.warn(`[EMULATOR] getState() attempt ${attempt} failed, retrying...`);
+    // Play briefly then pause before retry (MAME needs this)
+    bridge.sync.play();
+    await new Promise((r) => setTimeout(r, 300));
+    bridge.sync.pause();
+    await new Promise((r) => setTimeout(r, 300));
+  }
+  console.error("[EMULATOR] getState() failed after all retries");
+  return null;
 }
 
-export default EmulatorPlayer;
+/**
+ * Load a save state into the emulator (GUEST).
+ */
+export function loadSaveState(
+  containerRef: React.RefObject<HTMLDivElement | null>,
+  state: ArrayBuffer,
+): boolean {
+  const bridge = createEmulatorRuntimeBridge(containerRef);
+  return bridge.sync.loadSaveState(state);
+}
 
-// Send a remote input event into the iframe (button = libretro button index)
+/**
+ * Send a remote input event into the emulator.
+ */
 export function sendRemoteInput(
-  iframeRef: React.RefObject<HTMLIFrameElement | null>,
+  containerRef: React.RefObject<HTMLDivElement | null>,
   button: number,
   down: boolean,
 ) {
-  createEmulatorRuntimeBridge(iframeRef).input.sendRemoteInput(button, down);
+  const bridge = createEmulatorRuntimeBridge(containerRef);
+  bridge.input.sendRemoteInput(button, down);
 }
 
-// Tell the iframe to unpause and start the game (netplay sync)
-export function sendStartGame(iframeRef: React.RefObject<HTMLIFrameElement | null>) {
-  createEmulatorRuntimeBridge(iframeRef).sync.startGame();
+/**
+ * Get a resync state (micro-pause, get state, resume).
+ */
+export function requestResyncGetState(
+  containerRef: React.RefObject<HTMLDivElement | null>,
+): ArrayBuffer | null {
+  const bridge = createEmulatorRuntimeBridge(containerRef);
+  return bridge.sync.getResyncState();
 }
 
-export function focusEmulator(iframeRef: React.RefObject<HTMLIFrameElement | null>) {
-  createEmulatorRuntimeBridge(iframeRef).ui.focus();
-}
-
-// Ask the iframe to extract a save state (HOST)
-export function requestSaveState(iframeRef: React.RefObject<HTMLIFrameElement | null>) {
-  createEmulatorRuntimeBridge(iframeRef).sync.requestInitialState();
-}
-
-// Send a save state into the iframe to load (GUEST)
-export function loadSaveState(
-  iframeRef: React.RefObject<HTMLIFrameElement | null>,
-  state: ArrayBuffer,
-) {
-  createEmulatorRuntimeBridge(iframeRef).sync.loadInitialState(state);
-}
-
-// Coordinated resync helpers
-export function requestResyncGetState(iframeRef: React.RefObject<HTMLIFrameElement | null>) {
-  createEmulatorRuntimeBridge(iframeRef).sync.requestResyncState();
-}
-
+/**
+ * Load a resync state (micro-pause, load state, resume).
+ */
 export function requestResyncLoadState(
-  iframeRef: React.RefObject<HTMLIFrameElement | null>,
+  containerRef: React.RefObject<HTMLDivElement | null>,
   state: ArrayBuffer,
-) {
-  createEmulatorRuntimeBridge(iframeRef).sync.loadResyncState(state);
+): boolean {
+  const bridge = createEmulatorRuntimeBridge(containerRef);
+  return bridge.sync.loadResyncState(state);
 }
+
+/** Mark the game as "running" for input gating (netplay) */
+export function markGameRunning() {
+  // The EmulatorPlayer component tracks this internally via gameRunningRef,
+  // but other callers can't access it. We use a window-level flag as fallback.
+  (window as Record<string, unknown>).__rtcade_game_running = true;
+}
+
+export default EmulatorPlayer;
 
 export const SYSTEM_OPTIONS: { value: SystemCore; label: string; extensions: string }[] = [
   { value: "nes", label: "NES", extensions: ".nes,.zip" },

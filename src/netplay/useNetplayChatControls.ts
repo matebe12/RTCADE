@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, type MutableRefObject, type RefObject } from "react";
+import { useCallback, useEffect, useMemo, useRef, type MutableRefObject, type RefObject } from "react";
 
 import type { NetplayChatMessage } from "@/components/NetplayChatPanel";
 import { createEmulatorRuntimeBridge } from "@/lib/emulator-runtime-bridge";
@@ -21,7 +21,7 @@ interface UseNetplayChatControlsOptions {
   chatDraft: string;
   chatChannelState: string;
   peerRef: MutableRefObject<NetplayPeer | null>;
-  emulatorRef: RefObject<HTMLIFrameElement | null>;
+  emulatorRef: RefObject<HTMLDivElement | null>;
   opponentProfileRef: MutableRefObject<{ nickname: string; avatar: string } | null>;
   appendChatMessage: (message: NetplayChatMessage) => void;
   setChatOpen: (chatOpen: boolean) => void;
@@ -54,7 +54,7 @@ export function useNetplayChatControls({
   const peerTypingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const chatInputRef = useRef<HTMLInputElement>(null);
   const pendingChatFocusRef = useRef(false);
-  const emulatorRuntime = createEmulatorRuntimeBridge(emulatorRef);
+  const emulatorRuntime = useMemo(() => createEmulatorRuntimeBridge(emulatorRef), [emulatorRef]);
 
   useEffect(() => {
     return () => {

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, type MutableRefObject, type RefObject } from "react";
+import { useCallback, useEffect, useMemo, useRef, type MutableRefObject, type RefObject } from "react";
 
 import type { SystemCore } from "@/components/EmulatorPlayer";
 import { createEmulatorRuntimeBridge } from "@/lib/emulator-runtime-bridge";
@@ -69,7 +69,7 @@ function getIntervalForStateSize(core: SystemCore | null, stateBuffer: ArrayBuff
 
 interface UseNetplayResyncLoopOptions {
   peerRef: MutableRefObject<NetplayPeer | null>;
-  emulatorRef: RefObject<HTMLIFrameElement | null>;
+  emulatorRef: RefObject<HTMLDivElement | null>;
   roleRef: MutableRefObject<"host" | "guest" | null>;
   gameStartedRef: MutableRefObject<boolean>;
   lastInputTimeRef: MutableRefObject<number>;
@@ -110,7 +110,7 @@ export function useNetplayResyncLoop({
     rawBytes: 0,
     receiveMs: 0,
   });
-  const emulatorRuntime = createEmulatorRuntimeBridge(emulatorRef);
+  const emulatorRuntime = useMemo(() => createEmulatorRuntimeBridge(emulatorRef), [emulatorRef]);
 
   const clearResyncTimeout = useCallback(() => {
     if (resyncTimeoutRef.current) {
@@ -176,7 +176,35 @@ export function useNetplayResyncLoop({
               scheduleNextResyncImpl();
             }
           }, profile.ackTimeoutMs);
-          emulatorRuntime.sync.requestResyncState();
+          // Direct call: get resync state synchronously and send to peer
+          const stateBuffer = emulatorRuntime.sync.getResyncState();
+          if (stateBuffer) {
+            const sizeKB = stateBuffer.byteLength / 1024;
+            resyncIntervalMsRef.current = getIntervalForStateSize(sessionCoreRef.current, stateBuffer);
+            console.log(
+              `[LOBBY] Resync state ${sizeKB.toFixed(0)}KB for ${sessionCoreRef.current ?? "default"}, next=${resyncIntervalMsRef.current}ms`,
+            );
+            const sent = peerRef.current?.sendResyncState(stateBuffer);
+            if (!sent) {
+              console.warn("[LOBBY] Resync skipped (backpressure)");
+              // Inline backpressure handling (avoids circular dep with completeHostResync)
+              resyncInProgressRef.current = false;
+              resyncStartedAtRef.current = null;
+              deferredSinceRef.current = null;
+              clearResyncTimeout();
+              increaseResyncInterval("backpressure");
+              scheduleNextResyncImpl();
+            }
+            // Otherwise: wait for peer ACK (handlePeerResyncLoaded/Failed)
+          } else {
+            console.warn("[LOBBY] Resync state null, scheduling retry");
+            resyncInProgressRef.current = false;
+            resyncStartedAtRef.current = null;
+            deferredSinceRef.current = null;
+            clearResyncTimeout();
+            increaseResyncInterval("failed");
+            scheduleNextResyncImpl();
+          }
         } else {
           scheduleNextResyncImpl();
         }
@@ -188,6 +216,7 @@ export function useNetplayResyncLoop({
       gameStartedRef,
       increaseResyncInterval,
       lastInputTimeRef,
+      peerRef,
       roleRef,
       sessionCoreRef,
     ],

@@ -24,7 +24,7 @@ interface SoloPlayingSession {
 }
 
 interface SoloPlayingScreenProps {
-  emulatorRef: RefObject<HTMLIFrameElement | null>;
+  emulatorRef: RefObject<HTMLDivElement | null>;
   onBack: () => void;
   session: SoloPlayingSession;
 }

@@ -42,7 +42,7 @@ export function useSoloSession({
   setLobbyState,
   setRecentGames,
 }: UseSoloSessionOptions) {
-  const emulatorRef = useRef<HTMLIFrameElement>(null);
+  const emulatorRef = useRef<HTMLDivElement>(null);
   const activeSoloSessionIdRef = useRef<string | null>(null);
   const pendingStartTimeoutRef = useRef<number | null>(null);
   const activeSessionRef = useRef<{

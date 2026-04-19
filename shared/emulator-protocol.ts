@@ -1,149 +1,99 @@
-export const EMULATOR_MESSAGE_TYPE = {
-  CHAT_SHORTCUT: "chat-shortcut",
-  EMULATOR_PUBLIC_READY: "emulator-public-ready",
-  EMULATOR_READY: "emulator-ready",
-  GET_SAVE_STATE: "get-save-state",
-  LOAD_SAVE_STATE: "load-save-state",
-  LOCAL_INPUT: "localInput",
-  REMOTE_INPUT: "remoteInput",
-  RESYNC_FAILED: "resync-failed",
-  RESYNC_GET_STATE: "resync-get-state",
-  RESYNC_LOAD_STATE: "resync-load-state",
-  RESYNC_LOADED: "resync-loaded",
-  RESYNC_STATE: "resync-state",
-  ROM_DATA: "romData",
-  SAVE_STATE: "save-state",
-  SAVE_STATE_ERROR: "save-state-error",
-  START_GAME: "start-game",
-  START_VIDEO_CAPTURE: "start-video-capture",
-  STATE_LOADED: "state-loaded",
-  STOP_VIDEO_CAPTURE: "stop-video-capture",
-  VIDEO_FRAME: "video-frame",
-} as const;
+/**
+ * Emulator Direct API Protocol
+ *
+ * EmulatorJS runs directly in the parent DOM (no iframe).
+ * All communication is via direct function calls to window.EJS_emulator.
+ * This file defines the typed interface for those interactions.
+ */
 
-export type EmulatorMessageType =
-  (typeof EMULATOR_MESSAGE_TYPE)[keyof typeof EMULATOR_MESSAGE_TYPE];
+/* ---------- EJS runtime types (minimal subset we depend on) ---------- */
 
-export interface RemoteInputCommand {
-  type: typeof EMULATOR_MESSAGE_TYPE.REMOTE_INPUT;
-  button: number;
-  down: boolean;
+export interface EJSGameManager {
+  simulateInput(player: number, button: number, value: number): void;
+  getState(): Uint8Array;
+  loadState(state: Uint8Array): void;
 }
 
-export interface StartGameCommand {
-  type: typeof EMULATOR_MESSAGE_TYPE.START_GAME;
+export interface EJSEmulatorInstance {
+  gameManager: EJSGameManager;
+  play(): void;
+  pause(): void;
 }
 
-export interface GetSaveStateCommand {
-  type: typeof EMULATOR_MESSAGE_TYPE.GET_SAVE_STATE;
+/* ---------- Key-to-button mapping (shared between HOST and GUEST) ---------- */
+
+export const KEY_TO_BUTTON: Record<string, number> = {
+  ArrowUp: 4,
+  ArrowDown: 5,
+  ArrowLeft: 6,
+  ArrowRight: 7,
+  KeyA: 0,
+  KeyS: 8,
+  KeyD: 1,
+  KeyF: 9,
+  Digit1: 3,
+  Digit5: 2,
+  KeyQ: 10,
+  KeyE: 11,
+};
+
+/* ---------- EJS global config shape ---------- */
+
+export interface EJSGlobalConfig {
+  EJS_player: string;
+  EJS_core: string;
+  EJS_pathtodata: string;
+  EJS_gameUrl: string;
+  EJS_biosUrl?: string;
+  EJS_color: string;
+  EJS_startOnLoaded: boolean;
+  EJS_language: string;
+  EJS_disableAutoLang: boolean;
+  EJS_gameID: number;
+  EJS_ready: () => void;
+  EJS_onGameStart?: () => void;
+  EJS_Buttons: Record<string, boolean>;
+  EJS_emulator?: EJSEmulatorInstance;
 }
 
-export interface LoadSaveStateCommand {
-  type: typeof EMULATOR_MESSAGE_TYPE.LOAD_SAVE_STATE;
-  state: ArrayBuffer;
-}
+/* ---------- Core remap (shared between client and server) ---------- */
 
-export interface ResyncGetStateCommand {
-  type: typeof EMULATOR_MESSAGE_TYPE.RESYNC_GET_STATE;
-}
+export const CORE_REMAP: Record<string, string> = {
+  mame2003: "mame2003_plus",
+  arcade: "fbneo",
+};
 
-export interface ResyncLoadStateCommand {
-  type: typeof EMULATOR_MESSAGE_TYPE.RESYNC_LOAD_STATE;
-  state: ArrayBuffer;
-}
+/* ---------- EJS button visibility config ---------- */
 
-export interface RomDataCommand {
-  type: typeof EMULATOR_MESSAGE_TYPE.ROM_DATA;
-  buffer: ArrayBuffer;
-}
+export const EJS_BUTTONS_CONFIG: Record<string, boolean> = {
+  playPause: false,
+  play: false,
+  pause: false,
+  restart: false,
+  mute: false,
+  unmute: false,
+  settings: true,
+  fullscreen: true,
+  saveState: false,
+  loadState: false,
+  screenRecord: false,
+  gamepad: true,
+  cheat: false,
+  volume: false,
+  saveSavFiles: false,
+  loadSavFiles: false,
+  quickSave: false,
+  quickLoad: false,
+  screenshot: false,
+  cacheManager: false,
+  exitEmulation: false,
+};
 
-export interface StartVideoCaptureCommand {
-  type: typeof EMULATOR_MESSAGE_TYPE.START_VIDEO_CAPTURE;
-}
+/* ---------- Heartbeat / disconnect protocol (DataChannel control msgs) ---------- */
 
-export interface StopVideoCaptureCommand {
-  type: typeof EMULATOR_MESSAGE_TYPE.STOP_VIDEO_CAPTURE;
-}
+export const HEARTBEAT_INTERVAL_MS = 5_000;
+export const HEARTBEAT_WARN_TIMEOUT_MS = 15_000;
+export const HEARTBEAT_DANGER_TIMEOUT_MS = 45_000;
+export const HEARTBEAT_DISCONNECT_TIMEOUT_MS = 60_000;
 
-export type ReactToIframeMessage =
-  | GetSaveStateCommand
-  | LoadSaveStateCommand
-  | RemoteInputCommand
-  | ResyncGetStateCommand
-  | ResyncLoadStateCommand
-  | RomDataCommand
-  | StartGameCommand
-  | StartVideoCaptureCommand
-  | StopVideoCaptureCommand;
-
-export interface LocalInputEvent {
-  type: typeof EMULATOR_MESSAGE_TYPE.LOCAL_INPUT;
-  button: number;
-  down: boolean;
-}
-
-export interface EmulatorReadyEvent {
-  type: typeof EMULATOR_MESSAGE_TYPE.EMULATOR_READY;
-}
-
-export interface EmulatorPublicReadyEvent {
-  type: typeof EMULATOR_MESSAGE_TYPE.EMULATOR_PUBLIC_READY;
-}
-
-export interface SaveStateEvent {
-  type: typeof EMULATOR_MESSAGE_TYPE.SAVE_STATE;
-  state: ArrayBuffer;
-}
-
-export interface StateLoadedEvent {
-  type: typeof EMULATOR_MESSAGE_TYPE.STATE_LOADED;
-}
-
-export interface SaveStateErrorEvent {
-  type: typeof EMULATOR_MESSAGE_TYPE.SAVE_STATE_ERROR;
-  error: string;
-}
-
-export interface ResyncStateEvent {
-  type: typeof EMULATOR_MESSAGE_TYPE.RESYNC_STATE;
-  state: ArrayBuffer;
-}
-
-export interface ResyncLoadedEvent {
-  type: typeof EMULATOR_MESSAGE_TYPE.RESYNC_LOADED;
-}
-
-export interface ResyncFailedEvent {
-  type: typeof EMULATOR_MESSAGE_TYPE.RESYNC_FAILED;
-}
-
-export interface ChatShortcutEvent {
-  type: typeof EMULATOR_MESSAGE_TYPE.CHAT_SHORTCUT;
-}
-
-export interface VideoFrameEvent {
-  type: typeof EMULATOR_MESSAGE_TYPE.VIDEO_FRAME;
-  bitmap: unknown; // ImageBitmap (DOM type, not available in Node tsconfig)
-}
-
-export type IframeToReactMessage =
-  | ChatShortcutEvent
-  | EmulatorPublicReadyEvent
-  | EmulatorReadyEvent
-  | LocalInputEvent
-  | ResyncFailedEvent
-  | ResyncLoadedEvent
-  | ResyncStateEvent
-  | SaveStateErrorEvent
-  | SaveStateEvent
-  | StateLoadedEvent
-  | VideoFrameEvent;
-
-export function isIframeToReactMessage(value: unknown): value is IframeToReactMessage {
-  if (!value || typeof value !== "object") {
-    return false;
-  }
-
-  const maybeMessage = value as { type?: unknown };
-  return typeof maybeMessage.type === "string";
-}
+export type DisconnectSeverity = "connected" | "warning" | "danger" | "disconnected";

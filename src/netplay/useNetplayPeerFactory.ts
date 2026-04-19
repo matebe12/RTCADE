@@ -43,6 +43,7 @@ interface UseNetplayPeerFactoryOptions {
   handlePeerResyncState: (payload: ResyncStatePayload) => void;
   handlePeerResyncFailed: () => void;
   handleVideoStream?: (stream: MediaStream) => void;
+  handleHeartbeat?: (ts: number) => void;
 }
 
 export function useNetplayPeerFactory({
@@ -70,6 +71,7 @@ export function useNetplayPeerFactory({
   handlePeerResyncState,
   handlePeerResyncFailed,
   handleVideoStream,
+  handleHeartbeat,
 }: UseNetplayPeerFactoryOptions) {
   const createPeer = useCallback((): NetplayPeer => {
     const peer = new NetplayPeer({
@@ -101,6 +103,7 @@ export function useNetplayPeerFactory({
         console.warn(`[LOBBY] Input seq gap: expected ${expected}, got ${got}`);
       },
       onVideoStream: (stream) => handleVideoStream?.(stream),
+      onHeartbeat: (ts) => handleHeartbeat?.(ts),
       onRoomCreated: () => {
         setState((previous) => {
           if (previous.step === "browse" || previous.step === "menu") {
@@ -177,6 +180,7 @@ export function useNetplayPeerFactory({
     handleRemoteHeldMask,
     handleRemoteInput,
     handleVideoStream,
+    handleHeartbeat,
     peerRef,
     resetToMenu,
     roleRef,

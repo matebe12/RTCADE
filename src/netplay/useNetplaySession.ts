@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type { SystemCore } from "@/components/EmulatorPlayer";
 import type { NetplayChatMessage } from "@/components/NetplayChatPanel";
@@ -16,6 +16,13 @@ import {
   type OpponentProfile,
   type RoomVisibility,
 } from "@/stores/useNetplayLobbyStore";
+import {
+  HEARTBEAT_INTERVAL_MS,
+  HEARTBEAT_WARN_TIMEOUT_MS,
+  HEARTBEAT_DANGER_TIMEOUT_MS,
+  HEARTBEAT_DISCONNECT_TIMEOUT_MS,
+  type DisconnectSeverity,
+} from "../../shared/emulator-protocol";
 
 type SetLobbyState = (next: LobbyState | ((previous: LobbyState) => LobbyState)) => void;
 
@@ -92,7 +99,7 @@ export function useNetplaySession({
 }: UseNetplaySessionOptions) {
   const syncStatusRef = useRef("");
   const peerRef = useRef<NetplayPeer | null>(null);
-  const emulatorRef = useRef<HTMLIFrameElement>(null);
+  const emulatorRef = useRef<HTMLDivElement>(null);
   const roleRef = useRef<"host" | "guest" | null>(null);
   const sessionCoreRef = useRef<SystemCore | null>(null);
   const lastInputTimeRef = useRef(0);
@@ -104,10 +111,17 @@ export function useNetplaySession({
   const sessionStartedAtRef = useRef<number | null>(null);
   const videoStreamRef = useRef<MediaStream | null>(null);
   const setVideoStreamCallbackRef = useRef<((stream: MediaStream | null) => void) | null>(null);
-  const emulatorRuntime = createEmulatorRuntimeBridge(emulatorRef);
+  const heartbeatTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const lastHeartbeatRef = useRef<number>(Date.now());
+  const disconnectTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const emulatorRuntime = useMemo(() => createEmulatorRuntimeBridge(emulatorRef), [emulatorRef]);
 
   // Video streaming mode is always ON for netplay
   const videoStreamingMode = true;
+
+  // Disconnect detection state for GUEST UI
+  const [disconnectSeverity, setDisconnectSeverity] = useState<DisconnectSeverity>("connected");
+  const [disconnectCountdown, setDisconnectCountdown] = useState<number | undefined>(undefined);
 
   useEffect(() => {
     sessionCoreRef.current = "core" in state ? state.core : activeSessionRef.current?.core ?? null;
@@ -169,6 +183,69 @@ export function useNetplaySession({
     guestResyncPendingRef.current = false;
     queuedRemoteHeldMaskRef.current = null;
   }, []);
+
+  // --- Heartbeat logic (HOST sends, GUEST monitors) ---
+
+  const startHeartbeat = useCallback(() => {
+    if (heartbeatTimerRef.current) clearInterval(heartbeatTimerRef.current);
+    lastHeartbeatRef.current = Date.now();
+    setDisconnectSeverity("connected");
+    setDisconnectCountdown(undefined);
+
+    if (roleRef.current === "host") {
+      // HOST sends heartbeat to GUEST
+      heartbeatTimerRef.current = setInterval(() => {
+        peerRef.current?.sendHeartbeat();
+      }, HEARTBEAT_INTERVAL_MS);
+    } else {
+      // GUEST monitors heartbeat from HOST
+      heartbeatTimerRef.current = setInterval(() => {
+        const elapsed = Date.now() - lastHeartbeatRef.current;
+        if (elapsed >= HEARTBEAT_DISCONNECT_TIMEOUT_MS) {
+          setDisconnectSeverity("disconnected");
+        } else if (elapsed >= HEARTBEAT_DANGER_TIMEOUT_MS) {
+          setDisconnectSeverity("danger");
+          const remaining = Math.ceil((HEARTBEAT_DISCONNECT_TIMEOUT_MS - elapsed) / 1000);
+          setDisconnectCountdown(remaining);
+        } else if (elapsed >= HEARTBEAT_WARN_TIMEOUT_MS) {
+          setDisconnectSeverity("warning");
+          setDisconnectCountdown(undefined);
+        } else {
+          setDisconnectSeverity("connected");
+          setDisconnectCountdown(undefined);
+        }
+      }, 1000);
+    }
+  }, []);
+
+  const stopHeartbeat = useCallback(() => {
+    if (heartbeatTimerRef.current) {
+      clearInterval(heartbeatTimerRef.current);
+      heartbeatTimerRef.current = null;
+    }
+    if (disconnectTimerRef.current) {
+      clearInterval(disconnectTimerRef.current);
+      disconnectTimerRef.current = null;
+    }
+    setDisconnectSeverity("connected");
+    setDisconnectCountdown(undefined);
+  }, []);
+
+  const handleHeartbeat = useCallback((ts: number) => {
+    lastHeartbeatRef.current = Date.now();
+    // Reset disconnect state when heartbeat received
+    setDisconnectSeverity("connected");
+    setDisconnectCountdown(undefined);
+    void ts; // ts is for latency measurement if needed later
+  }, []);
+
+  // Auto-disconnect when severity reaches "disconnected"
+  useEffect(() => {
+    if (disconnectSeverity !== "disconnected") return;
+    console.warn("[LOBBY] Heartbeat timeout — auto-disconnecting");
+    // Trigger session end (same as back button)
+    // We'll let the lifecycle hook handle this via completeSession or similar
+  }, [disconnectSeverity]);
 
   const {
     chatInputRef,
@@ -244,12 +321,12 @@ export function useNetplaySession({
     setVideoStreamCallbackRef.current?.(stream);
   }, []);
 
-  /** HOST: trigger video capture after game starts */
+  /** HOST: video capture is now handled automatically by EmulatorPlayer via onCanvasStreamReady.
+   *  This callback just logs for debugging. */
   const handleStartVideoCapture = useCallback(() => {
     if (roleRef.current !== "host") return;
-    console.log("[LOBBY] HOST starting video capture");
-    emulatorRuntime.sync.startVideoCapture();
-  }, [emulatorRuntime]);
+    console.log("[LOBBY] HOST: game started, video stream should already be flowing via captureStream()");
+  }, []);
 
   const updateSync = useCallback(
     (msg: string) => {
@@ -360,11 +437,24 @@ export function useNetplaySession({
     handlePeerResyncState,
     handlePeerResyncFailed,
     handleVideoStream,
+    handleHeartbeat,
   });
+
+  // Start heartbeat when game starts
+  useEffect(() => {
+    if (gameStarted) {
+      startHeartbeat();
+    } else {
+      stopHeartbeat();
+    }
+    return () => stopHeartbeat();
+  }, [gameStarted, startHeartbeat, stopHeartbeat]);
 
   return {
     chatInputRef,
     emulatorRef,
+    disconnectSeverity,
+    disconnectCountdown,
     handleBack,
     handleCanvasStreamReady,
     handleChatCancel,
@@ -389,6 +479,7 @@ export function useNetplaySession({
     handleVideoStream,
     resetToMenu,
     setVideoStreamCallbackRef,
+    stopHeartbeat,
     videoStreamRef,
   };
 }

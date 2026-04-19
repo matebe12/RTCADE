@@ -92,6 +92,8 @@ export default function NetplayLobby() {
   const {
     chatInputRef,
     emulatorRef,
+    disconnectSeverity,
+    disconnectCountdown,
     handleBack,
     handleChatCancel,
     handleChatDraftChange,
@@ -363,6 +365,8 @@ export default function NetplayLobby() {
         onChatShortcut={handleChatShortcut}
         onCanvasStreamReady={handleCanvasStreamReady}
         videoStream={guestVideoStream}
+        disconnectSeverity={disconnectSeverity}
+        disconnectCountdown={disconnectCountdown}
       />
     );
   }

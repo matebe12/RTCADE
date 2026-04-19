@@ -64,6 +64,7 @@ export type PeerEventHandler = {
   onChatMessage?: (msg: ChatMessage) => void;
   onChatTyping?: (isTyping: boolean) => void;
   onVideoStream?: (stream: MediaStream) => void;
+  onHeartbeat?: (ts: number) => void;
 };
 
 type GameplayTransportState = "closed" | "connecting" | "open" | "closing";
@@ -235,6 +236,13 @@ export class NetplayPeer {
     }
   }
 
+  /** Send a heartbeat message (HOST → GUEST, periodic keepalive) */
+  sendHeartbeat() {
+    if (this.controlDc?.readyState === "open") {
+      this.controlDc.send(JSON.stringify({ type: "heartbeat", ts: Date.now() }));
+    }
+  }
+
   sendChatMessage(text: string): ChatMessage | null {
     if (this.chatDc?.readyState !== "open") return null;
     const trimmed = text.trim().slice(0, 300);
@@ -259,14 +267,14 @@ export class NetplayPeer {
     this.chatDc.send(JSON.stringify({ type: "chat-typing", isTyping }));
   }
 
-  /** Add a video MediaStream to the peer connection and trigger renegotiation */
+  /** Add video+audio tracks from a MediaStream to the peer connection and trigger renegotiation */
   startVideoStreaming(stream: MediaStream) {
     if (!this.pc) {
       console.warn("[PEER] startVideoStreaming: no peer connection");
       return;
     }
 
-    // Remove any previously added video senders
+    // Remove any previously added video/audio senders
     for (const sender of this._videoSenders) {
       try {
         this.pc.removeTrack(sender);
@@ -276,6 +284,7 @@ export class NetplayPeer {
     }
     this._videoSenders = [];
 
+    // Add video tracks
     for (const track of stream.getVideoTracks()) {
       const sender = this.pc.addTrack(track, stream);
       this._videoSenders.push(sender);
@@ -293,8 +302,14 @@ export class NetplayPeer {
       }
     }
 
+    // Add audio tracks
+    for (const track of stream.getAudioTracks()) {
+      const sender = this.pc.addTrack(track, stream);
+      this._videoSenders.push(sender);
+    }
+
     console.log(
-      `[PEER] startVideoStreaming: added ${stream.getVideoTracks().length} video track(s)`,
+      `[PEER] startVideoStreaming: added ${stream.getVideoTracks().length} video + ${stream.getAudioTracks().length} audio track(s)`,
     );
     // onnegotiationneeded will fire automatically and handle renegotiation
   }
@@ -577,6 +592,8 @@ export class NetplayPeer {
           this.handler.onResyncLoaded?.();
         } else if (msg.type === "resync-failed") {
           this.handler.onResyncFailed?.();
+        } else if (msg.type === "heartbeat") {
+          this.handler.onHeartbeat?.(msg.ts);
         }
       } catch {
         /* ignore */

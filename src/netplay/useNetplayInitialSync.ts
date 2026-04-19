@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, type MutableRefObject, type RefObject } from "react";
+import { useCallback, useEffect, useMemo, useRef, type MutableRefObject, type RefObject } from "react";
 
 import { createEmulatorRuntimeBridge } from "@/lib/emulator-runtime-bridge";
 import { NETPLAY_COPY } from "@/netplay/netplayCopy";
@@ -8,7 +8,7 @@ interface UseNetplayInitialSyncOptions {
   dcState: string;
   gameStarted: boolean;
   peerRef: MutableRefObject<NetplayPeer | null>;
-  emulatorRef: RefObject<HTMLIFrameElement | null>;
+  emulatorRef: RefObject<HTMLDivElement | null>;
   roleRef: MutableRefObject<"host" | "guest" | null>;
   gameStartedRef: MutableRefObject<boolean>;
   setGameStarted: (gameStarted: boolean) => void;
@@ -34,7 +34,7 @@ export function useNetplayInitialSync({
   const localReadyRef = useRef(false);
   const remoteReadyRef = useRef(false);
   const pendingStateRef = useRef<ArrayBuffer | null>(null);
-  const emulatorRuntime = createEmulatorRuntimeBridge(emulatorRef);
+  const emulatorRuntime = useMemo(() => createEmulatorRuntimeBridge(emulatorRef), [emulatorRef]);
 
   const startGame = useCallback(
     (message: string, notifyPeer: boolean) => {
@@ -43,6 +43,8 @@ export function useNetplayInitialSync({
       setGameStarted(true);
       gameStartedRef.current = true;
       emulatorRuntime.sync.startGame();
+      // Mark game running so EmulatorPlayer's keyboard handler processes input
+      (window as Record<string, unknown>).__rtcade_game_running = true;
       if (notifyPeer) {
         peerRef.current?.sendStartSignal();
       }
@@ -116,7 +118,7 @@ export function useNetplayInitialSync({
       if (roleRef.current === "guest") {
         if (localReadyRef.current) {
           updateSync(NETPLAY_COPY.syncFinishingSetup);
-          emulatorRuntime.sync.loadInitialState(stateBuffer);
+          emulatorRuntime.sync.loadSaveState(stateBuffer);
         } else {
           pendingStateRef.current = stateBuffer;
           updateSync(NETPLAY_COPY.syncStateReceived);
@@ -163,7 +165,7 @@ export function useNetplayInitialSync({
       peerRef.current?.sendPeerReady();
       if (pendingStateRef.current) {
         updateSync(NETPLAY_COPY.syncFinishingSetup);
-        emulatorRuntime.sync.loadInitialState(pendingStateRef.current);
+        emulatorRuntime.sync.loadSaveState(pendingStateRef.current);
         pendingStateRef.current = null;
       }
     }

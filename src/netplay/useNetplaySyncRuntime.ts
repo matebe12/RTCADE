@@ -10,7 +10,7 @@ interface UseNetplaySyncRuntimeOptions {
   dcState: string;
   gameStarted: boolean;
   peerRef: MutableRefObject<NetplayPeer | null>;
-  emulatorRef: RefObject<HTMLIFrameElement | null>;
+  emulatorRef: RefObject<HTMLDivElement | null>;
   roleRef: MutableRefObject<"host" | "guest" | null>;
   lastInputTimeRef: MutableRefObject<number>;
   sessionCoreRef: MutableRefObject<SystemCore | null>;

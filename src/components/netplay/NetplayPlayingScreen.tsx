@@ -22,6 +22,7 @@ import type { UserProfile } from "@/lib/user-profile";
 import { NETPLAY_COPY, getConnectionStatusLabel } from "@/netplay/netplayCopy";
 import type { OpponentProfile } from "@/stores/useNetplayLobbyStore";
 import { ArrowLeft, Loader2, MessageSquare, Wifi, WifiOff } from "lucide-react";
+import type { DisconnectSeverity } from "../../../shared/emulator-protocol";
 
 interface PlayingSession {
   core: SystemCore;
@@ -44,7 +45,7 @@ interface NetplayPlayingScreenProps {
   isPeerTyping: boolean;
   chatChannelState: string;
   inputRef: RefObject<HTMLInputElement | null>;
-  emulatorRef: RefObject<HTMLIFrameElement | null>;
+  emulatorRef: RefObject<HTMLDivElement | null>;
   onBack: () => void;
   onChatToggle: () => void;
   onChatCancel: () => void;
@@ -61,6 +62,8 @@ interface NetplayPlayingScreenProps {
   onChatShortcut: () => void;
   onCanvasStreamReady?: (stream: MediaStream) => void;
   videoStream: MediaStream | null;
+  disconnectSeverity?: DisconnectSeverity;
+  disconnectCountdown?: number;
 }
 
 export default function NetplayPlayingScreen({
@@ -94,6 +97,8 @@ export default function NetplayPlayingScreen({
   onChatShortcut,
   onCanvasStreamReady,
   videoStream,
+  disconnectSeverity,
+  disconnectCountdown,
 }: NetplayPlayingScreenProps) {
   const localChatUser = myProfile ?? { nickname: "나", avatar: "🎮" };
 
@@ -180,6 +185,8 @@ export default function NetplayPlayingScreen({
               videoStream={videoStream}
               onLocalInput={onLocalInput}
               onChatShortcut={onChatShortcut}
+              disconnectSeverity={disconnectSeverity}
+              disconnectCountdown={disconnectCountdown}
             />
           ) : (
             <EmulatorPlayer
