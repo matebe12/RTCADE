@@ -56,10 +56,20 @@ export default function NetplayChatPanel({
   inputRef,
 }: NetplayChatPanelProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!open) return;
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+    const viewport = scrollAreaRef.current?.querySelector(
+      "[data-radix-scroll-area-viewport]",
+    );
+
+    if (!(viewport instanceof HTMLDivElement)) return;
+
+    viewport.scrollTo({
+      top: viewport.scrollHeight,
+      behavior: messages.length > 0 ? "smooth" : "auto",
+    });
   }, [isPeerTyping, messages, open]);
 
   if (!open) return null;
@@ -101,7 +111,10 @@ export default function NetplayChatPanel({
       </CardHeader>
 
       <CardContent className="flex h-88 min-h-0 flex-1 flex-col gap-3 p-3">
-        <ScrollArea className="min-h-0 flex-1 rounded-md border border-border/60 bg-background/50">
+        <ScrollArea
+          ref={scrollAreaRef}
+          className="min-h-0 flex-1 rounded-md border border-border/60 bg-background/50"
+        >
           <div className="flex min-h-full flex-col gap-3 p-3">
             {messages.length === 0 ? (
               <div className="flex flex-1 flex-col items-center justify-center gap-3 py-10 text-center text-muted-foreground">

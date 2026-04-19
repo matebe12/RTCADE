@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 
 interface PlayControlsGuideProps {
   mode: "netplay" | "solo";
+  className?: string;
 }
 
 const CONTROLS_GUIDE_COLLAPSED_KEY = "rtcade_play_controls_collapsed";
@@ -43,7 +44,7 @@ function KeyBadge({ value }: { value: string }) {
   );
 }
 
-export default function PlayControlsGuide({ mode }: PlayControlsGuideProps) {
+export default function PlayControlsGuide({ mode, className }: PlayControlsGuideProps) {
   const [collapsed, setCollapsed] = useState(false);
 
   useEffect(() => {
@@ -65,7 +66,7 @@ export default function PlayControlsGuide({ mode }: PlayControlsGuideProps) {
   };
 
   return (
-    <Card className="w-[800px] max-w-[95vw] border-border/70 bg-card/95">
+    <Card className={cn("w-[800px] max-w-[95vw] border-border/70 bg-card/95", className)}>
       <CardHeader className="flex flex-row items-center justify-between gap-3 pb-3">
         <div className="space-y-1">
           <CardTitle className="text-sm">키 안내</CardTitle>

@@ -166,43 +166,43 @@ export default function NetplayPlayingScreen({
         </div>
       )}
 
-      <div className="flex w-full justify-center">
-        <PlayControlsGuide mode="netplay" />
-      </div>
+      <div className="mx-auto flex w-full max-w-[1132px] flex-col gap-3">
+        <PlayControlsGuide mode="netplay" className="w-full max-w-none" />
 
-      <div className="flex w-full flex-col items-center gap-3 xl:flex-row xl:items-start xl:justify-center">
-        <EmulatorPlayer
-          ref={emulatorRef}
-          romSource=""
-          core={session.core}
-          role={session.role}
-          romPath={session.romPath}
-          biosPath={session.biosPath}
-          onLocalInput={onLocalInput}
-          onEmulatorReady={onEmulatorReady}
-          onSaveState={onSaveState}
-          onStateLoaded={onStateLoaded}
-          onSaveStateError={onSaveStateError}
-          onResyncState={onResyncState}
-          onResyncLoaded={onResyncLoaded}
-          onResyncFailed={onResyncFailed}
-          onChatShortcut={onChatShortcut}
-        />
+        <div className="flex w-full flex-col items-center gap-3 xl:flex-row xl:items-start xl:justify-center">
+          <EmulatorPlayer
+            ref={emulatorRef}
+            romSource=""
+            core={session.core}
+            role={session.role}
+            romPath={session.romPath}
+            biosPath={session.biosPath}
+            onLocalInput={onLocalInput}
+            onEmulatorReady={onEmulatorReady}
+            onSaveState={onSaveState}
+            onStateLoaded={onStateLoaded}
+            onSaveStateError={onSaveStateError}
+            onResyncState={onResyncState}
+            onResyncLoaded={onResyncLoaded}
+            onResyncFailed={onResyncFailed}
+            onChatShortcut={onChatShortcut}
+          />
 
-        <NetplayChatPanel
-          open={chatOpen}
-          onCancel={onChatCancel}
-          messages={chatMessages}
-          draft={chatDraft}
-          onDraftChange={onChatDraftChange}
-          onSend={onSendChat}
-          unreadCount={unreadChatCount}
-          isPeerTyping={isPeerTyping}
-          chatChannelState={chatChannelState}
-          localUser={localChatUser}
-          remoteUser={opponentProfile}
-          inputRef={inputRef}
-        />
+          <NetplayChatPanel
+            open={chatOpen}
+            onCancel={onChatCancel}
+            messages={chatMessages}
+            draft={chatDraft}
+            onDraftChange={onChatDraftChange}
+            onSend={onSendChat}
+            unreadCount={unreadChatCount}
+            isPeerTyping={isPeerTyping}
+            chatChannelState={chatChannelState}
+            localUser={localChatUser}
+            remoteUser={opponentProfile}
+            inputRef={inputRef}
+          />
+        </div>
       </div>
     </div>
   );

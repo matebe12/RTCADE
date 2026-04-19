@@ -8,6 +8,13 @@ import { toast } from "sonner";
 
 const CHAT_TYPING_TIMEOUT_MS = 2000;
 
+function focusChatInputWithoutScroll(input: HTMLInputElement | null) {
+  if (!input) return;
+
+  input.focus({ preventScroll: true });
+  input.select();
+}
+
 interface UseNetplayChatControlsOptions {
   currentStep: string;
   chatOpen: boolean;
@@ -85,8 +92,7 @@ export function useNetplayChatControls({
 
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
-        chatInputRef.current?.focus();
-        chatInputRef.current?.select();
+        focusChatInputWithoutScroll(chatInputRef.current);
         pendingChatFocusRef.current = false;
       });
     });
@@ -123,8 +129,7 @@ export function useNetplayChatControls({
 
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
-        chatInputRef.current?.focus();
-        chatInputRef.current?.select();
+        focusChatInputWithoutScroll(chatInputRef.current);
         pendingChatFocusRef.current = false;
       });
     });
