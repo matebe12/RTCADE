@@ -82,7 +82,6 @@ function captureAudioFromEJS(): MediaStream | null {
 
     if (!audioCtx || audioCtx.state === "closed") return null;
 
-    const dest = audioCtx.createMediaStreamDestination();
     // Connect the AudioContext destination to our capture node.
     // We need to find the node connected to audioCtx.destination.
     // Workaround: we monkey-patch createGain or use an AnalyserNode approach.
@@ -120,7 +119,7 @@ function captureAudioFromEJS(): MediaStream | null {
 export function createEmulatorRuntimeBridge(
   containerRef: RefObject<HTMLDivElement | null>,
   /** 0 = local player, 1 = remote player (or vice versa for guest) */
-  localPlayer: number = 0,
+  _localPlayer: number = 0,
   remotePlayer: number = 1,
 ): EmulatorRuntimeBridge {
   return {
