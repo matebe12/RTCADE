@@ -44,7 +44,7 @@ export function useNetplayInitialSync({
       gameStartedRef.current = true;
       emulatorRuntime.sync.startGame();
       // Mark game running so EmulatorPlayer's keyboard handler processes input
-      (window as Record<string, unknown>).__rtcade_game_running = true;
+      (window as unknown as Record<string, unknown>).__rtcade_game_running = true;
       if (notifyPeer) {
         peerRef.current?.sendStartSignal();
       }

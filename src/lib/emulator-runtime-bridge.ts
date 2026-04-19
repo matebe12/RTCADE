@@ -36,7 +36,7 @@ export interface EmulatorRuntimeBridge {
 }
 
 function getEJSEmulator(): EJSEmulatorInstance | null {
-  const ejs = (window as Record<string, unknown>).EJS_emulator as EJSEmulatorInstance | undefined;
+  const ejs = (window as unknown as Record<string, unknown>).EJS_emulator as EJSEmulatorInstance | undefined;
   if (!ejs?.gameManager) return null;
   return ejs;
 }
@@ -104,7 +104,7 @@ function captureAudioFromEJS(): MediaStream | null {
     // AudioContext monkey-patching before EJS loads.
     
     // If we already have a splitter node installed (see EmulatorPlayer), use it
-    const splitter = (window as Record<string, unknown>).__rtcade_audio_splitter as {
+    const splitter = (window as unknown as Record<string, unknown>).__rtcade_audio_splitter as {
       stream: MediaStream;
     } | undefined;
     if (splitter?.stream) {
@@ -142,7 +142,7 @@ export function createEmulatorRuntimeBridge(
           const state = ejs.gameManager.getState();
           const buf = (state as unknown as { buffer?: ArrayBuffer }).buffer ?? state;
           if (buf instanceof ArrayBuffer && buf.byteLength > 0) return buf;
-          if (ArrayBuffer.isView(buf) && buf.byteLength > 0) return (buf as Uint8Array).buffer;
+          if (ArrayBuffer.isView(buf) && buf.byteLength > 0) return (buf as Uint8Array).buffer as ArrayBuffer;
           return null;
         } catch (e) {
           console.warn("[BRIDGE] getSaveState failed:", e);
@@ -169,7 +169,7 @@ export function createEmulatorRuntimeBridge(
           const buf = (state as unknown as { buffer?: ArrayBuffer }).buffer ?? state;
           ejs.play();
           if (buf instanceof ArrayBuffer && buf.byteLength > 0) return buf;
-          if (ArrayBuffer.isView(buf) && buf.byteLength > 0) return (buf as Uint8Array).buffer;
+          if (ArrayBuffer.isView(buf) && buf.byteLength > 0) return (buf as Uint8Array).buffer as ArrayBuffer;
           return null;
         } catch (e) {
           console.warn("[BRIDGE] getResyncState failed:", e);
