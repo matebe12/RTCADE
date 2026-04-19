@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { ArrowLeft, Loader2, Search } from "lucide-react";
 
 import { SYSTEM_OPTIONS } from "@/components/EmulatorPlayer";
@@ -6,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { parseRomName } from "@/lib/game-names";
+import { parseRomName, getRomCategory, CATEGORY_INFO, type GameCategory } from "@/lib/game-names";
 import type { RecentGame } from "@/lib/user-profile";
 import type { RomInfo } from "@/stores/useNetplayLobbyStore";
 
@@ -81,6 +82,33 @@ export default function SoloBrowseRomsScreen({
   const browseRoms = showPersonalizedSections
     ? filteredRoms.filter((rom) => !pinnedRomPaths.has(rom.path))
     : filteredRoms;
+
+  const isSearching = searchQuery.length > 0;
+
+  const categoryGroups = useMemo(() => {
+    if (isSearching) return [];
+    const groups: Record<GameCategory, RomInfo[]> = {
+      fighting: [],
+      action: [],
+      shooting: [],
+      puzzle: [],
+      sports: [],
+      etc: [],
+    };
+    browseRoms.forEach((rom) => {
+      const cat = getRomCategory(rom.filename, rom.core);
+      groups[cat].push(rom);
+    });
+    return (Object.entries(CATEGORY_INFO) as [GameCategory, (typeof CATEGORY_INFO)[GameCategory]][])
+      .sort(([, a], [, b]) => a.order - b.order)
+      .map(([key, info]) => ({
+        category: key,
+        label: info.label,
+        icon: info.icon,
+        roms: groups[key],
+      }))
+      .filter((group) => group.roms.length > 0);
+  }, [browseRoms, isSearching]);
 
   return (
     <Card className="w-full max-w-lg border-border/70 bg-card/95">
@@ -173,26 +201,66 @@ export default function SoloBrowseRomsScreen({
               </div>
             )}
 
-            {browseRoms.map((rom) => {
-              const sys = SYSTEM_OPTIONS.find((system) => system.value === rom.core);
-              return (
-                <GameCard
-                  key={rom.path}
-                  filename={rom.filename}
-                  core={rom.core}
-                  systemLabel={sys?.label || rom.core}
-                  disabled={isStarting}
-                  selected={startingRomPath === rom.path}
-                  favorite={favoriteGames.includes(rom.path)}
-                  onToggleFavorite={() => onToggleFavoriteGame(rom.path)}
-                  onClick={() => onStartSoloGame(rom)}
-                />
-              );
-            })}
+            {/* 카테고리별 그룹 (검색 중이 아닐 때) */}
+            {!isSearching &&
+              categoryGroups.map((group) => {
+                return (
+                  <div key={group.category} className="flex flex-col gap-2 pb-2">
+                    <div className="flex items-center gap-1.5 pt-2">
+                      <span className="text-xs">{group.icon}</span>
+                      <p className="text-xs font-medium text-foreground">
+                        {group.label}
+                      </p>
+                      <span className="text-[10px] text-muted-foreground">
+                        {group.roms.length}
+                      </span>
+                    </div>
+                    {group.roms.map((rom) => {
+                      const sys = SYSTEM_OPTIONS.find(
+                        (system) => system.value === rom.core,
+                      );
+                      return (
+                        <GameCard
+                          key={rom.path}
+                          filename={rom.filename}
+                          core={rom.core}
+                          systemLabel={sys?.label || rom.core}
+                          disabled={isStarting}
+                          selected={startingRomPath === rom.path}
+                          favorite={favoriteGames.includes(rom.path)}
+                          onToggleFavorite={() => onToggleFavoriteGame(rom.path)}
+                          onClick={() => onStartSoloGame(rom)}
+                        />
+                      );
+                    })}
+                  </div>
+                );
+              })}
+
+            {/* 검색 결과 (플랫 리스트) */}
+            {isSearching &&
+              browseRoms.map((rom) => {
+                const sys = SYSTEM_OPTIONS.find(
+                  (system) => system.value === rom.core,
+                );
+                return (
+                  <GameCard
+                    key={rom.path}
+                    filename={rom.filename}
+                    core={rom.core}
+                    systemLabel={sys?.label || rom.core}
+                    disabled={isStarting}
+                    selected={startingRomPath === rom.path}
+                    favorite={favoriteGames.includes(rom.path)}
+                    onToggleFavorite={() => onToggleFavoriteGame(rom.path)}
+                    onClick={() => onStartSoloGame(rom)}
+                  />
+                );
+              })}
 
             {browseRoms.length === 0 && (
               <p className="py-8 text-center text-xs text-muted-foreground">
-                {showPersonalizedSections ? "표시할 다른 게임이 없습니다" : "검색 결과가 없습니다"}
+                {isSearching ? "검색 결과가 없습니다" : "표시할 다른 게임이 없습니다"}
               </p>
             )}
           </div>
