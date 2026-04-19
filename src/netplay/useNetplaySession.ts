@@ -207,6 +207,17 @@ export function useNetplaySession({
     reconcileRemoteHeldMask(nextHeldMask);
   }, [reconcileRemoteHeldMask]);
 
+  const handleRemoteHeldMask = useCallback((heldMask: number) => {
+    lastInputTimeRef.current = Date.now();
+
+    if (guestResyncPendingRef.current) {
+      queuedRemoteHeldMaskRef.current = heldMask;
+      return;
+    }
+
+    reconcileRemoteHeldMask(heldMask);
+  }, [reconcileRemoteHeldMask]);
+
   const handleLocalInput = useCallback((button: number, down: boolean) => {
     lastInputTimeRef.current = Date.now();
     peerRef.current?.sendInput(button, down);
@@ -307,6 +318,7 @@ export function useNetplaySession({
     resetToMenu,
     completeSession,
     handleRemoteInput,
+    handleRemoteHeldMask,
     handleIncomingChatMessage,
     handleIncomingTypingState,
     handlePeerReady,

@@ -21,6 +21,12 @@ export type ChatMessage = {
   sentAt: number;
 };
 
+export type InputSyncMessage = {
+  type: "input-sync";
+  heldMask: number;
+  seq: number;
+};
+
 export type PeerEventHandler = {
   onConnected: () => void;
   onDisconnected: () => void;
@@ -47,6 +53,7 @@ export type PeerEventHandler = {
   onResyncFailed?: () => void; // Resync failed
   // Input sequence gap detection
   onInputSeqGap?: (expected: number, got: number) => void;
+  onRemoteHeldMask?: (heldMask: number) => void;
   onChatChannelState?: (state: string) => void;
   onChatMessage?: (msg: ChatMessage) => void;
   onChatTyping?: (isTyping: boolean) => void;
@@ -68,13 +75,17 @@ type PendingResyncStream = PendingBinaryStream & {
 };
 
 const INPUT_CHANNEL_LABEL = "input";
+const CONTROL_CHANNEL_LABEL = "control";
 const STATE_CHANNEL_LABEL = "state";
+const REPAIR_CHANNEL_LABEL = "repair";
 const CHAT_CHANNEL_LABEL = "chat";
 const SAVE_STATE_CHUNK_SIZE = 64 * 1024;
 const RESYNC_STATE_CHUNK_SIZE = 256 * 1024;
 const CHAT_BUFFER_THRESHOLD = 64 * 1024;
 const STATE_BUFFER_THRESHOLD = 512 * 1024;
 const DEFAULT_REMOTE_HELD_MASK = 0;
+const REPAIR_SYNC_INTERVAL_MS = 120;
+const REPAIR_SYNC_ZERO_FLUSH_COUNT = 3;
 
 const RTC_CONFIG: RTCConfiguration = {
   iceServers: [{ urls: "stun:stun.l.google.com:19302" }, { urls: "stun:stun1.l.google.com:19302" }],
@@ -84,7 +95,9 @@ export class NetplayPeer {
   private signaling: SignalingClient;
   private pc: RTCPeerConnection | null = null;
   private inputDc: RTCDataChannel | null = null;
+  private controlDc: RTCDataChannel | null = null;
   private stateDc: RTCDataChannel | null = null;
+  private repairDc: RTCDataChannel | null = null;
   private chatDc: RTCDataChannel | null = null;
   private handler: PeerEventHandler;
   private _closing = false;
@@ -94,6 +107,9 @@ export class NetplayPeer {
   private _gameplayConnected = false;
   private _localHeldMask = 0;
   private _resetSeqTo: number | null = null;
+  private _resetRepairSeqTo: number | null = null;
+  private _repairSyncTimer: ReturnType<typeof setInterval> | null = null;
+  private _repairZeroFlushRemaining = 0;
 
   constructor(handler: PeerEventHandler) {
     this.handler = handler;
@@ -141,13 +157,15 @@ export class NetplayPeer {
           seq: ++this._inputSeq,
         }),
       );
+      this.sendRepairSync();
+      this.updateRepairSyncLoop();
     }
   }
 
   sendPeerReady() {
-    console.log("[PEER] sendPeerReady, input dc:", this.inputDc?.readyState);
-    if (this.inputDc?.readyState === "open") {
-      this.inputDc.send(JSON.stringify({ type: "peer-ready" }));
+    console.log("[PEER] sendPeerReady, control dc:", this.controlDc?.readyState);
+    if (this.controlDc?.readyState === "open") {
+      this.controlDc.send(JSON.stringify({ type: "peer-ready" }));
     }
   }
 
@@ -179,28 +197,28 @@ export class NetplayPeer {
   // Tell HOST that GUEST loaded the state
   sendStateLoaded() {
     console.log("[PEER] sendStateLoaded");
-    if (this.inputDc?.readyState === "open") {
-      this.inputDc.send(JSON.stringify({ type: "state-loaded" }));
+    if (this.controlDc?.readyState === "open") {
+      this.controlDc.send(JSON.stringify({ type: "state-loaded" }));
     }
   }
 
   // HOST tells GUEST to start the game
   sendStartSignal() {
     console.log("[PEER] sendStartSignal");
-    if (this.inputDc?.readyState === "open") {
-      this.inputDc.send(JSON.stringify({ type: "start-signal" }));
+    if (this.controlDc?.readyState === "open") {
+      this.controlDc.send(JSON.stringify({ type: "start-signal" }));
     }
   }
 
   sendResyncFailed() {
-    if (this.inputDc?.readyState === "open") {
-      this.inputDc.send(JSON.stringify({ type: "resync-failed" }));
+    if (this.controlDc?.readyState === "open") {
+      this.controlDc.send(JSON.stringify({ type: "resync-failed" }));
     }
   }
 
   sendResyncLoaded() {
-    if (this.inputDc?.readyState === "open") {
-      this.inputDc.send(JSON.stringify({ type: "resync-loaded" }));
+    if (this.controlDc?.readyState === "open") {
+      this.controlDc.send(JSON.stringify({ type: "resync-loaded" }));
     }
   }
 
@@ -232,6 +250,7 @@ export class NetplayPeer {
   /** Reset remote input sequence counter (after resync, GUEST resets) */
   resetRemoteSeq(nextExpectedSeq: number) {
     this._resetSeqTo = nextExpectedSeq;
+    this._resetRepairSeqTo = nextExpectedSeq - 1;
   }
 
   sendResyncState(state: ArrayBuffer): boolean {
@@ -266,13 +285,18 @@ export class NetplayPeer {
 
   close() {
     this._closing = true;
+    this.stopRepairSyncLoop();
     this.inputDc?.close();
+    this.controlDc?.close();
     this.stateDc?.close();
+    this.repairDc?.close();
     this.chatDc?.close();
     this.pc?.close();
     this.signaling.close();
     this.inputDc = null;
+    this.controlDc = null;
     this.stateDc = null;
+    this.repairDc = null;
     this.chatDc = null;
     this.pc = null;
     this._gameplayConnected = false;
@@ -339,17 +363,20 @@ export class NetplayPeer {
 
   private emitGameplayTransportState() {
     const inputState = this.inputDc?.readyState ?? "closed";
+    const controlState = this.controlDc?.readyState ?? "closed";
     const stateState = this.stateDc?.readyState ?? "closed";
 
     let nextState: GameplayTransportState = "closed";
-    if (inputState === "open" && stateState === "open") {
+    if (inputState === "open" && controlState === "open" && stateState === "open") {
       nextState = "open";
-    } else if (inputState === "closing" || stateState === "closing") {
+    } else if (inputState === "closing" || controlState === "closing" || stateState === "closing") {
       nextState = "closing";
     } else if (
       inputState === "connecting" ||
+      controlState === "connecting" ||
       stateState === "connecting" ||
       inputState === "open" ||
+      controlState === "open" ||
       stateState === "open"
     ) {
       nextState = "connecting";
@@ -412,7 +439,33 @@ export class NetplayPeer {
           }
           expectedSeq = inp.seq + 1;
           this.handler.onInput(inp);
-        } else if (msg.type === "peer-ready") {
+        }
+      } catch {
+        /* ignore */
+      }
+    };
+  }
+
+  private setupControlDataChannel(dc: RTCDataChannel) {
+    this.controlDc = dc;
+    this.emitGameplayTransportState();
+
+    dc.onopen = () => {
+      this.emitGameplayTransportState();
+    };
+
+    dc.onclose = () => {
+      this.emitGameplayTransportState();
+    };
+
+    dc.onmessage = (e) => {
+      if (typeof e.data !== "string") {
+        return;
+      }
+
+      try {
+        const msg = JSON.parse(e.data);
+        if (msg.type === "peer-ready") {
           console.log("[PEER] received peer-ready");
           this.handler.onPeerReady?.();
         } else if (msg.type === "state-loaded") {
@@ -530,6 +583,44 @@ export class NetplayPeer {
     };
   }
 
+  private setupRepairDataChannel(dc: RTCDataChannel) {
+    this.repairDc = dc;
+
+    let latestSeq = 0;
+
+    dc.onopen = () => {
+      this.updateRepairSyncLoop();
+      this.sendRepairSync();
+    };
+
+    dc.onclose = () => {
+      this.stopRepairSyncLoop();
+    };
+
+    dc.onmessage = (e) => {
+      if (typeof e.data !== "string") return;
+
+      try {
+        const msg = JSON.parse(e.data) as InputSyncMessage;
+        if (msg.type !== "input-sync") return;
+
+        if (this._resetRepairSeqTo !== null) {
+          latestSeq = Math.max(latestSeq, this._resetRepairSeqTo);
+          this._resetRepairSeqTo = null;
+        }
+
+        if (msg.seq < latestSeq) {
+          return;
+        }
+
+        latestSeq = Math.max(latestSeq, msg.seq);
+        this.handler.onRemoteHeldMask?.(msg.heldMask);
+      } catch {
+        /* ignore */
+      }
+    };
+  }
+
   private setupChatDataChannel(dc: RTCDataChannel) {
     this.chatDc = dc;
     this._lastTypingState = null;
@@ -571,11 +662,21 @@ export class NetplayPeer {
 
   private async startAsHost() {
     this.setupPeerConnection();
-    const inputDc = this.pc!.createDataChannel(INPUT_CHANNEL_LABEL);
+    const inputDc = this.pc!.createDataChannel(INPUT_CHANNEL_LABEL, {
+      ordered: false,
+      maxRetransmits: 0,
+    });
+    const controlDc = this.pc!.createDataChannel(CONTROL_CHANNEL_LABEL);
     const stateDc = this.pc!.createDataChannel(STATE_CHANNEL_LABEL);
+    const repairDc = this.pc!.createDataChannel(REPAIR_CHANNEL_LABEL, {
+      ordered: false,
+      maxRetransmits: 0,
+    });
     const chatDc = this.pc!.createDataChannel(CHAT_CHANNEL_LABEL);
     this.setupInputDataChannel(inputDc);
+    this.setupControlDataChannel(controlDc);
     this.setupStateDataChannel(stateDc);
+    this.setupRepairDataChannel(repairDc);
     this.setupChatDataChannel(chatDc);
 
     const offer = await this.pc!.createOffer();
@@ -597,8 +698,18 @@ export class NetplayPeer {
         return;
       }
 
+      if (e.channel.label === CONTROL_CHANNEL_LABEL) {
+        this.setupControlDataChannel(e.channel);
+        return;
+      }
+
       if (e.channel.label === STATE_CHANNEL_LABEL) {
         this.setupStateDataChannel(e.channel);
+        return;
+      }
+
+      if (e.channel.label === REPAIR_CHANNEL_LABEL) {
+        this.setupRepairDataChannel(e.channel);
       }
     };
 
@@ -606,6 +717,57 @@ export class NetplayPeer {
     const answer = await this.pc!.createAnswer();
     await this.pc!.setLocalDescription(answer);
     this.signaling.send({ type: "answer", sdp: this.pc!.localDescription! });
+  }
+
+  private sendRepairSync() {
+    if (this.repairDc?.readyState !== "open") return;
+
+    const message: InputSyncMessage = {
+      type: "input-sync",
+      heldMask: this._localHeldMask,
+      seq: this._inputSeq,
+    };
+
+    this.repairDc.send(JSON.stringify(message));
+  }
+
+  private updateRepairSyncLoop() {
+    if (this._localHeldMask !== 0) {
+      this._repairZeroFlushRemaining = REPAIR_SYNC_ZERO_FLUSH_COUNT;
+    } else if (this._repairZeroFlushRemaining === 0) {
+      this._repairZeroFlushRemaining = REPAIR_SYNC_ZERO_FLUSH_COUNT;
+    }
+
+    if (this.repairDc?.readyState !== "open") return;
+    if (this._repairSyncTimer) return;
+
+    this._repairSyncTimer = setInterval(() => {
+      if (this.repairDc?.readyState !== "open") {
+        this.stopRepairSyncLoop();
+        return;
+      }
+
+      if (this._localHeldMask === 0 && this._repairZeroFlushRemaining <= 0) {
+        this.stopRepairSyncLoop();
+        return;
+      }
+
+      this.sendRepairSync();
+
+      if (this._localHeldMask === 0) {
+        this._repairZeroFlushRemaining -= 1;
+      } else {
+        this._repairZeroFlushRemaining = REPAIR_SYNC_ZERO_FLUSH_COUNT;
+      }
+    }, REPAIR_SYNC_INTERVAL_MS);
+  }
+
+  private stopRepairSyncLoop() {
+    if (this._repairSyncTimer) {
+      clearInterval(this._repairSyncTimer);
+      this._repairSyncTimer = null;
+    }
+    this._repairZeroFlushRemaining = 0;
   }
 }
 

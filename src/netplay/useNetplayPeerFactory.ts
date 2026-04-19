@@ -32,6 +32,7 @@ interface UseNetplayPeerFactoryOptions {
   resetToMenu: () => void;
   completeSession: (endReason: SessionEndReason) => void;
   handleRemoteInput: (msg: InputMessage) => void;
+  handleRemoteHeldMask: (heldMask: number) => void;
   handleIncomingChatMessage: (message: PeerChatMessage) => void;
   handleIncomingTypingState: (isTyping: boolean) => void;
   handlePeerReady: () => void;
@@ -57,6 +58,7 @@ export function useNetplayPeerFactory({
   resetToMenu,
   completeSession,
   handleRemoteInput,
+  handleRemoteHeldMask,
   handleIncomingChatMessage,
   handleIncomingTypingState,
   handlePeerReady,
@@ -80,6 +82,7 @@ export function useNetplayPeerFactory({
         resetToMenu();
       },
       onInput: handleRemoteInput,
+      onRemoteHeldMask: handleRemoteHeldMask,
       onError: (msg) => setError(msg),
       onDataChannelState: (nextState) => setDcState(nextState),
       onChatChannelState: (nextState) => setChatChannelState(nextState),
@@ -168,6 +171,7 @@ export function useNetplayPeerFactory({
     handlePeerStartSignal,
     handlePeerResyncLoaded,
     handlePeerStateLoaded,
+    handleRemoteHeldMask,
     handleRemoteInput,
     peerRef,
     resetToMenu,

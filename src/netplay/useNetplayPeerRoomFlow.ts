@@ -38,6 +38,7 @@ interface UseNetplayPeerRoomFlowOptions {
   resetToMenu: () => void;
   completeSession: (endReason: SessionEndReason) => void;
   handleRemoteInput: (msg: InputMessage) => void;
+  handleRemoteHeldMask: (heldMask: number) => void;
   handleIncomingChatMessage: (message: PeerChatMessage) => void;
   handleIncomingTypingState: (isTyping: boolean) => void;
   handlePeerReady: () => void;
@@ -68,6 +69,7 @@ export function useNetplayPeerRoomFlow({
   resetToMenu,
   completeSession,
   handleRemoteInput,
+  handleRemoteHeldMask,
   handleIncomingChatMessage,
   handleIncomingTypingState,
   handlePeerReady,
@@ -92,6 +94,7 @@ export function useNetplayPeerRoomFlow({
     resetToMenu,
     completeSession,
     handleRemoteInput,
+    handleRemoteHeldMask,
     handleIncomingChatMessage,
     handleIncomingTypingState,
     handlePeerReady,
