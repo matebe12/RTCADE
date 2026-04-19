@@ -24,7 +24,7 @@ export default function NetplayWaitingScreen({
   onBack,
 }: NetplayWaitingScreenProps) {
   return (
-    <Card className="w-full max-w-sm">
+    <Card className="flex h-full w-full flex-col border-border/70 bg-card/95">
       <CardHeader className="flex flex-row items-center gap-3">
         <Button variant="ghost" size="icon" className="size-8" onClick={onBack}>
           <ArrowLeft className="size-4" />

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, type MutableRefObject, type RefObject } from "react";
 
-import { focusEmulator } from "@/components/EmulatorPlayer";
 import type { NetplayChatMessage } from "@/components/NetplayChatPanel";
+import { createEmulatorRuntimeBridge } from "@/lib/emulator-runtime-bridge";
 import type { ChatMessage as PeerChatMessage, NetplayPeer } from "@/netplay/peer";
 import { NETPLAY_COPY } from "@/netplay/netplayCopy";
 import { toast } from "sonner";
@@ -54,6 +54,7 @@ export function useNetplayChatControls({
   const peerTypingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const chatInputRef = useRef<HTMLInputElement>(null);
   const pendingChatFocusRef = useRef(false);
+  const emulatorRuntime = createEmulatorRuntimeBridge(emulatorRef);
 
   useEffect(() => {
     return () => {
@@ -81,8 +82,8 @@ export function useNetplayChatControls({
   );
 
   const focusEmulatorPlayer = useCallback(() => {
-    focusEmulator(emulatorRef);
-  }, [emulatorRef]);
+    emulatorRuntime.ui.focus();
+  }, [emulatorRuntime]);
 
   const focusChatComposer = useCallback(() => {
     pendingChatFocusRef.current = true;
@@ -136,7 +137,7 @@ export function useNetplayChatControls({
   }, [chatChannelState, chatOpen]);
 
   useEffect(() => {
-    if (currentStep !== "playing") return;
+    if (currentStep !== "playing") return undefined;
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (

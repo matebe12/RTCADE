@@ -48,6 +48,7 @@ interface UseNetplayPeerRoomFlowOptions {
   handlePeerResyncLoaded: () => void;
   handlePeerResyncState: (payload: ResyncStatePayload) => void;
   handlePeerResyncFailed: () => void;
+  handleVideoStream?: (stream: MediaStream) => void;
 }
 
 export function useNetplayPeerRoomFlow({
@@ -79,6 +80,7 @@ export function useNetplayPeerRoomFlow({
   handlePeerResyncLoaded,
   handlePeerResyncState,
   handlePeerResyncFailed,
+  handleVideoStream,
 }: UseNetplayPeerRoomFlowOptions) {
   const { createPeer } = useNetplayPeerFactory({
     peerRef,
@@ -104,6 +106,7 @@ export function useNetplayPeerRoomFlow({
     handlePeerResyncLoaded,
     handlePeerResyncState,
     handlePeerResyncFailed,
+    handleVideoStream,
   });
 
   const {

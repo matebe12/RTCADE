@@ -13,6 +13,12 @@ export type ResyncStatePayload = {
   stateBuffer: ArrayBuffer;
   remoteHeldMask: number;
   remoteInputSeq: number;
+  stats: {
+    compressedBytes: number;
+    decompressMs: number;
+    rawBytes: number;
+    receiveMs: number;
+  };
 };
 
 export type ChatMessage = {
@@ -57,6 +63,7 @@ export type PeerEventHandler = {
   onChatChannelState?: (state: string) => void;
   onChatMessage?: (msg: ChatMessage) => void;
   onChatTyping?: (isTyping: boolean) => void;
+  onVideoStream?: (stream: MediaStream) => void;
 };
 
 type GameplayTransportState = "closed" | "connecting" | "open" | "closing";
@@ -64,14 +71,18 @@ type GameplayTransportState = "closed" | "connecting" | "open" | "closing";
 type PendingBinaryStream = {
   totalBytes: number;
   chunks: number;
-  received: ArrayBuffer[];
+  buffer: Uint8Array;
   bytesReceived: number;
+  chunksReceived: number;
+  writeOffset: number;
 };
 
 type PendingResyncStream = PendingBinaryStream & {
   compressed: boolean;
   heldMask: number;
   inputSeq: number;
+  rawBytes: number;
+  startedAt: number;
 };
 
 const INPUT_CHANNEL_LABEL = "input";
@@ -110,6 +121,8 @@ export class NetplayPeer {
   private _resetRepairSeqTo: number | null = null;
   private _repairSyncTimer: ReturnType<typeof setInterval> | null = null;
   private _repairZeroFlushRemaining = 0;
+  private _videoSenders: RTCRtpSender[] = [];
+  private _negotiating = false;
 
   constructor(handler: PeerEventHandler) {
     this.handler = handler;
@@ -246,6 +259,60 @@ export class NetplayPeer {
     this.chatDc.send(JSON.stringify({ type: "chat-typing", isTyping }));
   }
 
+  /** Add a video MediaStream to the peer connection and trigger renegotiation */
+  startVideoStreaming(stream: MediaStream) {
+    if (!this.pc) {
+      console.warn("[PEER] startVideoStreaming: no peer connection");
+      return;
+    }
+
+    // Remove any previously added video senders
+    for (const sender of this._videoSenders) {
+      try {
+        this.pc.removeTrack(sender);
+      } catch {
+        /* ignore */
+      }
+    }
+    this._videoSenders = [];
+
+    for (const track of stream.getVideoTracks()) {
+      const sender = this.pc.addTrack(track, stream);
+      this._videoSenders.push(sender);
+
+      // Set encoding parameters for low latency
+      try {
+        const params = sender.getParameters();
+        if (params.encodings && params.encodings.length > 0) {
+          params.encodings[0].maxBitrate = 3_000_000; // 3 Mbps
+          params.encodings[0].maxFramerate = 60;
+          sender.setParameters(params).catch(() => {});
+        }
+      } catch {
+        /* not all browsers support setParameters */
+      }
+    }
+
+    console.log(
+      `[PEER] startVideoStreaming: added ${stream.getVideoTracks().length} video track(s)`,
+    );
+    // onnegotiationneeded will fire automatically and handle renegotiation
+  }
+
+  /** Stop sending video tracks */
+  stopVideoStreaming() {
+    if (!this.pc) return;
+
+    for (const sender of this._videoSenders) {
+      try {
+        this.pc.removeTrack(sender);
+      } catch {
+        /* ignore */
+      }
+    }
+    this._videoSenders = [];
+  }
+
   // --- Fire-and-forget resync ---
   /** Reset remote input sequence counter (after resync, GUEST resets) */
   resetRemoteSeq(nextExpectedSeq: number) {
@@ -273,6 +340,7 @@ export class NetplayPeer {
         compressed: true,
         heldMask: this._localHeldMask,
         inputSeq: this._inputSeq,
+        rawBytes: state.byteLength,
       }),
     );
     for (let i = 0; i < numChunks; i++) {
@@ -286,6 +354,7 @@ export class NetplayPeer {
   close() {
     this._closing = true;
     this.stopRepairSyncLoop();
+    this.stopVideoStreaming();
     this.inputDc?.close();
     this.controlDc?.close();
     this.stateDc?.close();
@@ -321,7 +390,12 @@ export class NetplayPeer {
         break;
 
       case "offer":
-        this.handleOffer(msg.sdp);
+        if (this.pc) {
+          // Renegotiation on existing connection
+          this.handleRenegotiationOffer(msg.sdp);
+        } else {
+          this.handleOffer(msg.sdp);
+        }
         break;
 
       case "answer":
@@ -348,6 +422,31 @@ export class NetplayPeer {
     this.pc.onicecandidate = (e) => {
       if (e.candidate) {
         this.signaling.send({ type: "ice-candidate", candidate: e.candidate.toJSON() });
+      }
+    };
+
+    this.pc.ontrack = (e) => {
+      console.log("[PEER] ontrack fired, streams:", e.streams.length);
+      if (e.streams && e.streams.length > 0) {
+        this.handler.onVideoStream?.(e.streams[0]);
+      } else if (e.track) {
+        // Fallback: create a new MediaStream from the track
+        const stream = new MediaStream([e.track]);
+        this.handler.onVideoStream?.(stream);
+      }
+    };
+
+    this.pc.onnegotiationneeded = async () => {
+      if (this._negotiating) return;
+      this._negotiating = true;
+      try {
+        const offer = await this.pc!.createOffer();
+        await this.pc!.setLocalDescription(offer);
+        this.signaling.send({ type: "offer", sdp: this.pc!.localDescription! });
+      } catch (err) {
+        console.warn("[PEER] onnegotiationneeded renegotiation failed:", err);
+      } finally {
+        this._negotiating = false;
       }
     };
 
@@ -504,31 +603,55 @@ export class NetplayPeer {
     dc.onmessage = (e) => {
       if (e.data instanceof ArrayBuffer) {
         if (pendingResync) {
-          pendingResync.received.push(e.data);
-          pendingResync.bytesReceived += e.data.byteLength;
-          if (pendingResync.received.length >= pendingResync.chunks) {
-            const full = new Uint8Array(pendingResync.totalBytes);
-            let offset = 0;
-            for (const chunk of pendingResync.received) {
-              full.set(new Uint8Array(chunk), offset);
-              offset += chunk.byteLength;
-            }
+          const chunk = new Uint8Array(e.data);
+          const nextOffset = Math.min(
+            pendingResync.writeOffset + chunk.byteLength,
+            pendingResync.totalBytes,
+          );
+          pendingResync.buffer.set(
+            chunk.subarray(0, nextOffset - pendingResync.writeOffset),
+            pendingResync.writeOffset,
+          );
+          pendingResync.writeOffset = nextOffset;
+          pendingResync.bytesReceived += chunk.byteLength;
+          pendingResync.chunksReceived += 1;
+          if (
+            pendingResync.chunksReceived >= pendingResync.chunks ||
+            pendingResync.writeOffset >= pendingResync.totalBytes
+          ) {
+            const full = pendingResync.buffer;
             const wasCompressed = pendingResync.compressed;
             const remoteHeldMask = pendingResync.heldMask;
             const remoteInputSeq = pendingResync.inputSeq;
+            const compressedBytes = pendingResync.totalBytes;
+            const rawBytes = pendingResync.rawBytes;
+            const receiveMs = Math.max(0, performance.now() - pendingResync.startedAt);
             pendingResync = null;
             if (wasCompressed) {
+              const inflateStartedAt = performance.now();
               const decompressed = inflate(full);
               this.handler.onResyncState?.({
                 stateBuffer: decompressed.buffer,
                 remoteHeldMask,
                 remoteInputSeq,
+                stats: {
+                  compressedBytes,
+                  decompressMs: Math.max(0, performance.now() - inflateStartedAt),
+                  rawBytes: decompressed.byteLength || rawBytes,
+                  receiveMs,
+                },
               });
             } else {
               this.handler.onResyncState?.({
-                stateBuffer: full.buffer,
+                stateBuffer: full.buffer as ArrayBuffer,
                 remoteHeldMask,
                 remoteInputSeq,
+                stats: {
+                  compressedBytes,
+                  decompressMs: 0,
+                  rawBytes,
+                  receiveMs,
+                },
               });
             }
           }
@@ -537,17 +660,16 @@ export class NetplayPeer {
 
         if (!pendingState) return;
 
-        pendingState.received.push(e.data);
-        pendingState.bytesReceived += e.data.byteLength;
-        if (pendingState.received.length >= pendingState.chunks) {
-          const full = new Uint8Array(pendingState.totalBytes);
-          let offset = 0;
-          for (const chunk of pendingState.received) {
-            full.set(new Uint8Array(chunk), offset);
-            offset += chunk.byteLength;
-          }
+        const chunk = new Uint8Array(e.data);
+        const nextOffset = Math.min(pendingState.writeOffset + chunk.byteLength, pendingState.totalBytes);
+        pendingState.buffer.set(chunk.subarray(0, nextOffset - pendingState.writeOffset), pendingState.writeOffset);
+        pendingState.writeOffset = nextOffset;
+        pendingState.bytesReceived += chunk.byteLength;
+        pendingState.chunksReceived += 1;
+        if (pendingState.chunksReceived >= pendingState.chunks || pendingState.writeOffset >= pendingState.totalBytes) {
+          const full = pendingState.buffer;
           pendingState = null;
-          this.handler.onSaveState?.(full.buffer);
+          this.handler.onSaveState?.(full.buffer as ArrayBuffer);
         }
         return;
       }
@@ -563,18 +685,24 @@ export class NetplayPeer {
           pendingState = {
             totalBytes: msg.totalBytes,
             chunks: msg.chunks,
-            received: [],
+            buffer: new Uint8Array(msg.totalBytes),
             bytesReceived: 0,
+            chunksReceived: 0,
+            writeOffset: 0,
           };
         } else if (msg.type === "resync-state-header") {
           pendingResync = {
             totalBytes: msg.totalBytes,
             chunks: msg.chunks,
-            received: [],
+            buffer: new Uint8Array(msg.totalBytes),
             bytesReceived: 0,
+            chunksReceived: 0,
+            writeOffset: 0,
             compressed: !!msg.compressed,
             heldMask: typeof msg.heldMask === "number" ? msg.heldMask : DEFAULT_REMOTE_HELD_MASK,
             inputSeq: typeof msg.inputSeq === "number" ? msg.inputSeq : 0,
+            rawBytes: typeof msg.rawBytes === "number" ? msg.rawBytes : msg.totalBytes,
+            startedAt: performance.now(),
           };
         }
       } catch {
@@ -717,6 +845,19 @@ export class NetplayPeer {
     const answer = await this.pc!.createAnswer();
     await this.pc!.setLocalDescription(answer);
     this.signaling.send({ type: "answer", sdp: this.pc!.localDescription! });
+  }
+
+  private async handleRenegotiationOffer(sdp: RTCSessionDescriptionInit) {
+    if (!this.pc) return;
+    try {
+      await this.pc.setRemoteDescription(sdp);
+      const answer = await this.pc.createAnswer();
+      await this.pc.setLocalDescription(answer);
+      this.signaling.send({ type: "answer", sdp: this.pc.localDescription! });
+      console.log("[PEER] Renegotiation answer sent");
+    } catch (err) {
+      console.warn("[PEER] Renegotiation failed:", err);
+    }
   }
 
   private sendRepairSync() {

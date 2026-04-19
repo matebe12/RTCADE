@@ -1,6 +1,7 @@
 import type { RefObject } from "react";
 
 import EmulatorPlayer, { type SystemCore } from "@/components/EmulatorPlayer";
+import GuestVideoDisplay from "@/components/netplay/GuestVideoDisplay";
 import NetplayChatPanel, { type NetplayChatMessage } from "@/components/NetplayChatPanel";
 import PlayControlsGuide from "@/components/netplay/PlayControlsGuide";
 import { UserBadge } from "@/components/UserBadge";
@@ -58,6 +59,8 @@ interface NetplayPlayingScreenProps {
   onResyncLoaded: () => void;
   onResyncFailed: () => void;
   onChatShortcut: () => void;
+  onCanvasStreamReady?: (stream: MediaStream) => void;
+  videoStream: MediaStream | null;
 }
 
 export default function NetplayPlayingScreen({
@@ -89,6 +92,8 @@ export default function NetplayPlayingScreen({
   onResyncLoaded,
   onResyncFailed,
   onChatShortcut,
+  onCanvasStreamReady,
+  videoStream,
 }: NetplayPlayingScreenProps) {
   const localChatUser = myProfile ?? { nickname: "나", avatar: "🎮" };
 
@@ -170,23 +175,32 @@ export default function NetplayPlayingScreen({
         <PlayControlsGuide mode="netplay" className="w-full max-w-none" />
 
         <div className="flex w-full flex-col items-center gap-3 xl:flex-row xl:items-start xl:justify-center">
-          <EmulatorPlayer
-            ref={emulatorRef}
-            romSource=""
-            core={session.core}
-            role={session.role}
-            romPath={session.romPath}
-            biosPath={session.biosPath}
-            onLocalInput={onLocalInput}
-            onEmulatorReady={onEmulatorReady}
-            onSaveState={onSaveState}
-            onStateLoaded={onStateLoaded}
-            onSaveStateError={onSaveStateError}
-            onResyncState={onResyncState}
-            onResyncLoaded={onResyncLoaded}
-            onResyncFailed={onResyncFailed}
-            onChatShortcut={onChatShortcut}
-          />
+          {session.role === "guest" ? (
+            <GuestVideoDisplay
+              videoStream={videoStream}
+              onLocalInput={onLocalInput}
+              onChatShortcut={onChatShortcut}
+            />
+          ) : (
+            <EmulatorPlayer
+              ref={emulatorRef}
+              romSource=""
+              core={session.core}
+              role={session.role}
+              romPath={session.romPath}
+              biosPath={session.biosPath}
+              onLocalInput={onLocalInput}
+              onEmulatorReady={onEmulatorReady}
+              onSaveState={onSaveState}
+              onStateLoaded={onStateLoaded}
+              onSaveStateError={onSaveStateError}
+              onResyncState={onResyncState}
+              onResyncLoaded={onResyncLoaded}
+              onResyncFailed={onResyncFailed}
+              onChatShortcut={onChatShortcut}
+              onCanvasStreamReady={onCanvasStreamReady}
+            />
+          )}
 
           <NetplayChatPanel
             open={chatOpen}

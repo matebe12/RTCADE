@@ -1,4 +1,4 @@
-import { type ReactElement, useCallback } from "react";
+import { type ReactElement, useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import NetplaySessionSummary from "./NetplaySessionSummary";
@@ -112,6 +112,10 @@ export default function NetplayLobby() {
     handleStateLoaded,
     handleSummaryChooseAnotherGame,
     handleSummaryRematch,
+    handleCanvasStreamReady,
+    handleVideoStream,
+    setVideoStreamCallbackRef,
+    videoStreamRef,
     resetToMenu,
   } = useNetplaySession({
     state,
@@ -144,6 +148,27 @@ export default function NetplayLobby() {
     resetSessionUiState,
     fetchRoms,
   });
+
+  // GUEST: video stream received from HOST via WebRTC
+  const [guestVideoStream, setGuestVideoStream] = useState<MediaStream | null>(null);
+
+  useEffect(() => {
+    setVideoStreamCallbackRef.current = setGuestVideoStream;
+    // If videoStream was already received before this render, sync it
+    if (videoStreamRef.current && !guestVideoStream) {
+      setGuestVideoStream(videoStreamRef.current);
+    }
+    return () => {
+      setVideoStreamCallbackRef.current = null;
+    };
+  }, [guestVideoStream, setVideoStreamCallbackRef, videoStreamRef]);
+
+  // Reset video stream when leaving playing state
+  useEffect(() => {
+    if (state.step !== "playing") {
+      setGuestVideoStream(null);
+    }
+  }, [state.step]);
 
   const handleToggleFavoriteGame = useCallback(
     (romPath: string) => {
@@ -337,6 +362,8 @@ export default function NetplayLobby() {
         onResyncLoaded={handleResyncLoaded}
         onResyncFailed={handleResyncFailed}
         onChatShortcut={handleChatShortcut}
+        onCanvasStreamReady={handleCanvasStreamReady}
+        videoStream={guestVideoStream}
       />
     );
   }

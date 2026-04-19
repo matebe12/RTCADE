@@ -12,13 +12,17 @@ interface UseNetplaySyncRuntimeOptions {
   peerRef: MutableRefObject<NetplayPeer | null>;
   emulatorRef: RefObject<HTMLIFrameElement | null>;
   roleRef: MutableRefObject<"host" | "guest" | null>;
+  lastInputTimeRef: MutableRefObject<number>;
   sessionCoreRef: MutableRefObject<SystemCore | null>;
+  /** When true, use video streaming instead of state sync */
+  videoStreamingMode?: boolean;
   onGuestResyncLoaded?: () => void;
   onGuestResyncFailed?: () => void;
   onGuestResyncState?: (payload: ResyncStatePayload) => void;
   setGameStarted: (gameStarted: boolean) => void;
   updateSync: (message: string) => void;
   markSessionStarted: () => void;
+  onStartVideoCapture?: () => void;
 }
 
 export function useNetplaySyncRuntime({
@@ -27,13 +31,16 @@ export function useNetplaySyncRuntime({
   peerRef,
   emulatorRef,
   roleRef,
+  lastInputTimeRef,
   sessionCoreRef,
+  videoStreamingMode,
   onGuestResyncLoaded,
   onGuestResyncFailed,
   onGuestResyncState,
   setGameStarted,
   updateSync,
   markSessionStarted,
+  onStartVideoCapture,
 }: UseNetplaySyncRuntimeOptions) {
   const gameStartedRef = useRef(false);
   const {
@@ -50,7 +57,9 @@ export function useNetplaySyncRuntime({
     emulatorRef,
     roleRef,
     gameStartedRef,
+    lastInputTimeRef,
     sessionCoreRef,
+    videoStreamingMode,
     onGuestResyncLoaded,
     onGuestResyncFailed,
     onGuestResyncState,
@@ -77,6 +86,7 @@ export function useNetplaySyncRuntime({
     updateSync,
     markSessionStarted,
     startPeriodicResync,
+    onStartVideoCapture,
   });
   const resetSyncRuntime = useCallback(() => {
     resetInitialSyncRuntime();

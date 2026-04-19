@@ -29,7 +29,7 @@ async function bootstrap() {
   app.use(createCorsMiddleware(config.allowedOrigins));
   app.use(createVisitorTrackingMiddleware(operationsDatabase));
   registerRomRoutes(app, config.romsDir);
-  registerEmulatorRoute(app);
+  registerEmulatorRoute(app, config.emulatorJsDataUrl);
   registerPublicRoomRoutes(app, roomStore);
   registerNoticeRoutes(app, operationsDatabase, config.noticeAdminToken);
   registerStatsRoutes(app, operationsDatabase, roomStore, playSessionStore);

@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef } from "react";
 
 import type { SystemCore } from "@/components/EmulatorPlayer";
-import { sendRemoteInput } from "@/components/EmulatorPlayer";
 import type { NetplayChatMessage } from "@/components/NetplayChatPanel";
+import { createEmulatorRuntimeBridge } from "@/lib/emulator-runtime-bridge";
 import { type RecentGame, type RecentOpponent } from "@/lib/user-profile";
 import { NetplayPeer, type InputMessage, type ResyncStatePayload } from "@/netplay/peer";
 import { useNetplayChatControls } from "@/netplay/useNetplayChatControls";
@@ -102,6 +102,12 @@ export function useNetplaySession({
   const opponentProfileRef = useRef<OpponentProfile | null>(null);
   const activeSessionRef = useRef<ActiveSession | null>(null);
   const sessionStartedAtRef = useRef<number | null>(null);
+  const videoStreamRef = useRef<MediaStream | null>(null);
+  const setVideoStreamCallbackRef = useRef<((stream: MediaStream | null) => void) | null>(null);
+  const emulatorRuntime = createEmulatorRuntimeBridge(emulatorRef);
+
+  // Video streaming mode is always ON for netplay
+  const videoStreamingMode = true;
 
   useEffect(() => {
     sessionCoreRef.current = "core" in state ? state.core : activeSessionRef.current?.core ?? null;
@@ -129,12 +135,12 @@ export function useNetplaySession({
       const isDown = (nextMask & bit) !== 0;
 
       if (wasDown !== isDown) {
-        sendRemoteInput(emulatorRef, button, isDown);
+        emulatorRuntime.input.sendRemoteInput(button, isDown);
       }
     }
 
     remoteHeldMaskRef.current = nextMask;
-  }, []);
+  }, [emulatorRuntime]);
 
   const handleGuestResyncState = useCallback((payload: ResyncStatePayload) => {
     if (roleRef.current !== "guest") return;
@@ -223,6 +229,28 @@ export function useNetplaySession({
     peerRef.current?.sendInput(button, down);
   }, []);
 
+  // --- Video streaming handlers ---
+
+  /** HOST: canvas stream is ready → attach to peer connection */
+  const handleCanvasStreamReady = useCallback((stream: MediaStream) => {
+    console.log("[LOBBY] HOST canvas stream ready, attaching to peer");
+    peerRef.current?.startVideoStreaming(stream);
+  }, []);
+
+  /** GUEST: video stream received from HOST via WebRTC */
+  const handleVideoStream = useCallback((stream: MediaStream) => {
+    console.log("[LOBBY] GUEST received video stream from HOST");
+    videoStreamRef.current = stream;
+    setVideoStreamCallbackRef.current?.(stream);
+  }, []);
+
+  /** HOST: trigger video capture after game starts */
+  const handleStartVideoCapture = useCallback(() => {
+    if (roleRef.current !== "host") return;
+    console.log("[LOBBY] HOST starting video capture");
+    emulatorRuntime.sync.startVideoCapture();
+  }, [emulatorRuntime]);
+
   const updateSync = useCallback(
     (msg: string) => {
       syncStatusRef.current = msg;
@@ -262,13 +290,16 @@ export function useNetplaySession({
     peerRef,
     emulatorRef,
     roleRef,
+    lastInputTimeRef,
     sessionCoreRef,
+    videoStreamingMode,
     onGuestResyncLoaded: handleGuestResyncLoaded,
     onGuestResyncFailed: handleGuestResyncFailed,
     onGuestResyncState: handleGuestResyncState,
     setGameStarted,
     updateSync,
     markSessionStarted,
+    onStartVideoCapture: handleStartVideoCapture,
   });
 
   const {
@@ -328,12 +359,14 @@ export function useNetplaySession({
     handlePeerResyncLoaded,
     handlePeerResyncState,
     handlePeerResyncFailed,
+    handleVideoStream,
   });
 
   return {
     chatInputRef,
     emulatorRef,
     handleBack,
+    handleCanvasStreamReady,
     handleChatCancel,
     handleChatDraftChange,
     handleChatShortcut,
@@ -353,6 +386,9 @@ export function useNetplaySession({
     handleStateLoaded,
     handleSummaryChooseAnotherGame,
     handleSummaryRematch,
+    handleVideoStream,
     resetToMenu,
+    setVideoStreamCallbackRef,
+    videoStreamRef,
   };
 }

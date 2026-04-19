@@ -7,6 +7,11 @@ export interface ServerConfig {
   allowedOrigins: string[];
   databaseUrl: string | null;
   noticeAdminToken: string | null;
+  emulatorJsDataUrl: string;
+}
+
+function normalizeEmulatorJsDataUrl(url: string) {
+  return url.endsWith("/") ? url : `${url}/`;
 }
 
 function buildDatabaseUrlFromEnv() {
@@ -49,6 +54,9 @@ export function getServerConfig(): ServerConfig {
     allowedOrigins: process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(",") : ["*"],
     databaseUrl: buildDatabaseUrlFromEnv(),
     noticeAdminToken: process.env.NOTICE_ADMIN_TOKEN || null,
+    emulatorJsDataUrl: normalizeEmulatorJsDataUrl(
+      process.env.EMULATORJS_DATA_URL || "https://cdn.emulatorjs.org/stable/data/",
+    ),
   };
 }
 

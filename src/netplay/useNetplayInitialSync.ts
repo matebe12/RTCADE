@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, type MutableRefObject, type RefObject } from "react";
 
-import { loadSaveState, requestSaveState, sendStartGame } from "@/components/EmulatorPlayer";
+import { createEmulatorRuntimeBridge } from "@/lib/emulator-runtime-bridge";
 import { NETPLAY_COPY } from "@/netplay/netplayCopy";
 import type { NetplayPeer } from "@/netplay/peer";
 
@@ -15,6 +15,7 @@ interface UseNetplayInitialSyncOptions {
   updateSync: (message: string) => void;
   markSessionStarted: () => void;
   startPeriodicResync: () => void;
+  onStartVideoCapture?: () => void;
 }
 
 export function useNetplayInitialSync({
@@ -28,10 +29,12 @@ export function useNetplayInitialSync({
   updateSync,
   markSessionStarted,
   startPeriodicResync,
+  onStartVideoCapture,
 }: UseNetplayInitialSyncOptions) {
   const localReadyRef = useRef(false);
   const remoteReadyRef = useRef(false);
   const pendingStateRef = useRef<ArrayBuffer | null>(null);
+  const emulatorRuntime = createEmulatorRuntimeBridge(emulatorRef);
 
   const startGame = useCallback(
     (message: string, notifyPeer: boolean) => {
@@ -39,12 +42,16 @@ export function useNetplayInitialSync({
       markSessionStarted();
       setGameStarted(true);
       gameStartedRef.current = true;
-      sendStartGame(emulatorRef);
+      emulatorRuntime.sync.startGame();
       if (notifyPeer) {
         peerRef.current?.sendStartSignal();
       }
+      // HOST: start video capture for streaming after game starts
+      if (roleRef.current === "host") {
+        onStartVideoCapture?.();
+      }
     },
-    [emulatorRef, gameStartedRef, markSessionStarted, peerRef, setGameStarted, updateSync],
+    [emulatorRuntime, gameStartedRef, markSessionStarted, onStartVideoCapture, peerRef, roleRef, setGameStarted, updateSync],
   );
 
   useEffect(() => {
@@ -57,6 +64,21 @@ export function useNetplayInitialSync({
       peerRef.current?.sendPeerReady();
     }
   }, [dcState, gameStarted, peerRef, roleRef]);
+
+  // Video streaming: GUEST auto-marks ready when DC opens (no emulator to wait for)
+  useEffect(() => {
+    if (
+      dcState === "open" &&
+      !localReadyRef.current &&
+      roleRef.current === "guest" &&
+      !gameStarted
+    ) {
+      console.log("[LOBBY] GUEST auto-ready (video streaming mode, no emulator)");
+      localReadyRef.current = true;
+      updateSync(NETPLAY_COPY.syncWaitingForStart);
+      peerRef.current?.sendPeerReady();
+    }
+  }, [dcState, gameStarted, peerRef, roleRef, updateSync]);
 
   const resetInitialSyncRuntime = useCallback(() => {
     localReadyRef.current = false;
@@ -74,10 +96,12 @@ export function useNetplayInitialSync({
     );
     remoteReadyRef.current = true;
     if (roleRef.current === "host" && localReadyRef.current) {
+      // Video streaming: start the game directly — no state transfer needed
       updateSync(NETPLAY_COPY.syncPreparing);
-      requestSaveState(emulatorRef);
+      startGame(NETPLAY_COPY.syncStartNow, true);
+      startPeriodicResync();
     }
-  }, [emulatorRef, roleRef, updateSync]);
+  }, [roleRef, startGame, startPeriodicResync, updateSync]);
 
   const handlePeerSaveState = useCallback(
     (stateBuffer: ArrayBuffer) => {
@@ -92,14 +116,14 @@ export function useNetplayInitialSync({
       if (roleRef.current === "guest") {
         if (localReadyRef.current) {
           updateSync(NETPLAY_COPY.syncFinishingSetup);
-          loadSaveState(emulatorRef, stateBuffer);
+          emulatorRuntime.sync.loadInitialState(stateBuffer);
         } else {
           pendingStateRef.current = stateBuffer;
           updateSync(NETPLAY_COPY.syncStateReceived);
         }
       }
     },
-    [emulatorRef, roleRef, updateSync],
+    [emulatorRuntime, roleRef, updateSync],
   );
 
   const handlePeerStateLoaded = useCallback(() => {
@@ -129,19 +153,21 @@ export function useNetplayInitialSync({
     if (roleRef.current === "host") {
       updateSync(NETPLAY_COPY.syncWaitingForOpponent);
       if (remoteReadyRef.current) {
+        // Video streaming: start game directly — no state transfer needed
         updateSync(NETPLAY_COPY.syncPreparing);
-        requestSaveState(emulatorRef);
+        startGame(NETPLAY_COPY.syncStartNow, true);
+        startPeriodicResync();
       }
     } else {
       updateSync(NETPLAY_COPY.syncWaitingForStart);
       peerRef.current?.sendPeerReady();
       if (pendingStateRef.current) {
         updateSync(NETPLAY_COPY.syncFinishingSetup);
-        loadSaveState(emulatorRef, pendingStateRef.current);
+        emulatorRuntime.sync.loadInitialState(pendingStateRef.current);
         pendingStateRef.current = null;
       }
     }
-  }, [emulatorRef, peerRef, roleRef, updateSync]);
+  }, [emulatorRuntime, peerRef, roleRef, startGame, startPeriodicResync, updateSync]);
 
   const handleSaveState = useCallback(
     (stateBuffer: ArrayBuffer) => {
