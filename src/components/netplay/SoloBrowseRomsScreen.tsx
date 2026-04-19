@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { ArrowLeft, Loader2, Search } from "lucide-react";
 
 import { SYSTEM_OPTIONS } from "@/components/EmulatorPlayer";
@@ -84,9 +84,36 @@ export default function SoloBrowseRomsScreen({
     : filteredRoms;
 
   const isSearching = searchQuery.length > 0;
+  const [categoryFilter, setCategoryFilter] = useState<GameCategory | null>(null);
+
+  const categoryCounts = useMemo(() => {
+    const counts: Record<GameCategory, number> = {
+      fighting: 0, action: 0, shooting: 0, puzzle: 0, sports: 0, etc: 0,
+    };
+    browseRoms.forEach((rom) => {
+      counts[getRomCategory(rom.filename, rom.core)]++;
+    });
+    return counts;
+  }, [browseRoms]);
+
+  const availableCategories = useMemo(
+    () =>
+      (Object.entries(CATEGORY_INFO) as [GameCategory, (typeof CATEGORY_INFO)[GameCategory]][])
+        .sort(([, a], [, b]) => a.order - b.order)
+        .filter(([key]) => categoryCounts[key] > 0),
+    [categoryCounts],
+  );
+
+  const filteredBrowseRoms = useMemo(
+    () =>
+      categoryFilter
+        ? browseRoms.filter((rom) => getRomCategory(rom.filename, rom.core) === categoryFilter)
+        : browseRoms,
+    [browseRoms, categoryFilter],
+  );
 
   const categoryGroups = useMemo(() => {
-    if (isSearching) return [];
+    if (isSearching || categoryFilter) return [];
     const groups: Record<GameCategory, RomInfo[]> = {
       fighting: [],
       action: [],
@@ -108,7 +135,7 @@ export default function SoloBrowseRomsScreen({
         roms: groups[key],
       }))
       .filter((group) => group.roms.length > 0);
-  }, [browseRoms, isSearching]);
+  }, [browseRoms, isSearching, categoryFilter]);
 
   return (
     <Card className="w-full max-w-lg border-border/70 bg-card/95">
@@ -141,6 +168,33 @@ export default function SoloBrowseRomsScreen({
           />
         </div>
 
+        {!isSearching && availableCategories.length > 1 && (
+          <div className="flex flex-wrap gap-1.5">
+            <Button
+              type="button"
+              variant={categoryFilter === null ? "default" : "outline"}
+              size="sm"
+              className="h-7 rounded-full px-3 text-[11px]"
+              disabled={isStarting}
+              onClick={() => setCategoryFilter(null)}
+            >
+              전체 {browseRoms.length}
+            </Button>
+            {availableCategories.map(([key, info]) => (
+              <Button
+                key={key}
+                type="button"
+                variant={categoryFilter === key ? "default" : "outline"}
+                size="sm"
+                className="h-7 rounded-full px-3 text-[11px]"
+                disabled={isStarting}
+                onClick={() => setCategoryFilter(categoryFilter === key ? null : key)}
+              >
+                {info.icon} {info.label} {categoryCounts[key]}
+              </Button>
+            ))}
+          </div>
+        )}
         <ScrollArea className="h-120">
           <div className="flex flex-col gap-2 pr-3">
             {showPersonalizedSections && recentRoms.length > 0 && (
@@ -201,8 +255,8 @@ export default function SoloBrowseRomsScreen({
               </div>
             )}
 
-            {/* 카테고리별 그룹 (검색 중이 아닐 때) */}
-            {!isSearching &&
+            {/* 카테고리별 그룹 (검색/필터 없을 때) */}
+            {!isSearching && !categoryFilter &&
               categoryGroups.map((group) => {
                 return (
                   <div key={group.category} className="flex flex-col gap-2 pb-2">
@@ -237,9 +291,9 @@ export default function SoloBrowseRomsScreen({
                 );
               })}
 
-            {/* 검색 결과 (플랫 리스트) */}
-            {isSearching &&
-              browseRoms.map((rom) => {
+            {/* 카테고리 필터 또는 검색 결과 (플랫 리스트) */}
+            {(isSearching || categoryFilter) &&
+              filteredBrowseRoms.map((rom) => {
                 const sys = SYSTEM_OPTIONS.find(
                   (system) => system.value === rom.core,
                 );
@@ -258,9 +312,9 @@ export default function SoloBrowseRomsScreen({
                 );
               })}
 
-            {browseRoms.length === 0 && (
+            {(isSearching || categoryFilter ? filteredBrowseRoms : browseRoms).length === 0 && (
               <p className="py-8 text-center text-xs text-muted-foreground">
-                {isSearching ? "검색 결과가 없습니다" : "표시할 다른 게임이 없습니다"}
+                {isSearching ? "검색 결과가 없습니다" : categoryFilter ? "해당 카테고리에 게임이 없습니다" : "표시할 다른 게임이 없습니다"}
               </p>
             )}
           </div>

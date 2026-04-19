@@ -91,7 +91,7 @@ export default function NetplayPage() {
         className={
           showHeroCard
             ? "grid w-full gap-4 lg:grid-cols-[0.8fr_1.2fr] lg:items-stretch"
-            : "flex justify-center"
+            : "flex w-full max-w-xl justify-center self-center"
         }
       >
         {showHeroCard && (
