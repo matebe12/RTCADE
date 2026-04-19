@@ -123,7 +123,7 @@ export interface ChatShortcutEvent {
 
 export interface VideoFrameEvent {
   type: typeof EMULATOR_MESSAGE_TYPE.VIDEO_FRAME;
-  bitmap: ImageBitmap;
+  bitmap: unknown; // ImageBitmap (DOM type, not available in Node tsconfig)
 }
 
 export type IframeToReactMessage =

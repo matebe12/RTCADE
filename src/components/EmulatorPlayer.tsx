@@ -1,4 +1,4 @@
-import { useEffect, useRef, forwardRef, useImperativeHandle, useCallback } from "react";
+import { useEffect, useRef, forwardRef, useImperativeHandle } from "react";
 
 import { appEnvironment } from "@/config/environment";
 import { createEmulatorRuntimeBridge } from "@/lib/emulator-runtime-bridge";

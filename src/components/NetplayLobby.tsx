@@ -113,7 +113,6 @@ export default function NetplayLobby() {
     handleSummaryChooseAnotherGame,
     handleSummaryRematch,
     handleCanvasStreamReady,
-    handleVideoStream,
     setVideoStreamCallbackRef,
     videoStreamRef,
     resetToMenu,
