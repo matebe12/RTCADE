@@ -6,6 +6,7 @@ import {
   NetplayPeer,
   type ChatMessage as PeerChatMessage,
   type InputMessage,
+  type ResyncStatePayload,
 } from "@/netplay/peer";
 import { NETPLAY_COPY } from "@/netplay/netplayCopy";
 import {
@@ -38,7 +39,7 @@ interface UseNetplayPeerFactoryOptions {
   handlePeerStateLoaded: () => void;
   handlePeerStartSignal: () => void;
   handlePeerResyncLoaded: () => void;
-  handlePeerResyncState: (stateBuffer: ArrayBuffer) => void;
+  handlePeerResyncState: (payload: ResyncStatePayload) => void;
   handlePeerResyncFailed: () => void;
 }
 

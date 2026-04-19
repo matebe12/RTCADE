@@ -4,7 +4,7 @@ import type { SystemCore } from "@/components/EmulatorPlayer";
 import { sendRemoteInput } from "@/components/EmulatorPlayer";
 import type { NetplayChatMessage } from "@/components/NetplayChatPanel";
 import { type RecentGame, type RecentOpponent } from "@/lib/user-profile";
-import { NetplayPeer, type InputMessage } from "@/netplay/peer";
+import { NetplayPeer, type InputMessage, type ResyncStatePayload } from "@/netplay/peer";
 import { useNetplayChatControls } from "@/netplay/useNetplayChatControls";
 import { useNetplayPeerRoomFlow } from "@/netplay/useNetplayPeerRoomFlow";
 import { useNetplaySessionHistory } from "@/netplay/useNetplaySessionHistory";
@@ -18,6 +18,14 @@ import {
 } from "@/stores/useNetplayLobbyStore";
 
 type SetLobbyState = (next: LobbyState | ((previous: LobbyState) => LobbyState)) => void;
+
+const REMOTE_INPUT_BUTTON_COUNT = 12;
+
+function updateHeldMask(mask: number, button: number, down: boolean) {
+  if (button < 0 || button >= REMOTE_INPUT_BUTTON_COUNT) return mask;
+  const bit = 1 << button;
+  return down ? mask | bit : mask & ~bit;
+}
 
 interface UseNetplaySessionOptions {
   state: LobbyState;
@@ -88,6 +96,9 @@ export function useNetplaySession({
   const roleRef = useRef<"host" | "guest" | null>(null);
   const sessionCoreRef = useRef<SystemCore | null>(null);
   const lastInputTimeRef = useRef(0);
+  const remoteHeldMaskRef = useRef(0);
+  const queuedRemoteHeldMaskRef = useRef<number | null>(null);
+  const guestResyncPendingRef = useRef(false);
   const opponentProfileRef = useRef<OpponentProfile | null>(null);
   const activeSessionRef = useRef<ActiveSession | null>(null);
   const sessionStartedAtRef = useRef<number | null>(null);
@@ -99,6 +110,59 @@ export function useNetplaySession({
   useEffect(() => {
     opponentProfileRef.current = opponentProfile;
   }, [opponentProfile]);
+
+  useEffect(() => {
+    if (state.step === "playing") return;
+    remoteHeldMaskRef.current = 0;
+    queuedRemoteHeldMaskRef.current = null;
+    guestResyncPendingRef.current = false;
+  }, [state.step]);
+
+  const reconcileRemoteHeldMask = useCallback((nextMask: number) => {
+    const previousMask = remoteHeldMaskRef.current;
+
+    if (previousMask === nextMask) return;
+
+    for (let button = 0; button < REMOTE_INPUT_BUTTON_COUNT; button += 1) {
+      const bit = 1 << button;
+      const wasDown = (previousMask & bit) !== 0;
+      const isDown = (nextMask & bit) !== 0;
+
+      if (wasDown !== isDown) {
+        sendRemoteInput(emulatorRef, button, isDown);
+      }
+    }
+
+    remoteHeldMaskRef.current = nextMask;
+  }, []);
+
+  const handleGuestResyncState = useCallback((payload: ResyncStatePayload) => {
+    if (roleRef.current !== "guest") return;
+
+    guestResyncPendingRef.current = true;
+    queuedRemoteHeldMaskRef.current = null;
+    remoteHeldMaskRef.current = payload.remoteHeldMask;
+  }, []);
+
+  const handleGuestResyncLoaded = useCallback(() => {
+    if (roleRef.current !== "guest") return;
+
+    guestResyncPendingRef.current = false;
+
+    const queuedHeldMask = queuedRemoteHeldMaskRef.current;
+    queuedRemoteHeldMaskRef.current = null;
+
+    if (queuedHeldMask !== null) {
+      reconcileRemoteHeldMask(queuedHeldMask);
+    }
+  }, [reconcileRemoteHeldMask]);
+
+  const handleGuestResyncFailed = useCallback(() => {
+    if (roleRef.current !== "guest") return;
+
+    guestResyncPendingRef.current = false;
+    queuedRemoteHeldMaskRef.current = null;
+  }, []);
 
   const {
     chatInputRef,
@@ -129,8 +193,19 @@ export function useNetplaySession({
 
   const handleRemoteInput = useCallback((msg: InputMessage) => {
     lastInputTimeRef.current = Date.now();
-    sendRemoteInput(emulatorRef, msg.button, msg.down);
-  }, []);
+
+    const nextHeldMask =
+      typeof msg.heldMask === "number"
+        ? msg.heldMask
+        : updateHeldMask(remoteHeldMaskRef.current, msg.button, msg.down);
+
+    if (guestResyncPendingRef.current) {
+      queuedRemoteHeldMaskRef.current = nextHeldMask;
+      return;
+    }
+
+    reconcileRemoteHeldMask(nextHeldMask);
+  }, [reconcileRemoteHeldMask]);
 
   const handleLocalInput = useCallback((button: number, down: boolean) => {
     lastInputTimeRef.current = Date.now();
@@ -177,6 +252,9 @@ export function useNetplaySession({
     emulatorRef,
     roleRef,
     sessionCoreRef,
+    onGuestResyncLoaded: handleGuestResyncLoaded,
+    onGuestResyncFailed: handleGuestResyncFailed,
+    onGuestResyncState: handleGuestResyncState,
     setGameStarted,
     updateSync,
     markSessionStarted,

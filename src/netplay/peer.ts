@@ -5,7 +5,14 @@ export type InputMessage = {
   type: "input";
   button: number;
   down: boolean;
+  heldMask: number;
   seq: number;
+};
+
+export type ResyncStatePayload = {
+  stateBuffer: ArrayBuffer;
+  remoteHeldMask: number;
+  remoteInputSeq: number;
 };
 
 export type ChatMessage = {
@@ -35,7 +42,7 @@ export type PeerEventHandler = {
   onStateLoaded?: () => void;
   onStartSignal?: () => void; // GUEST receives "go" from HOST
   // Fire-and-forget resync
-  onResyncState?: (state: ArrayBuffer) => void; // GUEST: load this state
+  onResyncState?: (payload: ResyncStatePayload) => void; // GUEST: load this state
   onResyncLoaded?: () => void; // HOST: guest applied correction
   onResyncFailed?: () => void; // Resync failed
   // Input sequence gap detection
@@ -56,6 +63,8 @@ type PendingBinaryStream = {
 
 type PendingResyncStream = PendingBinaryStream & {
   compressed: boolean;
+  heldMask: number;
+  inputSeq: number;
 };
 
 const INPUT_CHANNEL_LABEL = "input";
@@ -65,6 +74,7 @@ const SAVE_STATE_CHUNK_SIZE = 64 * 1024;
 const RESYNC_STATE_CHUNK_SIZE = 256 * 1024;
 const CHAT_BUFFER_THRESHOLD = 64 * 1024;
 const STATE_BUFFER_THRESHOLD = 512 * 1024;
+const DEFAULT_REMOTE_HELD_MASK = 0;
 
 const RTC_CONFIG: RTCConfiguration = {
   iceServers: [{ urls: "stun:stun.l.google.com:19302" }, { urls: "stun:stun1.l.google.com:19302" }],
@@ -82,6 +92,8 @@ export class NetplayPeer {
   private _lastTypingState: boolean | null = null;
   private _gameplayTransportState: GameplayTransportState = "closed";
   private _gameplayConnected = false;
+  private _localHeldMask = 0;
+  private _resetSeqTo: number | null = null;
 
   constructor(handler: PeerEventHandler) {
     this.handler = handler;
@@ -119,7 +131,16 @@ export class NetplayPeer {
 
   sendInput(button: number, down: boolean) {
     if (this.inputDc?.readyState === "open") {
-      this.inputDc.send(JSON.stringify({ type: "input", button, down, seq: ++this._inputSeq }));
+      this._localHeldMask = updateHeldMask(this._localHeldMask, button, down);
+      this.inputDc.send(
+        JSON.stringify({
+          type: "input",
+          button,
+          down,
+          heldMask: this._localHeldMask,
+          seq: ++this._inputSeq,
+        }),
+      );
     }
   }
 
@@ -209,12 +230,9 @@ export class NetplayPeer {
 
   // --- Fire-and-forget resync ---
   /** Reset remote input sequence counter (after resync, GUEST resets) */
-  resetRemoteSeq() {
-    // Will be set when setupDataChannel runs; this method signals
-    // the DC handler to accept next seq as the new baseline
-    this._resetSeqFlag = true;
+  resetRemoteSeq(nextExpectedSeq: number) {
+    this._resetSeqTo = nextExpectedSeq;
   }
-  private _resetSeqFlag = false;
 
   sendResyncState(state: ArrayBuffer): boolean {
     if (this.stateDc?.readyState !== "open") return false;
@@ -234,6 +252,8 @@ export class NetplayPeer {
         totalBytes: total,
         chunks: numChunks,
         compressed: true,
+        heldMask: this._localHeldMask,
+        inputSeq: this._inputSeq,
       }),
     );
     for (let i = 0; i < numChunks; i++) {
@@ -378,9 +398,13 @@ export class NetplayPeer {
         const msg = JSON.parse(e.data);
         if (msg.type === "input") {
           const inp = msg as InputMessage;
-          if (this._resetSeqFlag) {
-            expectedSeq = inp.seq;
-            this._resetSeqFlag = false;
+          if (this._resetSeqTo !== null) {
+            expectedSeq = this._resetSeqTo;
+            this._resetSeqTo = null;
+          }
+          if (inp.seq < expectedSeq) {
+            console.log(`[PEER] ignoring stale input seq ${inp.seq} (< ${expectedSeq})`);
+            return;
           }
           if (inp.seq !== expectedSeq) {
             console.warn(`[PEER] input seq gap: expected ${expectedSeq}, got ${inp.seq}`);
@@ -437,12 +461,22 @@ export class NetplayPeer {
               offset += chunk.byteLength;
             }
             const wasCompressed = pendingResync.compressed;
+            const remoteHeldMask = pendingResync.heldMask;
+            const remoteInputSeq = pendingResync.inputSeq;
             pendingResync = null;
             if (wasCompressed) {
               const decompressed = inflate(full);
-              this.handler.onResyncState?.(decompressed.buffer);
+              this.handler.onResyncState?.({
+                stateBuffer: decompressed.buffer,
+                remoteHeldMask,
+                remoteInputSeq,
+              });
             } else {
-              this.handler.onResyncState?.(full.buffer);
+              this.handler.onResyncState?.({
+                stateBuffer: full.buffer,
+                remoteHeldMask,
+                remoteInputSeq,
+              });
             }
           }
           return;
@@ -486,6 +520,8 @@ export class NetplayPeer {
             received: [],
             bytesReceived: 0,
             compressed: !!msg.compressed,
+            heldMask: typeof msg.heldMask === "number" ? msg.heldMask : DEFAULT_REMOTE_HELD_MASK,
+            inputSeq: typeof msg.inputSeq === "number" ? msg.inputSeq : 0,
           };
         }
       } catch {
@@ -571,4 +607,10 @@ export class NetplayPeer {
     await this.pc!.setLocalDescription(answer);
     this.signaling.send({ type: "answer", sdp: this.pc!.localDescription! });
   }
+}
+
+function updateHeldMask(mask: number, button: number, down: boolean) {
+  if (button < 0 || button > 30) return mask;
+  const bit = 1 << button;
+  return down ? mask | bit : mask & ~bit;
 }
