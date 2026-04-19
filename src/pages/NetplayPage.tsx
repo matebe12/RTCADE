@@ -91,7 +91,7 @@ export default function NetplayPage() {
         className={
           showHeroCard
             ? "grid w-full gap-4 lg:grid-cols-[0.8fr_1.2fr] lg:items-stretch"
-            : "flex w-full max-w-xl justify-center self-center"
+            : "flex w-full"
         }
       >
         {showHeroCard && (
@@ -132,7 +132,7 @@ export default function NetplayPage() {
           </Card>
         )}
 
-        <div className="min-w-0 lg:h-full">
+        <div className="min-w-0 w-full lg:h-full">
           <NetplayLobby />
         </div>
       </div>

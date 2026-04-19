@@ -133,7 +133,7 @@ export default function NetplayBrowseRomsScreen({
   }, [browseRoms, isSearching, categoryFilter]);
 
   return (
-    <Card className="w-full max-w-lg">
+    <Card className="w-full">
       <CardHeader className="flex flex-row items-center gap-3 pb-3">
         <Button variant="ghost" size="icon" className="size-8" onClick={onBack}>
           <ArrowLeft className="size-4" />

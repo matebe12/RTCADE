@@ -1,4 +1,4 @@
-import type { RefObject } from "react";
+import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
 
 import EmulatorPlayer, { type SystemCore } from "@/components/EmulatorPlayer";
 import GuestVideoDisplay from "@/components/netplay/GuestVideoDisplay";
@@ -18,10 +18,11 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import type { UserProfile } from "@/lib/user-profile";
 import { NETPLAY_COPY, getConnectionStatusLabel } from "@/netplay/netplayCopy";
 import type { OpponentProfile } from "@/stores/useNetplayLobbyStore";
-import { ArrowLeft, Loader2, MessageSquare, Wifi, WifiOff } from "lucide-react";
+import { ArrowLeft, Loader2, Maximize2, MessageSquare, Minimize2, Wifi, WifiOff } from "lucide-react";
 import type { DisconnectSeverity } from "../../../shared/emulator-protocol";
 
 interface PlayingSession {
@@ -101,9 +102,44 @@ export default function NetplayPlayingScreen({
   disconnectCountdown,
 }: NetplayPlayingScreenProps) {
   const localChatUser = myProfile ?? { nickname: "나", avatar: "🎮" };
+  const gameAreaRef = useRef<HTMLDivElement>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  const toggleFullscreen = useCallback(() => {
+    const el = gameAreaRef.current;
+    if (!el) return;
+    if (document.fullscreenElement) {
+      document.exitFullscreen().catch(() => {});
+    } else {
+      el.requestFullscreen().catch(() => {});
+    }
+  }, []);
+
+  useEffect(() => {
+    const handler = () => setIsFullscreen(!!document.fullscreenElement);
+    document.addEventListener("fullscreenchange", handler);
+    return () => document.removeEventListener("fullscreenchange", handler);
+  }, []);
+
+  const chatPanel = (
+    <NetplayChatPanel
+      open={chatOpen}
+      onCancel={onChatCancel}
+      messages={chatMessages}
+      draft={chatDraft}
+      onDraftChange={onChatDraftChange}
+      onSend={onSendChat}
+      unreadCount={unreadChatCount}
+      isPeerTyping={isPeerTyping}
+      chatChannelState={chatChannelState}
+      localUser={localChatUser}
+      remoteUser={opponentProfile}
+      inputRef={inputRef}
+    />
+  );
 
   return (
-    <div className="mx-auto flex w-full max-w-285 flex-col gap-3">
+    <div className="flex w-full flex-col gap-3">
       <div className="flex w-full flex-wrap items-center gap-3">
         <AlertDialog>
           <AlertDialogTrigger asChild>
@@ -165,6 +201,18 @@ export default function NetplayPlayingScreen({
           {dcState === "open" ? <Wifi className="size-3" /> : <WifiOff className="size-3" />}
           {getConnectionStatusLabel(dcState)}
         </Badge>
+
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="gap-1 text-xs"
+          onClick={toggleFullscreen}
+          title="전체화면"
+        >
+          <Maximize2 className="size-3" />
+          전체화면
+        </Button>
       </div>
 
       {!gameStarted && (
@@ -176,12 +224,30 @@ export default function NetplayPlayingScreen({
         </div>
       )}
 
-      <div className="mx-auto flex w-full max-w-[1132px] flex-col gap-3">
-        <PlayControlsGuide mode="netplay" className="w-full max-w-none" />
+      {!isFullscreen && <PlayControlsGuide mode="netplay" />}
 
-        <div className="flex w-full flex-col items-center gap-3 xl:flex-row xl:items-start xl:justify-center">
+      {/* Game area — this div becomes fullscreen */}
+      <div
+        ref={gameAreaRef}
+        className={cn(
+          "flex w-full",
+          isFullscreen
+            ? "h-screen bg-black items-stretch"
+            : "flex-col gap-3 xl:flex-row xl:items-start",
+        )}
+      >
+        {/* Game wrapper */}
+        <div
+          className={cn(
+            "relative",
+            isFullscreen
+              ? "flex-1 min-w-0 flex items-center justify-center"
+              : "w-full xl:flex-1 xl:min-w-0",
+          )}
+        >
           {session.role === "guest" ? (
             <GuestVideoDisplay
+              ref={emulatorRef}
               videoStream={videoStream}
               onLocalInput={onLocalInput}
               onChatShortcut={onChatShortcut}
@@ -209,21 +275,65 @@ export default function NetplayPlayingScreen({
             />
           )}
 
-          <NetplayChatPanel
-            open={chatOpen}
-            onCancel={onChatCancel}
-            messages={chatMessages}
-            draft={chatDraft}
-            onDraftChange={onChatDraftChange}
-            onSend={onSendChat}
-            unreadCount={unreadChatCount}
-            isPeerTyping={isPeerTyping}
-            chatChannelState={chatChannelState}
-            localUser={localChatUser}
-            remoteUser={opponentProfile}
-            inputRef={inputRef}
-          />
+          {/* Fullscreen top-right controls */}
+          {isFullscreen && (
+            <div className="absolute right-3 top-3 z-50 flex items-center gap-2">
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                className="relative h-8 gap-1.5 rounded-full bg-black/60 text-xs text-white backdrop-blur-sm hover:bg-black/80"
+                onClick={onChatToggle}
+              >
+                <MessageSquare className="size-3.5" />
+                채팅
+                {unreadChatCount > 0 && (
+                  <Badge
+                    variant="destructive"
+                    className="absolute -right-1.5 -top-1.5 px-1 py-0 text-[9px]"
+                  >
+                    {unreadChatCount}
+                  </Badge>
+                )}
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                className="h-8 w-8 rounded-full bg-black/60 p-0 text-white backdrop-blur-sm hover:bg-black/80"
+                onClick={toggleFullscreen}
+                title="전체화면 나가기"
+              >
+                <Minimize2 className="size-3.5" />
+              </Button>
+            </div>
+          )}
         </div>
+
+        {/* Chat panel — real flex column in fullscreen, inline otherwise */}
+        {isFullscreen ? (
+          chatOpen && (
+            <div className="flex h-full w-[340px] shrink-0 border-l border-white/10 bg-background">
+              <NetplayChatPanel
+                open
+                onCancel={onChatCancel}
+                messages={chatMessages}
+                draft={chatDraft}
+                onDraftChange={onChatDraftChange}
+                onSend={onSendChat}
+                unreadCount={unreadChatCount}
+                isPeerTyping={isPeerTyping}
+                chatChannelState={chatChannelState}
+                localUser={localChatUser}
+                remoteUser={opponentProfile}
+                inputRef={inputRef}
+                className="h-full xl:h-full rounded-none border-none"
+              />
+            </div>
+          )
+        ) : (
+          chatPanel
+        )}
       </div>
     </div>
   );

@@ -138,7 +138,7 @@ export default function SoloBrowseRomsScreen({
   }, [browseRoms, isSearching, categoryFilter]);
 
   return (
-    <Card className="w-full max-w-lg border-border/70 bg-card/95">
+    <Card className="w-full border-border/70 bg-card/95">
       <CardHeader className="flex flex-row items-center gap-3 pb-3">
         <Button variant="ghost" size="icon" className="size-8" onClick={onBack}>
           <ArrowLeft className="size-4" />

@@ -84,7 +84,7 @@ export default function NetplaySessionSummary({
   const isSolo = mode === "solo";
 
   return (
-    <Card className="w-full max-w-lg">
+    <Card className="mx-auto w-full max-w-lg">
       <CardHeader className="items-center text-center">
         <Badge variant="secondary" className="text-[10px]">
           {startedAt ? "플레이 요약" : "준비 종료"}

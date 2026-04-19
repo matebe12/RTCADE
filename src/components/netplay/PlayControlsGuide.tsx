@@ -66,7 +66,7 @@ export default function PlayControlsGuide({ mode, className }: PlayControlsGuide
   };
 
   return (
-    <Card className={cn("w-[800px] max-w-[95vw] border-border/70 bg-card/95", className)}>
+    <Card className={cn("w-full border-border/70 bg-card/95", className)}>
       <CardHeader className="flex flex-row items-center justify-between gap-3 pb-3">
         <div className="space-y-1">
           <CardTitle className="text-sm">키 안내</CardTitle>

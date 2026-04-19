@@ -34,6 +34,7 @@ interface NetplayChatPanelProps {
   localUser: ChatUser;
   remoteUser: ChatUser | null;
   inputRef: React.RefObject<HTMLInputElement | null>;
+  className?: string;
 }
 
 const timeFormatter = new Intl.DateTimeFormat("ko-KR", {
@@ -54,6 +55,7 @@ export default function NetplayChatPanel({
   localUser,
   remoteUser,
   inputRef,
+  className,
 }: NetplayChatPanelProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
@@ -78,7 +80,7 @@ export default function NetplayChatPanel({
   const isChatReady = chatChannelState === "open";
 
   return (
-    <Card className="flex w-full max-w-200 flex-col overflow-hidden border-border/70 bg-card/95 xl:h-150 xl:w-[320px] xl:max-w-[320px]">
+    <Card className={cn("flex w-full max-w-200 flex-col overflow-hidden border-border/70 bg-card/95 xl:h-150 xl:w-[320px] xl:max-w-[320px]", className)}>
       <CardHeader className="flex flex-row items-start justify-between gap-3 border-b px-4 py-3">
         <div className="min-w-0 space-y-2">
           <div className="flex items-center gap-2">

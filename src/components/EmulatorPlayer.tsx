@@ -55,12 +55,12 @@ interface EmulatorPlayerProps {
   onCanvasStreamReady?: (stream: MediaStream) => void;
 }
 
-/** CSS to hide EmulatorJS UI buttons we don't want */
+/** CSS to hide EmulatorJS UI buttons we don't want (keep volume only) */
 const EJS_HIDE_BUTTONS_CSS = [
   "playPause", "play", "pause", "restart", "mute", "unmute",
   "screenshot", "saveState", "loadState", "quickSave", "quickLoad",
   "screenRecord", "saveSavFiles", "loadSavFiles", "cacheManager",
-  "cheat", "exitEmulation", "volume",
+  "cheat", "exitEmulation", "settings", "fullscreen", "gamepad",
 ].map((btn) => `[data-btn="${btn}"]{display:none!important}`).join("");
 
 /**
@@ -77,12 +77,12 @@ const EJS_HIDE_BUTTONS_CSS = [
  * causes issues when multiple AudioContexts exist).
  */
 function installAudioCapture(): void {
-  if ((window as Record<string, unknown>).__rtcade_audio_patched) return;
-  (window as Record<string, unknown>).__rtcade_audio_patched = true;
+  if ((window as unknown as Record<string, unknown>).__rtcade_audio_patched) return;
+  (window as unknown as Record<string, unknown>).__rtcade_audio_patched = true;
 
   const OrigAudioContext = window.AudioContext;
   // Save original so we can restore it on cleanup
-  (window as Record<string, unknown>).__rtcade_orig_audio_context = OrigAudioContext;
+  (window as unknown as Record<string, unknown>).__rtcade_orig_audio_context = OrigAudioContext;
 
   const patchedCtor = function (this: AudioContext, ...args: ConstructorParameters<typeof AudioContext>) {
     const ctx = new OrigAudioContext(...args);
@@ -107,7 +107,7 @@ function installAudioCapture(): void {
       });
 
       // Store the capture stream for later retrieval
-      (window as Record<string, unknown>).__rtcade_audio_splitter = {
+      (window as unknown as Record<string, unknown>).__rtcade_audio_splitter = {
         stream: dest.stream,
         ctx,
         dest,
@@ -125,7 +125,7 @@ function installAudioCapture(): void {
   // Copy static properties so instanceof checks still work
   Object.setPrototypeOf(patchedCtor, OrigAudioContext);
   Object.setPrototypeOf(patchedCtor.prototype, OrigAudioContext.prototype);
-  (window as Record<string, unknown>).AudioContext = patchedCtor;
+  (window as unknown as Record<string, unknown>).AudioContext = patchedCtor;
 }
 
 /**
@@ -133,13 +133,13 @@ function installAudioCapture(): void {
  */
 function removeAudioCapture(): void {
   // Restore original AudioContext constructor
-  const orig = (window as Record<string, unknown>).__rtcade_orig_audio_context;
+  const orig = (window as unknown as Record<string, unknown>).__rtcade_orig_audio_context;
   if (orig) {
-    (window as Record<string, unknown>).AudioContext = orig;
-    delete (window as Record<string, unknown>).__rtcade_orig_audio_context;
+    (window as unknown as Record<string, unknown>).AudioContext = orig;
+    delete (window as unknown as Record<string, unknown>).__rtcade_orig_audio_context;
   }
-  delete (window as Record<string, unknown>).__rtcade_audio_splitter;
-  delete (window as Record<string, unknown>).__rtcade_audio_patched;
+  delete (window as unknown as Record<string, unknown>).__rtcade_audio_splitter;
+  delete (window as unknown as Record<string, unknown>).__rtcade_audio_patched;
 }
 
 /**
@@ -161,7 +161,7 @@ const OUR_EJS_GLOBALS = [
  * mounts don't hit "EJS_STORAGE is not a constructor".
  */
 function cleanupEJSGlobals() {
-  const win = window as Record<string, unknown>;
+  const win = window as unknown as Record<string, unknown>;
 
   // Destroy the running EmulatorJS instance if it exists and has a gameManager
   // (partially initialized instances don't have callEvent and crash on exit)
@@ -249,10 +249,10 @@ const EmulatorPlayer = forwardRef<HTMLDivElement, EmulatorPlayerProps>(function 
         e.preventDefault();
 
         // Check window-level flag set by sendStartGame / markGameRunning
-        if (!(window as Record<string, unknown>).__rtcade_game_running) return;
+        if (!(window as unknown as Record<string, unknown>).__rtcade_game_running) return;
 
         // Apply local input directly
-        const ejs = (window as Record<string, unknown>).EJS_emulator as
+        const ejs = (window as unknown as Record<string, unknown>).EJS_emulator as
           | { gameManager?: { simulateInput: (p: number, b: number, v: number) => void } }
           | undefined;
         ejs?.gameManager?.simulateInput(localPlayer, btn, 1);
@@ -272,9 +272,9 @@ const EmulatorPlayer = forwardRef<HTMLDivElement, EmulatorPlayerProps>(function 
         e.stopPropagation();
         e.preventDefault();
 
-        if (!(window as Record<string, unknown>).__rtcade_game_running) return;
+        if (!(window as unknown as Record<string, unknown>).__rtcade_game_running) return;
 
-        const ejs = (window as Record<string, unknown>).EJS_emulator as
+        const ejs = (window as unknown as Record<string, unknown>).EJS_emulator as
           | { gameManager?: { simulateInput: (p: number, b: number, v: number) => void } }
           | undefined;
         ejs?.gameManager?.simulateInput(localPlayer, btn, 0);
@@ -310,7 +310,7 @@ const EmulatorPlayer = forwardRef<HTMLDivElement, EmulatorPlayerProps>(function 
     styleRef.current = style;
 
     const ejsCore = CORE_REMAP[core] || core;
-    const win = window as Record<string, unknown>;
+    const win = window as unknown as Record<string, unknown>;
 
     // Suppress WakeLock
     try {
@@ -427,7 +427,7 @@ const EmulatorPlayer = forwardRef<HTMLDivElement, EmulatorPlayerProps>(function 
       // we cannot re-evaluate it — `class EJS_STORAGE` is a block-scoped declaration
       // that throws on redeclaration. Instead, call the EmulatorJS constructor
       // directly which was made available globally by emulator.min.js.
-      const win = window as Record<string, unknown>;
+      const win = window as unknown as Record<string, unknown>;
       if (win.EJS_STORAGE && typeof win.EmulatorJS === "function") {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const EmulatorJSCtor = win.EmulatorJS as new (el: Element) => any;
@@ -476,7 +476,7 @@ const EmulatorPlayer = forwardRef<HTMLDivElement, EmulatorPlayerProps>(function 
       removeAudioCapture();
 
       // Reset game-running flag
-      (window as Record<string, unknown>).__rtcade_game_running = false;
+      (window as unknown as Record<string, unknown>).__rtcade_game_running = false;
       gameRunningRef.current = false;
     }
 
@@ -520,8 +520,8 @@ const EmulatorPlayer = forwardRef<HTMLDivElement, EmulatorPlayerProps>(function 
         e.stopImmediatePropagation();
         e.preventDefault();
 
-        if (!(window as Record<string, unknown>).__rtcade_game_running) return;
-        const ejs = (window as Record<string, unknown>).EJS_emulator as
+        if (!(window as unknown as Record<string, unknown>).__rtcade_game_running) return;
+        const ejs = (window as unknown as Record<string, unknown>).EJS_emulator as
           | { gameManager?: { simulateInput: (p: number, b: number, v: number) => void } }
           | undefined;
         ejs?.gameManager?.simulateInput(localPlayer, btn, 1);
@@ -534,8 +534,8 @@ const EmulatorPlayer = forwardRef<HTMLDivElement, EmulatorPlayerProps>(function 
         e.stopImmediatePropagation();
         e.preventDefault();
 
-        if (!(window as Record<string, unknown>).__rtcade_game_running) return;
-        const ejs = (window as Record<string, unknown>).EJS_emulator as
+        if (!(window as unknown as Record<string, unknown>).__rtcade_game_running) return;
+        const ejs = (window as unknown as Record<string, unknown>).EJS_emulator as
           | { gameManager?: { simulateInput: (p: number, b: number, v: number) => void } }
           | undefined;
         ejs?.gameManager?.simulateInput(localPlayer, btn, 0);
@@ -558,10 +558,17 @@ const EmulatorPlayer = forwardRef<HTMLDivElement, EmulatorPlayerProps>(function 
   }, [handleKeyDown, handleKeyUp, isNetplay, localPlayer, onChatShortcut, onLocalInput]);
 
   // HOST: capture canvas stream after emulator is ready
+  // We wait for BOTH canvas AND audio to be available before firing.
+  // EmulatorJS creates the canvas during loading, but AudioContext is
+  // only created when the game starts playing. If we fire too early,
+  // the stream will be video-only and the guest won't get audio.
   useEffect(() => {
     if (role !== "host" || !onCanvasStreamReady || streamReadyFiredRef.current) return undefined;
 
-    // Poll for canvas availability (EmulatorJS creates it asynchronously)
+    let canvasFound = false;
+    let audioWaitCount = 0;
+    const MAX_AUDIO_WAIT = 30; // 30 × 500ms = 15s max wait for audio
+
     const interval = setInterval(() => {
       if (streamReadyFiredRef.current) {
         clearInterval(interval);
@@ -571,14 +578,27 @@ const EmulatorPlayer = forwardRef<HTMLDivElement, EmulatorPlayerProps>(function 
       const canvas = containerRef.current?.querySelector("canvas");
       if (!canvas) return;
 
+      if (!canvasFound) {
+        canvasFound = true;
+        console.log("[EMULATOR] Canvas found, waiting for audio...");
+      }
+
+      // Check if the audio splitter has been created (game must be playing)
+      const audioSplitter = (window as unknown as Record<string, unknown>).__rtcade_audio_splitter as {
+        stream?: MediaStream;
+      } | undefined;
+      const hasAudio = !!audioSplitter?.stream;
+
+      if (!hasAudio) {
+        audioWaitCount++;
+        if (audioWaitCount < MAX_AUDIO_WAIT) return; // keep waiting
+        console.warn("[EMULATOR] Audio not available after 15s, proceeding with video only");
+      }
+
       try {
         const videoStream = canvas.captureStream(60);
 
-        // Try to get audio stream and combine
-        const audioSplitter = (window as Record<string, unknown>).__rtcade_audio_splitter as {
-          stream?: MediaStream;
-        } | undefined;
-        if (audioSplitter?.stream) {
+        if (hasAudio && audioSplitter?.stream) {
           for (const track of audioSplitter.stream.getAudioTracks()) {
             videoStream.addTrack(track);
           }
@@ -602,7 +622,7 @@ const EmulatorPlayer = forwardRef<HTMLDivElement, EmulatorPlayerProps>(function 
     <div
       ref={containerRef}
       tabIndex={0}
-      className="relative w-[800px] h-[600px] max-w-[95vw] max-h-[70vh] bg-neutral-900 rounded-lg overflow-hidden outline-none focus:ring-2 focus:ring-primary/60"
+      className="relative w-full aspect-[4/3] bg-neutral-900 rounded-lg overflow-hidden outline-none focus:ring-2 focus:ring-primary/60"
       style={{ contain: "layout style paint" }}
     />
   );
@@ -616,7 +636,7 @@ export function sendStartGame(containerRef: React.RefObject<HTMLDivElement | nul
   const bridge = createEmulatorRuntimeBridge(containerRef);
   bridge.sync.startGame();
   // Mark game as running so the keyboard handler starts processing input
-  (window as Record<string, unknown>).__rtcade_game_running = true;
+  (window as unknown as Record<string, unknown>).__rtcade_game_running = true;
 }
 
 export function focusEmulator(containerRef: React.RefObject<HTMLDivElement | null>) {
@@ -700,7 +720,7 @@ export function requestResyncLoadState(
 export function markGameRunning() {
   // The EmulatorPlayer component tracks this internally via gameRunningRef,
   // but other callers can't access it. We use a window-level flag as fallback.
-  (window as Record<string, unknown>).__rtcade_game_running = true;
+  (window as unknown as Record<string, unknown>).__rtcade_game_running = true;
 }
 
 export default EmulatorPlayer;

@@ -31,7 +31,7 @@ interface SoloPlayingScreenProps {
 
 export default function SoloPlayingScreen({ emulatorRef, onBack, session }: SoloPlayingScreenProps) {
   return (
-    <div className="mx-auto flex w-full max-w-285 flex-col gap-3">
+    <div className="flex w-full flex-col gap-3">
       <div className="flex w-full flex-wrap items-center gap-3">
         <AlertDialog>
           <AlertDialogTrigger asChild>
@@ -66,19 +66,15 @@ export default function SoloPlayingScreen({ emulatorRef, onBack, session }: Solo
         서버 ROM을 단독으로 실행 중입니다. 종료하면 플레이 요약으로 이동합니다.
       </div>
 
-      <div className="flex w-full justify-center">
-        <PlayControlsGuide mode="solo" />
-      </div>
+      <PlayControlsGuide mode="solo" />
 
-      <div className="flex w-full justify-center">
-        <EmulatorPlayer
-          ref={emulatorRef}
-          romSource=""
-          core={session.core}
-          romPath={session.romPath}
-          biosPath={session.biosPath}
-        />
-      </div>
+      <EmulatorPlayer
+        ref={emulatorRef}
+        romSource=""
+        core={session.core}
+        romPath={session.romPath}
+        biosPath={session.biosPath}
+      />
     </div>
   );
 }

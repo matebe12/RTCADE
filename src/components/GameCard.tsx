@@ -1,8 +1,11 @@
+import { useCallback, useState } from "react";
+import { Gamepad2, Star } from "lucide-react";
+
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { parseRomName } from "@/lib/game-names";
+import { getGameThumbnailUrl } from "@/lib/game-thumbnails";
 import { cn } from "@/lib/utils";
-import { Star } from "lucide-react";
 
 interface GameCardProps {
   filename: string;
@@ -28,23 +31,50 @@ export function GameCard({
   onToggleFavorite,
 }: GameCardProps) {
   const resolvedDisplayName = displayName ?? parseRomName(filename, core);
+  const thumbnailUrl = getGameThumbnailUrl(filename, core);
+  const [imgError, setImgError] = useState(false);
+
+  const handleImgError = useCallback(() => setImgError(true), []);
 
   return (
     <div
       className={cn(
-        "flex w-full items-start gap-3 rounded-lg border p-4 text-left transition-all",
+        "flex w-full items-start gap-3 rounded-lg border p-3 text-left transition-all",
         !disabled && "hover:bg-accent hover:border-primary/30",
         disabled && "cursor-not-allowed opacity-70",
         selected ? "bg-primary/10 border-primary/50" : "bg-card border-border",
       )}
     >
+      {/* 썸네일 */}
       <button
         type="button"
         onClick={onClick}
         disabled={disabled}
-        className="flex min-w-0 flex-1 flex-col items-start gap-2 text-left"
+        className="relative size-14 shrink-0 overflow-hidden rounded-md bg-muted"
       >
-        <span className="text-sm font-medium text-card-foreground leading-tight">
+        {thumbnailUrl && !imgError ? (
+          <img
+            src={thumbnailUrl}
+            alt={resolvedDisplayName}
+            loading="lazy"
+            onError={handleImgError}
+            className="size-full object-cover"
+          />
+        ) : (
+          <span className="flex size-full items-center justify-center text-muted-foreground">
+            <Gamepad2 className="size-6" />
+          </span>
+        )}
+      </button>
+
+      {/* 텍스트 */}
+      <button
+        type="button"
+        onClick={onClick}
+        disabled={disabled}
+        className="flex min-w-0 flex-1 flex-col items-start gap-1.5 text-left"
+      >
+        <span className="text-sm font-medium leading-tight text-card-foreground">
           {resolvedDisplayName}
         </span>
         <div className="flex flex-wrap items-center gap-2">

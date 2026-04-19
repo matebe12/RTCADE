@@ -131,7 +131,8 @@ const GuestVideoDisplay = forwardRef<HTMLDivElement, GuestVideoDisplayProps>(
       <div
         ref={containerRef}
         tabIndex={0}
-        className="relative w-[800px] h-[600px] max-w-[95vw] max-h-[70vh] bg-neutral-900 rounded-lg overflow-hidden outline-none focus:ring-2 focus:ring-primary/60"
+        className="relative w-full aspect-[4/3] bg-neutral-900 rounded-lg overflow-hidden outline-none focus:ring-2 focus:ring-primary/60"
+        onContextMenu={(e) => e.preventDefault()}
       >
         {videoStream ? (
           <>
