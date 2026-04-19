@@ -3,6 +3,7 @@ import { useCallback, useRef, type MutableRefObject, type RefObject } from "reac
 import type { NetplayPeer } from "@/netplay/peer";
 import { useNetplayInitialSync } from "@/netplay/useNetplayInitialSync";
 import { useNetplayResyncLoop } from "@/netplay/useNetplayResyncLoop";
+import type { SystemCore } from "@/components/EmulatorPlayer";
 
 interface UseNetplaySyncRuntimeOptions {
   dcState: string;
@@ -10,6 +11,7 @@ interface UseNetplaySyncRuntimeOptions {
   peerRef: MutableRefObject<NetplayPeer | null>;
   emulatorRef: RefObject<HTMLIFrameElement | null>;
   roleRef: MutableRefObject<"host" | "guest" | null>;
+  sessionCoreRef: MutableRefObject<SystemCore | null>;
   setGameStarted: (gameStarted: boolean) => void;
   updateSync: (message: string) => void;
   markSessionStarted: () => void;
@@ -21,12 +23,14 @@ export function useNetplaySyncRuntime({
   peerRef,
   emulatorRef,
   roleRef,
+  sessionCoreRef,
   setGameStarted,
   updateSync,
   markSessionStarted,
 }: UseNetplaySyncRuntimeOptions) {
   const gameStartedRef = useRef(false);
   const {
+    handlePeerResyncLoaded,
     handlePeerResyncFailed,
     handlePeerResyncState,
     handleResyncFailed,
@@ -39,6 +43,7 @@ export function useNetplaySyncRuntime({
     emulatorRef,
     roleRef,
     gameStartedRef,
+    sessionCoreRef,
   });
 
   const {
@@ -63,7 +68,6 @@ export function useNetplaySyncRuntime({
     markSessionStarted,
     startPeriodicResync,
   });
-
   const resetSyncRuntime = useCallback(() => {
     resetInitialSyncRuntime();
     resetResyncRuntime();
@@ -72,6 +76,7 @@ export function useNetplaySyncRuntime({
   return {
     handleEmulatorReady,
     handlePeerReady,
+    handlePeerResyncLoaded,
     handlePeerResyncFailed,
     handlePeerResyncState,
     handlePeerSaveState,

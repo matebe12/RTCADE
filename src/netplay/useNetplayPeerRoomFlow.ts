@@ -43,6 +43,7 @@ interface UseNetplayPeerRoomFlowOptions {
   handlePeerSaveState: (stateBuffer: ArrayBuffer) => void;
   handlePeerStateLoaded: () => void;
   handlePeerStartSignal: () => void;
+  handlePeerResyncLoaded: () => void;
   handlePeerResyncState: (stateBuffer: ArrayBuffer) => void;
   handlePeerResyncFailed: () => void;
 }
@@ -72,6 +73,7 @@ export function useNetplayPeerRoomFlow({
   handlePeerSaveState,
   handlePeerStateLoaded,
   handlePeerStartSignal,
+  handlePeerResyncLoaded,
   handlePeerResyncState,
   handlePeerResyncFailed,
 }: UseNetplayPeerRoomFlowOptions) {
@@ -95,6 +97,7 @@ export function useNetplayPeerRoomFlow({
     handlePeerSaveState,
     handlePeerStateLoaded,
     handlePeerStartSignal,
+    handlePeerResyncLoaded,
     handlePeerResyncState,
     handlePeerResyncFailed,
   });

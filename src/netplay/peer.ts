@@ -36,6 +36,7 @@ export type PeerEventHandler = {
   onStartSignal?: () => void; // GUEST receives "go" from HOST
   // Fire-and-forget resync
   onResyncState?: (state: ArrayBuffer) => void; // GUEST: load this state
+  onResyncLoaded?: () => void; // HOST: guest applied correction
   onResyncFailed?: () => void; // Resync failed
   // Input sequence gap detection
   onInputSeqGap?: (expected: number, got: number) => void;
@@ -173,6 +174,12 @@ export class NetplayPeer {
   sendResyncFailed() {
     if (this.inputDc?.readyState === "open") {
       this.inputDc.send(JSON.stringify({ type: "resync-failed" }));
+    }
+  }
+
+  sendResyncLoaded() {
+    if (this.inputDc?.readyState === "open") {
+      this.inputDc.send(JSON.stringify({ type: "resync-loaded" }));
     }
   }
 
@@ -390,6 +397,8 @@ export class NetplayPeer {
         } else if (msg.type === "start-signal") {
           console.log("[PEER] received start-signal");
           this.handler.onStartSignal?.();
+        } else if (msg.type === "resync-loaded") {
+          this.handler.onResyncLoaded?.();
         } else if (msg.type === "resync-failed") {
           this.handler.onResyncFailed?.();
         }

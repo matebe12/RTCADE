@@ -37,6 +37,7 @@ interface UseNetplayPeerFactoryOptions {
   handlePeerSaveState: (stateBuffer: ArrayBuffer) => void;
   handlePeerStateLoaded: () => void;
   handlePeerStartSignal: () => void;
+  handlePeerResyncLoaded: () => void;
   handlePeerResyncState: (stateBuffer: ArrayBuffer) => void;
   handlePeerResyncFailed: () => void;
 }
@@ -61,6 +62,7 @@ export function useNetplayPeerFactory({
   handlePeerSaveState,
   handlePeerStateLoaded,
   handlePeerStartSignal,
+  handlePeerResyncLoaded,
   handlePeerResyncState,
   handlePeerResyncFailed,
 }: UseNetplayPeerFactoryOptions) {
@@ -86,6 +88,7 @@ export function useNetplayPeerFactory({
       onSaveState: handlePeerSaveState,
       onStateLoaded: handlePeerStateLoaded,
       onStartSignal: handlePeerStartSignal,
+      onResyncLoaded: handlePeerResyncLoaded,
       onResyncState: handlePeerResyncState,
       onResyncFailed: handlePeerResyncFailed,
       onInputSeqGap: (expected: number, got: number) => {
@@ -162,6 +165,7 @@ export function useNetplayPeerFactory({
     handlePeerResyncState,
     handlePeerSaveState,
     handlePeerStartSignal,
+    handlePeerResyncLoaded,
     handlePeerStateLoaded,
     handleRemoteInput,
     peerRef,

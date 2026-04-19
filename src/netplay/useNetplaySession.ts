@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef } from "react";
 
+import type { SystemCore } from "@/components/EmulatorPlayer";
 import { sendRemoteInput } from "@/components/EmulatorPlayer";
 import type { NetplayChatMessage } from "@/components/NetplayChatPanel";
 import { type RecentGame, type RecentOpponent } from "@/lib/user-profile";
@@ -85,10 +86,15 @@ export function useNetplaySession({
   const peerRef = useRef<NetplayPeer | null>(null);
   const emulatorRef = useRef<HTMLIFrameElement>(null);
   const roleRef = useRef<"host" | "guest" | null>(null);
+  const sessionCoreRef = useRef<SystemCore | null>(null);
   const lastInputTimeRef = useRef(0);
   const opponentProfileRef = useRef<OpponentProfile | null>(null);
   const activeSessionRef = useRef<ActiveSession | null>(null);
   const sessionStartedAtRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    sessionCoreRef.current = "core" in state ? state.core : activeSessionRef.current?.core ?? null;
+  }, [state]);
 
   useEffect(() => {
     opponentProfileRef.current = opponentProfile;
@@ -151,6 +157,7 @@ export function useNetplaySession({
   const {
     handleEmulatorReady,
     handlePeerReady,
+    handlePeerResyncLoaded,
     handlePeerResyncFailed,
     handlePeerResyncState,
     handlePeerSaveState,
@@ -169,6 +176,7 @@ export function useNetplaySession({
     peerRef,
     emulatorRef,
     roleRef,
+    sessionCoreRef,
     setGameStarted,
     updateSync,
     markSessionStarted,
@@ -227,6 +235,7 @@ export function useNetplaySession({
     handlePeerSaveState,
     handlePeerStateLoaded,
     handlePeerStartSignal,
+    handlePeerResyncLoaded,
     handlePeerResyncState,
     handlePeerResyncFailed,
   });
