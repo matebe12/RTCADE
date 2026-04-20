@@ -68,53 +68,94 @@ const EJS_HIDE_BUTTONS_CSS = [
  * This captures the AudioContext it creates and taps into the audio output
  * for WebRTC streaming.
  *
- * Strategy: Replace the AudioContext constructor. When EmulatorJS (via
- * Emscripten SDL2) creates its AudioContext, we intercept it and override
- * the `destination` property to return a GainNode that fans out audio to
- * BOTH the real speakers AND a MediaStreamDestination (for WebRTC capture).
+ * Strategy (two-layer capture):
  *
- * This avoids patching AudioNode.prototype.connect (which is fragile and
- * causes issues when multiple AudioContexts exist).
+ * Layer 1 (existing): Replace AudioContext constructor — override the
+ * `destination` getter so connections to destination go through our
+ * GainNode splitter (speakers + MediaStreamDestination).
+ *
+ * Layer 2 (new): Monkey-patch `AudioNode.prototype.connect` — if any
+ * node connects directly to an `AudioDestinationNode` (bypassing our
+ * patched destination getter), intercept the call and insert the
+ * splitter GainNode. This catches cases where Emscripten SDL2 caches
+ * the real destination reference before our getter patch takes effect.
  */
 function installAudioCapture(): void {
   if ((window as unknown as Record<string, unknown>).__rtcade_audio_patched) return;
   (window as unknown as Record<string, unknown>).__rtcade_audio_patched = true;
 
   const OrigAudioContext = window.AudioContext;
-  // Save original so we can restore it on cleanup
+  // Save originals for cleanup
   (window as unknown as Record<string, unknown>).__rtcade_orig_audio_context = OrigAudioContext;
+  const origConnect = AudioNode.prototype.connect as (
+    this: AudioNode, destinationNode: AudioNode | AudioParam, ...args: unknown[]
+  ) => AudioNode;
+  (window as unknown as Record<string, unknown>).__rtcade_orig_connect = origConnect;
 
+  /**
+   * Given an AudioContext, ensure we have a splitter (GainNode → speakers + MediaStreamDestination).
+   * Returns the splitter info or undefined if creation fails.
+   */
+  function ensureSplitter(ctx: AudioContext) {
+    const win = window as unknown as Record<string, unknown>;
+    const existing = win.__rtcade_audio_splitter as {
+      stream: MediaStream;
+      ctx: AudioContext;
+      dest: MediaStreamAudioDestinationNode;
+      fakeDestination: GainNode;
+    } | undefined;
+    if (existing && existing.ctx === ctx) return existing;
+
+    try {
+      const dest = ctx.createMediaStreamDestination();
+      const fakeDestination = ctx.createGain();
+      fakeDestination.gain.value = 1;
+      origConnect.call(fakeDestination, ctx.destination as AudioNode); // speakers
+      origConnect.call(fakeDestination, dest as AudioNode);             // WebRTC capture
+
+      const splitter = { stream: dest.stream, ctx, dest, fakeDestination };
+      win.__rtcade_audio_splitter = splitter;
+      console.log("[EMULATOR] Audio splitter created for AudioContext");
+      return splitter;
+    } catch (e) {
+      console.warn("[EMULATOR] Audio splitter creation failed:", e);
+      return undefined;
+    }
+  }
+
+  // ── Layer 2: AudioNode.prototype.connect intercept ──
+  AudioNode.prototype.connect = function (
+    this: AudioNode,
+    destinationNode: AudioNode | AudioParam,
+    ...rest: unknown[]
+  ): AudioNode {
+    // If connecting to the real AudioDestinationNode, redirect through splitter
+    if (destinationNode instanceof AudioDestinationNode) {
+      const splitter = ensureSplitter(this.context as AudioContext);
+      if (splitter) {
+        // Connect source → splitter instead of source → destination
+        return origConnect.call(this, splitter.fakeDestination as AudioNode, ...rest);
+      }
+    }
+    return origConnect.call(this, destinationNode, ...rest);
+  } as typeof AudioNode.prototype.connect;
+
+  // ── Layer 1: AudioContext constructor patch with destination override ──
   const patchedCtor = function (this: AudioContext, ...args: ConstructorParameters<typeof AudioContext>) {
     const ctx = new OrigAudioContext(...args);
 
     try {
-      // Create a MediaStreamDestination to capture audio for WebRTC
-      const dest = ctx.createMediaStreamDestination();
-      // Create a GainNode that serves as a "fake destination"
-      // Anything connecting to this node will be routed to BOTH
-      // the real ctx.destination (speakers) and the MediaStreamDestination (WebRTC)
-      const fakeDestination = ctx.createGain();
-      fakeDestination.gain.value = 1;
-      fakeDestination.connect(ctx.destination);  // speakers
-      fakeDestination.connect(dest);              // WebRTC capture
-
-      // Override the `destination` getter so EmulatorJS connects to our fakeDestination
-      Object.defineProperty(ctx, "destination", {
-        get() {
-          return fakeDestination;
-        },
-        configurable: true,
-      });
-
-      // Store the capture stream for later retrieval
-      (window as unknown as Record<string, unknown>).__rtcade_audio_splitter = {
-        stream: dest.stream,
-        ctx,
-        dest,
-        fakeDestination,
-      };
-
-      console.log("[EMULATOR] Audio capture installed via destination override");
+      const splitter = ensureSplitter(ctx);
+      if (splitter) {
+        // Override destination getter as additional safety net
+        Object.defineProperty(ctx, "destination", {
+          get() {
+            return splitter.fakeDestination;
+          },
+          configurable: true,
+        });
+      }
+      console.log("[EMULATOR] Audio capture installed via destination override + connect intercept");
     } catch (e) {
       console.warn("[EMULATOR] Audio capture setup failed:", e);
     }
@@ -132,14 +173,33 @@ function installAudioCapture(): void {
  * Remove audio capture monkey-patch and clean up.
  */
 function removeAudioCapture(): void {
+  const win = window as unknown as Record<string, unknown>;
+
   // Restore original AudioContext constructor
-  const orig = (window as unknown as Record<string, unknown>).__rtcade_orig_audio_context;
+  const orig = win.__rtcade_orig_audio_context;
   if (orig) {
-    (window as unknown as Record<string, unknown>).AudioContext = orig;
-    delete (window as unknown as Record<string, unknown>).__rtcade_orig_audio_context;
+    win.AudioContext = orig;
+    delete win.__rtcade_orig_audio_context;
   }
-  delete (window as unknown as Record<string, unknown>).__rtcade_audio_splitter;
-  delete (window as unknown as Record<string, unknown>).__rtcade_audio_patched;
+
+  // Restore original AudioNode.prototype.connect
+  const origConnect = win.__rtcade_orig_connect as typeof AudioNode.prototype.connect | undefined;
+  if (origConnect) {
+    AudioNode.prototype.connect = origConnect;
+    delete win.__rtcade_orig_connect;
+  }
+
+  // Disconnect splitter nodes to release resources
+  const splitter = win.__rtcade_audio_splitter as {
+    fakeDestination?: GainNode;
+    dest?: MediaStreamAudioDestinationNode;
+  } | undefined;
+  if (splitter) {
+    try { splitter.fakeDestination?.disconnect(); } catch { /* */ }
+    try { splitter.dest?.disconnect(); } catch { /* */ }
+  }
+  delete win.__rtcade_audio_splitter;
+  delete win.__rtcade_audio_patched;
 }
 
 /**

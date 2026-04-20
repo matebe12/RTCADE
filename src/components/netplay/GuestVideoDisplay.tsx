@@ -68,6 +68,10 @@ const GuestVideoDisplay = forwardRef<HTMLDivElement, GuestVideoDisplayProps>(
 
       video.srcObject = videoStream;
       video.muted = isMuted;
+      // Minimise playback buffer for low-latency WebRTC stream
+      if ("latencyHint" in video) {
+        (video as unknown as Record<string, unknown>).latencyHint = 0;
+      }
       video.play().catch(() => {
         /* autoplay policy — user interaction unblocks later */
       });

@@ -289,21 +289,27 @@ export class NetplayPeer {
       const sender = this.pc.addTrack(track, stream);
       this._videoSenders.push(sender);
 
-      // Set encoding parameters for low latency
+      // Set encoding parameters for quality + low latency
       try {
         const params = sender.getParameters();
         if (params.encodings && params.encodings.length > 0) {
-          params.encodings[0].maxBitrate = 3_000_000; // 3 Mbps
+          params.encodings[0].maxBitrate = 5_000_000; // 5 Mbps
           params.encodings[0].maxFramerate = 60;
-          sender.setParameters(params).catch(() => {});
+          params.encodings[0].scaleResolutionDownBy = 1.0; // no downscale
         }
+        params.degradationPreference = "maintain-resolution";
+        sender.setParameters(params).catch(() => {});
       } catch {
         /* not all browsers support setParameters */
       }
     }
 
-    // Add audio tracks
+    // Add audio tracks (only live & enabled ones)
     for (const track of stream.getAudioTracks()) {
+      if (track.readyState !== "live" || !track.enabled) {
+        console.warn("[PEER] skipping audio track (not live/enabled):", track.readyState, track.enabled);
+        continue;
+      }
       const sender = this.pc.addTrack(track, stream);
       this._videoSenders.push(sender);
     }
@@ -433,6 +439,19 @@ export class NetplayPeer {
 
   private setupPeerConnection() {
     this.pc = new RTCPeerConnection(RTC_CONFIG);
+
+    // Prefer H264 Constrained Baseline for hardware-accelerated low-latency encode
+    try {
+      const txv = this.pc.addTransceiver("video", { direction: "sendrecv" });
+      const codecs = RTCRtpReceiver.getCapabilities?.("video")?.codecs ?? [];
+      const h264 = codecs.filter((c) => c.mimeType === "video/H264");
+      const rest = codecs.filter((c) => c.mimeType !== "video/H264");
+      if (h264.length > 0) {
+        txv.setCodecPreferences([...h264, ...rest]);
+      }
+    } catch {
+      /* setCodecPreferences not supported — skip */
+    }
 
     this.pc.onicecandidate = (e) => {
       if (e.candidate) {
