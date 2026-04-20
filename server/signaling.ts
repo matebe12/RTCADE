@@ -4,6 +4,9 @@ import type { RawData } from "ws";
 
 import type { Room, RoomStore } from "./roomStore";
 
+/** Interval between server→client WebSocket pings to keep the connection alive. */
+const WS_PING_INTERVAL_MS = 30_000;
+
 type ClientRole = "host" | "guest" | null;
 
 function send(ws: WebSocket, data: unknown) {
@@ -24,6 +27,21 @@ export function attachSignalingServer(wss: WebSocketServer, roomStore: RoomStore
   wss.on("connection", (ws) => {
     let myRoom: Room | null = null;
     let role: ClientRole = null;
+    let alive = true;
+
+    // Periodic ping to keep the connection alive through Railway/nginx proxies.
+    const pingTimer = setInterval(() => {
+      if (!alive) {
+        ws.terminate();
+        return;
+      }
+      alive = false;
+      ws.ping();
+    }, WS_PING_INTERVAL_MS);
+
+    ws.on("pong", () => {
+      alive = true;
+    });
 
     ws.on("message", (raw) => {
       const message = parseMessage(raw);
@@ -100,6 +118,8 @@ export function attachSignalingServer(wss: WebSocketServer, roomStore: RoomStore
     });
 
     ws.on("close", () => {
+      clearInterval(pingTimer);
+
       if (!myRoom) {
         return;
       }
