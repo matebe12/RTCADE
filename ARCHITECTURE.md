@@ -36,19 +36,19 @@ RTCADE는 브라우저에서 레트로 게임을 실행하고, WebRTC 기반 P2P
 
 ## 2. 기술 스택
 
-| 계층 | 기술 | 비고 |
-| --- | --- | --- |
-| 프론트엔드 | React 19 | Vite SPA |
-| 빌드 | Vite 8 | `vite build` |
-| 언어 | TypeScript 6 | strict 설정 |
-| 서버 | Express 5 | `tsx server/index.ts` |
-| 시그널링 | ws | WebSocket |
-| 상태 관리 | Zustand | 로비 상태, 세션 상태 |
-| 유틸 | pako | 상태 압축/해제 |
-| UI | Tailwind CSS v4 + shadcn/ui | 다크 테마 |
-| 알림 | sonner | `toast()` 사용 |
-| 에뮬레이터 | EmulatorJS CDN | 직접 마운트 |
-| P2P | WebRTC DataChannel | host authoritative |
+| 계층       | 기술                        | 비고                  |
+| ---------- | --------------------------- | --------------------- |
+| 프론트엔드 | React 19                    | Vite SPA              |
+| 빌드       | Vite 8                      | `vite build`          |
+| 언어       | TypeScript 6                | strict 설정           |
+| 서버       | Express 5                   | `tsx server/index.ts` |
+| 시그널링   | ws                          | WebSocket             |
+| 상태 관리  | Zustand                     | 로비 상태, 세션 상태  |
+| 유틸       | pako                        | 상태 압축/해제        |
+| UI         | Tailwind CSS v4 + shadcn/ui | 다크 테마             |
+| 알림       | sonner                      | `toast()` 사용        |
+| 에뮬레이터 | EmulatorJS CDN              | 직접 마운트           |
+| P2P        | WebRTC DataChannel          | host authoritative    |
 
 타이포그래피는 Pretendard가 본문 기본이고, Press Start 2P가 강조용이다.
 
@@ -250,29 +250,29 @@ src/
 
 ### 6.3 환경변수
 
-| 변수 | 용도 |
-| --- | --- |
-| `PORT` | 서버 포트 |
-| `CORS_ORIGIN` | 허용 오리진 |
-| `ROMS_PATH` | ROM 디렉토리 |
-| `DATABASE_URL` | 운영 DB |
-| `DATABASE_PRIVATE_URL` | 내부 DB |
-| `DATABASE_PUBLIC_URL` | 외부 DB |
-| `NOTICE_ADMIN_TOKEN` | 공지 관리자 토큰 |
-| `EMULATORJS_DATA_URL` | EmulatorJS CDN data 경로 |
+| 변수                   | 용도                     |
+| ---------------------- | ------------------------ |
+| `PORT`                 | 서버 포트                |
+| `CORS_ORIGIN`          | 허용 오리진              |
+| `ROMS_PATH`            | ROM 디렉토리             |
+| `DATABASE_URL`         | 운영 DB                  |
+| `DATABASE_PRIVATE_URL` | 내부 DB                  |
+| `DATABASE_PUBLIC_URL`  | 외부 DB                  |
+| `NOTICE_ADMIN_TOKEN`   | 공지 관리자 토큰         |
+| `EMULATORJS_DATA_URL`  | EmulatorJS CDN data 경로 |
 
 ### 6.4 라우트
 
-| 라우트 | 메서드 | 설명 |
-| --- | --- | --- |
-| `/roms/*` | GET | ROM 정적 파일 |
-| `/api/roms` | GET | ROM 목록 JSON |
-| `/api/rooms` | GET | 공개 방 목록 |
-| `/api/notices` | GET | 공지 목록 |
-| `/api/admin/notices` | POST/PUT | 공지 관리 |
-| `/api/stats` | GET | 운영 통계 |
-| `/api/game-sessions` | GET | 세션 통계 |
-| `/api/active-play-sessions*` | GET | 활성 플레이 세션 |
+| 라우트                       | 메서드   | 설명             |
+| ---------------------------- | -------- | ---------------- |
+| `/roms/*`                    | GET      | ROM 정적 파일    |
+| `/api/roms`                  | GET      | ROM 목록 JSON    |
+| `/api/rooms`                 | GET      | 공개 방 목록     |
+| `/api/notices`               | GET      | 공지 목록        |
+| `/api/admin/notices`         | POST/PUT | 공지 관리        |
+| `/api/stats`                 | GET      | 운영 통계        |
+| `/api/game-sessions`         | GET      | 세션 통계        |
+| `/api/active-play-sessions*` | GET      | 활성 플레이 세션 |
 
 ---
 
