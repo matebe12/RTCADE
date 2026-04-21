@@ -37,11 +37,17 @@ export default function AppShell({ profile, onOpenProfile }: AppShellProps) {
       <header className="sticky top-0 z-40 border-b border-border/70 bg-background/86 backdrop-blur-xl">
         <div className="mx-auto flex w-full max-w-6xl flex-col gap-4 px-4 py-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex items-center gap-4">
-            <NavLink to="/" className="flex min-w-0 flex-col">
-              <span className="font-arcade text-sm text-primary">RTCADE</span>
-              <span className="text-[11px] text-muted-foreground">
-                {appEnvironment.siteTagline}
-              </span>
+            <NavLink
+              to="/"
+              className="group inline-flex items-center"
+              aria-label={appEnvironment.siteName}
+            >
+              <img
+                src="/header_logo.png"
+                alt=""
+                aria-hidden="true"
+                className="h-14 w-14 shrink-0 rounded-2xl border border-border/60 bg-background object-contain p-1 shadow-[0_10px_30px_rgba(0,132,255,0.16)] transition-transform duration-200 group-hover:-translate-y-0.5 lg:h-16 lg:w-16"
+              />
             </NavLink>
           </div>
 
