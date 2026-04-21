@@ -1,8 +1,16 @@
-import { useCallback, useEffect, useMemo, useRef, type MutableRefObject, type RefObject } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  type MutableRefObject,
+  type RefObject,
+} from "react";
 
 import type { SystemCore } from "@/components/EmulatorPlayer";
 import { createEmulatorRuntimeBridge } from "@/lib/emulator-runtime-bridge";
 import type { NetplayPeer, ResyncStatePayload } from "@/netplay/peer";
+import type { NetplaySessionRole } from "../../shared/emulator-protocol";
 
 const DEFAULT_RESYNC_PROFILE = {
   ackTimeoutMs: 4500,
@@ -70,7 +78,7 @@ function getIntervalForStateSize(core: SystemCore | null, stateBuffer: ArrayBuff
 interface UseNetplayResyncLoopOptions {
   peerRef: MutableRefObject<NetplayPeer | null>;
   emulatorRef: RefObject<HTMLDivElement | null>;
-  roleRef: MutableRefObject<"host" | "guest" | null>;
+  roleRef: MutableRefObject<NetplaySessionRole | null>;
   gameStartedRef: MutableRefObject<boolean>;
   lastInputTimeRef: MutableRefObject<number>;
   sessionCoreRef: MutableRefObject<SystemCore | null>;
@@ -119,16 +127,19 @@ export function useNetplayResyncLoop({
     }
   }, []);
 
-  const increaseResyncInterval = useCallback((reason: string) => {
-    const profile = getResyncProfile(sessionCoreRef.current);
-    resyncIntervalMsRef.current = Math.min(
-      profile.maxIntervalMs,
-      Math.max(profile.baseIntervalMs, resyncIntervalMsRef.current + profile.backoffStepMs),
-    );
-    console.warn(
-      `[LOBBY] Resync ${reason}, backing off to ${resyncIntervalMsRef.current}ms for ${sessionCoreRef.current ?? "default"}`,
-    );
-  }, [sessionCoreRef]);
+  const increaseResyncInterval = useCallback(
+    (reason: string) => {
+      const profile = getResyncProfile(sessionCoreRef.current);
+      resyncIntervalMsRef.current = Math.min(
+        profile.maxIntervalMs,
+        Math.max(profile.baseIntervalMs, resyncIntervalMsRef.current + profile.backoffStepMs),
+      );
+      console.warn(
+        `[LOBBY] Resync ${reason}, backing off to ${resyncIntervalMsRef.current}ms for ${sessionCoreRef.current ?? "default"}`,
+      );
+    },
+    [sessionCoreRef],
+  );
 
   const scheduleNextResync = useCallback(
     function scheduleNextResyncImpl(delayMs?: number) {
@@ -180,7 +191,10 @@ export function useNetplayResyncLoop({
           const stateBuffer = emulatorRuntime.sync.getResyncState();
           if (stateBuffer) {
             const sizeKB = stateBuffer.byteLength / 1024;
-            resyncIntervalMsRef.current = getIntervalForStateSize(sessionCoreRef.current, stateBuffer);
+            resyncIntervalMsRef.current = getIntervalForStateSize(
+              sessionCoreRef.current,
+              stateBuffer,
+            );
             console.log(
               `[LOBBY] Resync state ${sizeKB.toFixed(0)}KB for ${sessionCoreRef.current ?? "default"}, next=${resyncIntervalMsRef.current}ms`,
             );

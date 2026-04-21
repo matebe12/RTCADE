@@ -1,7 +1,6 @@
 import type { MutableRefObject } from "react";
 
 import type { SessionEndReason } from "@/components/NetplaySessionSummary";
-import type { RecentOpponent } from "@/lib/user-profile";
 import {
   type ChatMessage as PeerChatMessage,
   type InputMessage,
@@ -16,6 +15,7 @@ import {
   type OpponentProfile,
   type RoomVisibility,
 } from "@/stores/useNetplayLobbyStore";
+import type { NetplaySessionRole } from "../../shared/emulator-protocol";
 
 type SetLobbyState = (next: LobbyState | ((previous: LobbyState) => LobbyState)) => void;
 
@@ -24,7 +24,7 @@ interface UseNetplayPeerRoomFlowOptions {
   joinCode: string;
   roomVisibility: RoomVisibility;
   peerRef: MutableRefObject<NetplayPeer | null>;
-  roleRef: MutableRefObject<"host" | "guest" | null>;
+  roleRef: MutableRefObject<NetplaySessionRole | null>;
   activeSessionRef: MutableRefObject<ActiveSession | null>;
   sessionStartedAtRef: MutableRefObject<number | null>;
   setLobbyState: SetLobbyState;
@@ -32,8 +32,8 @@ interface UseNetplayPeerRoomFlowOptions {
   setError: (error: string) => void;
   setDcState: (dcState: string) => void;
   setChatChannelState: (chatChannelState: string) => void;
+  setGameStarted: (gameStarted: boolean) => void;
   setOpponentProfile: (opponentProfile: OpponentProfile | null) => void;
-  setReplayOpponentTarget: (replayOpponentTarget: RecentOpponent | null) => void;
   resetSessionRuntime: () => void;
   resetToMenu: () => void;
   completeSession: (endReason: SessionEndReason) => void;
@@ -65,8 +65,8 @@ export function useNetplayPeerRoomFlow({
   setError,
   setDcState,
   setChatChannelState,
+  setGameStarted,
   setOpponentProfile,
-  setReplayOpponentTarget,
   resetSessionRuntime,
   resetToMenu,
   completeSession,
@@ -94,6 +94,7 @@ export function useNetplayPeerRoomFlow({
     setError,
     setDcState,
     setChatChannelState,
+    setGameStarted,
     setOpponentProfile,
     resetToMenu,
     completeSession,
@@ -116,7 +117,8 @@ export function useNetplayPeerRoomFlow({
     handleCreateRoom,
     handleJoinPublicRoom,
     handleJoinRoom,
-    handleReplayRecentOpponent,
+    handleSpectatePublicRoom,
+    handleSpectateRoom,
     handleSummaryRematch,
   } = useNetplayRoomEntry({
     state,
@@ -125,7 +127,6 @@ export function useNetplayPeerRoomFlow({
     setLobbyState: setState,
     setStatus,
     setError,
-    setReplayOpponentTarget,
     resetSessionRuntime,
     createPeer,
   });
@@ -134,7 +135,8 @@ export function useNetplayPeerRoomFlow({
     handleCreateRoom,
     handleJoinPublicRoom,
     handleJoinRoom,
-    handleReplayRecentOpponent,
+    handleSpectatePublicRoom,
+    handleSpectateRoom,
     handleSummaryRematch,
   };
 }

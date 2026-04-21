@@ -2,7 +2,7 @@ import { useCallback } from "react";
 
 import type { SystemCore } from "@/components/EmulatorPlayer";
 import { appEnvironment } from "@/config/environment";
-import { getUserProfile, type RecentOpponent } from "@/lib/user-profile";
+import { getUserProfile } from "@/lib/user-profile";
 import { NETPLAY_COPY } from "@/netplay/netplayCopy";
 import type { NetplayPeer } from "@/netplay/peer";
 import { type LobbyState, type RomInfo, type RoomVisibility } from "@/stores/useNetplayLobbyStore";
@@ -23,7 +23,6 @@ interface UseNetplayRoomEntryOptions {
   setLobbyState: SetLobbyState;
   setStatus: (status: string) => void;
   setError: (error: string) => void;
-  setReplayOpponentTarget: (replayOpponentTarget: RecentOpponent | null) => void;
   resetSessionRuntime: () => void;
   createPeer: () => NetplayPeer;
 }
@@ -35,7 +34,6 @@ export function useNetplayRoomEntry({
   setLobbyState: setState,
   setStatus,
   setError,
-  setReplayOpponentTarget,
   resetSessionRuntime,
   createPeer,
 }: UseNetplayRoomEntryOptions) {
@@ -131,6 +129,30 @@ export function useNetplayRoomEntry({
     [createPeer, resetSessionRuntime, setError, setStatus],
   );
 
+  const spectateRoomWithCode = useCallback(
+    async (roomCode: string) => {
+      if (roomCode.length !== 6) {
+        setError(NETPLAY_COPY.invalidRoomCode);
+        return;
+      }
+
+      resetSessionRuntime();
+      setError("");
+      setStatus(NETPLAY_COPY.spectatingRoom);
+      const peer = createPeer();
+      try {
+        await peer.connect(SERVER_URL);
+      } catch {
+        const message = NETPLAY_COPY.connectionStartFailed;
+        setError(message);
+        toast.error(message);
+        return;
+      }
+      peer.spectateRoom(roomCode, getUserProfile()?.nickname, getUserProfile()?.avatar);
+    },
+    [createPeer, resetSessionRuntime, setError, setStatus],
+  );
+
   const handleJoinRoom = useCallback(async () => {
     if (joinCode.length !== 6) {
       setError(NETPLAY_COPY.invalidRoomCode);
@@ -147,18 +169,20 @@ export function useNetplayRoomEntry({
     [joinRoomWithCode],
   );
 
-  const handleReplayRecentOpponent = useCallback(
-    async (opponent: RecentOpponent, isPublic: boolean) => {
-      setReplayOpponentTarget(null);
-      await startHostingRoom({
-        romFilename: getRomFilename(opponent.romPath),
-        romPath: opponent.romPath,
-        core: opponent.core as SystemCore,
-        biosPath: opponent.biosPath,
-        isPublic,
-      });
+  const handleSpectateRoom = useCallback(async () => {
+    if (joinCode.length !== 6) {
+      setError(NETPLAY_COPY.invalidRoomCode);
+      return;
+    }
+
+    await spectateRoomWithCode(joinCode);
+  }, [joinCode, setError, spectateRoomWithCode]);
+
+  const handleSpectatePublicRoom = useCallback(
+    async (roomCode: string) => {
+      await spectateRoomWithCode(roomCode);
     },
-    [setReplayOpponentTarget, startHostingRoom],
+    [spectateRoomWithCode],
   );
 
   const handleSummaryRematch = useCallback(() => {
@@ -177,7 +201,8 @@ export function useNetplayRoomEntry({
     handleCreateRoom,
     handleJoinPublicRoom,
     handleJoinRoom,
-    handleReplayRecentOpponent,
+    handleSpectatePublicRoom,
+    handleSpectateRoom,
     handleSummaryRematch,
   };
 }

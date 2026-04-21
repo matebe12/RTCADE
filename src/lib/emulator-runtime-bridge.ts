@@ -35,15 +35,24 @@ export interface EmulatorRuntimeBridge {
   getEmulator: () => EJSEmulatorInstance | null;
 }
 
+type EmulatorContainerTarget = RefObject<HTMLDivElement | null> | (() => HTMLDivElement | null);
+
 function getEJSEmulator(): EJSEmulatorInstance | null {
-  const ejs = (window as unknown as Record<string, unknown>).EJS_emulator as EJSEmulatorInstance | undefined;
+  const ejs = (window as unknown as Record<string, unknown>).EJS_emulator as
+    | EJSEmulatorInstance
+    | undefined;
   if (!ejs?.gameManager) return null;
   return ejs;
 }
 
-function findEmulatorCanvas(containerRef: RefObject<HTMLDivElement | null>): HTMLCanvasElement | null {
-  if (!containerRef.current) return null;
-  return containerRef.current.querySelector("canvas");
+function getContainerElement(target: EmulatorContainerTarget): HTMLDivElement | null {
+  return typeof target === "function" ? target() : target.current;
+}
+
+function findEmulatorCanvas(target: EmulatorContainerTarget): HTMLCanvasElement | null {
+  const container = getContainerElement(target);
+  if (!container) return null;
+  return container.querySelector("canvas");
 }
 
 /**
@@ -90,22 +99,24 @@ function captureAudioFromEJS(): MediaStream | null {
     // existing output → GainNode → destination
     //                             → MediaStreamDestination
     // But we can't retroactively insert into the graph.
-    // 
+    //
     // Best approach: Use AudioContext.prototype.createMediaStreamDestination
     // and connect it after the fact. We override destination getter.
     //
     // Practical approach: Just capture all audio from the page context.
     // If EmulatorJS is the only audio source, this works.
-    
-    // Actually simplest reliable approach: use captureStream on an <audio> or 
+
+    // Actually simplest reliable approach: use captureStream on an <audio> or
     // use the MediaStream from canvas which only has video.
-    // For now, return null and we'll capture audio in EmulatorPlayer via 
+    // For now, return null and we'll capture audio in EmulatorPlayer via
     // AudioContext monkey-patching before EJS loads.
-    
+
     // If we already have a splitter node installed (see EmulatorPlayer), use it
-    const splitter = (window as unknown as Record<string, unknown>).__rtcade_audio_splitter as {
-      stream: MediaStream;
-    } | undefined;
+    const splitter = (window as unknown as Record<string, unknown>).__rtcade_audio_splitter as
+      | {
+          stream: MediaStream;
+        }
+      | undefined;
     if (splitter?.stream) {
       return splitter.stream;
     }
@@ -117,11 +128,13 @@ function captureAudioFromEJS(): MediaStream | null {
 }
 
 export function createEmulatorRuntimeBridge(
-  containerRef: RefObject<HTMLDivElement | null>,
+  containerTarget: EmulatorContainerTarget,
   /** 0 = local player, 1 = remote player (or vice versa for guest) */
   _localPlayer: number = 0,
   remotePlayer: number = 1,
 ): EmulatorRuntimeBridge {
+  void _localPlayer;
+
   return {
     input: {
       simulateLocalInput(player: number, button: number, value: number) {
@@ -141,7 +154,8 @@ export function createEmulatorRuntimeBridge(
           const state = ejs.gameManager.getState();
           const buf = (state as unknown as { buffer?: ArrayBuffer }).buffer ?? state;
           if (buf instanceof ArrayBuffer && buf.byteLength > 0) return buf;
-          if (ArrayBuffer.isView(buf) && buf.byteLength > 0) return (buf as Uint8Array).buffer as ArrayBuffer;
+          if (ArrayBuffer.isView(buf) && buf.byteLength > 0)
+            return (buf as Uint8Array).buffer as ArrayBuffer;
           return null;
         } catch (e) {
           console.warn("[BRIDGE] getSaveState failed:", e);
@@ -168,11 +182,16 @@ export function createEmulatorRuntimeBridge(
           const buf = (state as unknown as { buffer?: ArrayBuffer }).buffer ?? state;
           ejs.play();
           if (buf instanceof ArrayBuffer && buf.byteLength > 0) return buf;
-          if (ArrayBuffer.isView(buf) && buf.byteLength > 0) return (buf as Uint8Array).buffer as ArrayBuffer;
+          if (ArrayBuffer.isView(buf) && buf.byteLength > 0)
+            return (buf as Uint8Array).buffer as ArrayBuffer;
           return null;
         } catch (e) {
           console.warn("[BRIDGE] getResyncState failed:", e);
-          try { getEJSEmulator()?.play(); } catch { /* */ }
+          try {
+            getEJSEmulator()?.play();
+          } catch {
+            /* */
+          }
           return null;
         }
       },
@@ -186,7 +205,11 @@ export function createEmulatorRuntimeBridge(
           return true;
         } catch (e) {
           console.warn("[BRIDGE] loadResyncState failed:", e);
-          try { getEJSEmulator()?.play(); } catch { /* */ }
+          try {
+            getEJSEmulator()?.play();
+          } catch {
+            /* */
+          }
           return false;
         }
       },
@@ -205,7 +228,7 @@ export function createEmulatorRuntimeBridge(
     },
     capture: {
       getCaptureStream(fps = 60): MediaStream | null {
-        const canvas = findEmulatorCanvas(containerRef);
+        const canvas = findEmulatorCanvas(containerTarget);
         if (!canvas) return null;
         try {
           return canvas.captureStream(fps);
@@ -220,7 +243,7 @@ export function createEmulatorRuntimeBridge(
     },
     ui: {
       focus() {
-        containerRef.current?.focus();
+        getContainerElement(containerTarget)?.focus();
       },
     },
     getEmulator(): EJSEmulatorInstance | null {
@@ -228,4 +251,3 @@ export function createEmulatorRuntimeBridge(
     },
   };
 }
-

@@ -27,6 +27,7 @@ interface GuestVideoDisplayProps {
   videoStream: MediaStream | null;
   onLocalInput?: (button: number, down: boolean) => void;
   onChatShortcut?: () => void;
+  captureInput?: boolean;
   disconnectSeverity?: DisconnectSeverity;
   disconnectCountdown?: number; // seconds remaining before auto-disconnect
 }
@@ -40,7 +41,14 @@ interface GuestVideoDisplayProps {
  */
 const GuestVideoDisplay = forwardRef<HTMLDivElement, GuestVideoDisplayProps>(
   function GuestVideoDisplay(
-    { videoStream, onLocalInput, onChatShortcut, disconnectSeverity = "connected", disconnectCountdown },
+    {
+      videoStream,
+      onLocalInput,
+      onChatShortcut,
+      captureInput = true,
+      disconnectSeverity = "connected",
+      disconnectCountdown,
+    },
     ref,
   ) {
     const containerRef = useRef<HTMLDivElement>(null);
@@ -79,11 +87,13 @@ const GuestVideoDisplay = forwardRef<HTMLDivElement, GuestVideoDisplayProps>(
       return () => {
         video.srcObject = null;
       };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+      // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [videoStream]); // intentionally not including isMuted to avoid re-attaching
 
     // Keyboard input capture
     useEffect(() => {
+      if (!captureInput) return undefined;
+
       const container = containerRef.current;
       if (!container) return undefined;
 
@@ -127,9 +137,10 @@ const GuestVideoDisplay = forwardRef<HTMLDivElement, GuestVideoDisplayProps>(
         container.removeEventListener("keydown", handleKeyDown, true);
         container.removeEventListener("keyup", handleKeyUp, true);
       };
-    }, [onLocalInput, onChatShortcut]);
+    }, [captureInput, onLocalInput, onChatShortcut]);
 
-    const showDisconnectOverlay = disconnectSeverity === "warning" || disconnectSeverity === "danger";
+    const showDisconnectOverlay =
+      disconnectSeverity === "warning" || disconnectSeverity === "danger";
 
     return (
       <div
@@ -140,12 +151,7 @@ const GuestVideoDisplay = forwardRef<HTMLDivElement, GuestVideoDisplayProps>(
       >
         {videoStream ? (
           <>
-            <video
-              ref={videoRef}
-              autoPlay
-              playsInline
-              className="h-full w-full object-contain"
-            />
+            <video ref={videoRef} autoPlay playsInline className="h-full w-full object-contain" />
             {/* Mute/Unmute button overlay */}
             <div className="absolute bottom-3 right-3 z-10">
               <Button
@@ -155,11 +161,7 @@ const GuestVideoDisplay = forwardRef<HTMLDivElement, GuestVideoDisplayProps>(
                 onClick={toggleMute}
                 title={isMuted ? "소리 켜기" : "소리 끄기"}
               >
-                {isMuted ? (
-                  <VolumeX className="size-4" />
-                ) : (
-                  <Volume2 className="size-4" />
-                )}
+                {isMuted ? <VolumeX className="size-4" /> : <Volume2 className="size-4" />}
               </Button>
             </div>
           </>

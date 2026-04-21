@@ -10,6 +10,7 @@ import {
   type RecentGame,
   type RecentOpponent,
 } from "@/lib/user-profile";
+import type { NetplaySessionRole } from "../../shared/emulator-protocol";
 
 const CHAT_MAX_MESSAGES = 100;
 
@@ -35,6 +36,11 @@ export interface PublicRoomInfo {
   hostAvatar?: string;
 }
 
+export interface PlayingRoomInfo extends PublicRoomInfo {
+  startedAt: number;
+  spectatorCount: number;
+}
+
 export type LobbyMode = "netplay" | "solo";
 
 export type RoomVisibility = "private" | "public";
@@ -43,7 +49,7 @@ export interface ActiveSession {
   mode: LobbyMode;
   romPath: string;
   core: SystemCore;
-  role?: "host" | "guest";
+  role?: NetplaySessionRole;
   biosPath?: string;
   isPublic?: boolean;
 }
@@ -61,7 +67,7 @@ export type SessionSummaryState = {
   mode: LobbyMode;
   romPath: string;
   core: SystemCore;
-  role?: "host" | "guest";
+  role?: NetplaySessionRole;
   biosPath?: string;
   isPublic?: boolean;
   gameName: string;
@@ -77,6 +83,7 @@ export type LobbyState =
   | { step: "browse"; roms: RomInfo[] }
   | { step: "solo-browse"; roms: RomInfo[] }
   | { step: "public-rooms"; rooms: PublicRoomInfo[] }
+  | { step: "watch-rooms"; rooms: PlayingRoomInfo[] }
   | {
       step: "waiting";
       code: string;
@@ -87,11 +94,19 @@ export type LobbyState =
       isPublic?: boolean;
     }
   | { step: "join-input" }
+  | { step: "spectate-input" }
   | {
       step: "playing";
       romPath: string;
       core: SystemCore;
       role: "host" | "guest";
+      biosPath?: string;
+    }
+  | {
+      step: "watching";
+      romPath: string;
+      core: SystemCore;
+      role: "spectator";
       biosPath?: string;
     }
   | {
@@ -117,7 +132,6 @@ type NetplayLobbyStoreState = {
   recentOpponents: RecentOpponent[];
   favoriteGames: string[];
   menuPublicRooms: PublicRoomInfo[];
-  replayOpponentTarget: RecentOpponent | null;
   chatMessages: NetplayChatMessage[];
   chatOpen: boolean;
   chatDraft: string;
@@ -142,7 +156,6 @@ type NetplayLobbyStoreActions = {
   setRecentOpponents: (recentOpponents: RecentOpponent[]) => void;
   setFavoriteGames: (favoriteGames: string[]) => void;
   setMenuPublicRooms: (menuPublicRooms: PublicRoomInfo[]) => void;
-  setReplayOpponentTarget: (replayOpponentTarget: RecentOpponent | null) => void;
   appendChatMessage: (message: NetplayChatMessage) => void;
   setChatOpen: (chatOpen: boolean) => void;
   setChatDraft: (chatDraft: string) => void;
@@ -192,7 +205,6 @@ function getDefaultSessionUiState() {
     dcState: "",
     gameStarted: false,
     opponentProfile: null,
-    replayOpponentTarget: null,
     syncDisplay: "",
   };
 }
@@ -231,7 +243,6 @@ export const useNetplayLobbyStore = create<NetplayLobbyStore>((set) => ({
   setRecentOpponents: (recentOpponents) => set({ recentOpponents }),
   setFavoriteGames: (favoriteGames) => set({ favoriteGames }),
   setMenuPublicRooms: (menuPublicRooms) => set({ menuPublicRooms }),
-  setReplayOpponentTarget: (replayOpponentTarget) => set({ replayOpponentTarget }),
   appendChatMessage: (message) =>
     set((store) => ({
       chatMessages: [...store.chatMessages, message].slice(-CHAT_MAX_MESSAGES),

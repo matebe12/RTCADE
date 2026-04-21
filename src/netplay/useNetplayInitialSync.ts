@@ -1,20 +1,29 @@
-import { useCallback, useEffect, useMemo, useRef, type MutableRefObject, type RefObject } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  type MutableRefObject,
+  type RefObject,
+} from "react";
 
 import { createEmulatorRuntimeBridge } from "@/lib/emulator-runtime-bridge";
 import { NETPLAY_COPY } from "@/netplay/netplayCopy";
 import type { NetplayPeer } from "@/netplay/peer";
+import type { NetplaySessionRole } from "../../shared/emulator-protocol";
 
 interface UseNetplayInitialSyncOptions {
   dcState: string;
   gameStarted: boolean;
   peerRef: MutableRefObject<NetplayPeer | null>;
   emulatorRef: RefObject<HTMLDivElement | null>;
-  roleRef: MutableRefObject<"host" | "guest" | null>;
+  roleRef: MutableRefObject<NetplaySessionRole | null>;
   gameStartedRef: MutableRefObject<boolean>;
   setGameStarted: (gameStarted: boolean) => void;
   updateSync: (message: string) => void;
   markSessionStarted: () => void;
   startPeriodicResync: () => void;
+  onHostGameStarted?: () => void;
   onStartVideoCapture?: () => void;
 }
 
@@ -29,6 +38,7 @@ export function useNetplayInitialSync({
   updateSync,
   markSessionStarted,
   startPeriodicResync,
+  onHostGameStarted,
   onStartVideoCapture,
 }: UseNetplayInitialSyncOptions) {
   const localReadyRef = useRef(false);
@@ -50,10 +60,21 @@ export function useNetplayInitialSync({
       }
       // HOST: start video capture for streaming after game starts
       if (roleRef.current === "host") {
+        onHostGameStarted?.();
         onStartVideoCapture?.();
       }
     },
-    [emulatorRuntime, gameStartedRef, markSessionStarted, onStartVideoCapture, peerRef, roleRef, setGameStarted, updateSync],
+    [
+      emulatorRuntime,
+      gameStartedRef,
+      markSessionStarted,
+      onHostGameStarted,
+      onStartVideoCapture,
+      peerRef,
+      roleRef,
+      setGameStarted,
+      updateSync,
+    ],
   );
 
   useEffect(() => {

@@ -14,6 +14,9 @@ export interface NetplayChatMessage {
   text: string;
   sender: "local" | "remote";
   sentAt: number;
+  authorAvatar?: string;
+  authorName?: string;
+  authorRole?: "host" | "guest" | "spectator";
 }
 
 interface ChatUser {
@@ -62,9 +65,7 @@ export default function NetplayChatPanel({
 
   useEffect(() => {
     if (!open) return;
-    const viewport = scrollAreaRef.current?.querySelector(
-      "[data-radix-scroll-area-viewport]",
-    );
+    const viewport = scrollAreaRef.current?.querySelector("[data-radix-scroll-area-viewport]");
 
     if (!(viewport instanceof HTMLDivElement)) return;
 
@@ -80,7 +81,12 @@ export default function NetplayChatPanel({
   const isChatReady = chatChannelState === "open";
 
   return (
-    <Card className={cn("flex w-full max-w-200 flex-col overflow-hidden border-border/70 bg-card/95 xl:h-150 xl:w-[320px] xl:max-w-[320px]", className)}>
+    <Card
+      className={cn(
+        "flex w-full max-w-200 flex-col overflow-hidden border-border/70 bg-card/95 xl:h-150 xl:w-[320px] xl:max-w-[320px]",
+        className,
+      )}
+    >
       <CardHeader className="flex flex-row items-start justify-between gap-3 border-b px-4 py-3">
         <div className="min-w-0 space-y-2">
           <div className="flex items-center gap-2">
@@ -131,7 +137,15 @@ export default function NetplayChatPanel({
             ) : (
               messages.map((message) => {
                 const isLocal = message.sender === "local";
-                const author = isLocal ? localUser : remoteDisplay;
+                const author = isLocal
+                  ? {
+                      nickname: message.authorName || localUser.nickname,
+                      avatar: message.authorAvatar || localUser.avatar,
+                    }
+                  : {
+                      nickname: message.authorName || remoteDisplay.nickname,
+                      avatar: message.authorAvatar || remoteDisplay.avatar,
+                    };
 
                 return (
                   <div
@@ -145,6 +159,7 @@ export default function NetplayChatPanel({
                           isLocal ? "justify-end" : "justify-start",
                         )}
                       >
+                        <span className="text-sm leading-none">{author.avatar}</span>
                         <span className="font-medium text-foreground/80">{author.nickname}</span>
                         <span>{timeFormatter.format(message.sentAt)}</span>
                       </div>

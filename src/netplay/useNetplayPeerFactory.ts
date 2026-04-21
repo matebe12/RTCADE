@@ -15,12 +15,13 @@ import {
   type OpponentProfile,
 } from "@/stores/useNetplayLobbyStore";
 import { toast } from "sonner";
+import type { NetplaySessionRole } from "../../shared/emulator-protocol";
 
 type SetLobbyState = (next: LobbyState | ((previous: LobbyState) => LobbyState)) => void;
 
 interface UseNetplayPeerFactoryOptions {
   peerRef: MutableRefObject<NetplayPeer | null>;
-  roleRef: MutableRefObject<"host" | "guest" | null>;
+  roleRef: MutableRefObject<NetplaySessionRole | null>;
   activeSessionRef: MutableRefObject<ActiveSession | null>;
   sessionStartedAtRef: MutableRefObject<number | null>;
   setLobbyState: SetLobbyState;
@@ -28,6 +29,7 @@ interface UseNetplayPeerFactoryOptions {
   setError: (error: string) => void;
   setDcState: (dcState: string) => void;
   setChatChannelState: (chatChannelState: string) => void;
+  setGameStarted: (gameStarted: boolean) => void;
   setOpponentProfile: (opponentProfile: OpponentProfile | null) => void;
   resetToMenu: () => void;
   completeSession: (endReason: SessionEndReason) => void;
@@ -56,6 +58,7 @@ export function useNetplayPeerFactory({
   setError,
   setDcState,
   setChatChannelState,
+  setGameStarted,
   setOpponentProfile,
   resetToMenu,
   completeSession,
@@ -77,6 +80,12 @@ export function useNetplayPeerFactory({
     const peer = new NetplayPeer({
       onConnected: () => setStatus(NETPLAY_COPY.peerConnected),
       onDisconnected: () => {
+        if (activeSessionRef.current?.role === "spectator") {
+          toast.error(NETPLAY_COPY.peerLeft);
+          resetToMenu();
+          return;
+        }
+
         if (activeSessionRef.current) {
           completeSession("peer-left");
           return;
@@ -144,7 +153,30 @@ export function useNetplayPeerFactory({
         if (info.hostNickname) {
           setOpponentProfile({ nickname: info.hostNickname, avatar: info.hostAvatar || "🎮" });
         }
+        if (info.role === "spectator") {
+          setStatus(NETPLAY_COPY.spectatorJoined);
+          setGameStarted(true);
+          roleRef.current = "spectator";
+          activeSessionRef.current = {
+            mode: "netplay",
+            romPath: info.romFilename,
+            core: info.core as SystemCore,
+            role: "spectator",
+            biosPath: info.bios,
+          };
+          sessionStartedAtRef.current = null;
+          setState({
+            step: "watching",
+            romPath: info.romFilename,
+            core: info.core as SystemCore,
+            role: "spectator",
+            biosPath: info.bios,
+          });
+          return;
+        }
+
         setStatus(NETPLAY_COPY.roomJoined);
+        setGameStarted(false);
         roleRef.current = "guest";
         activeSessionRef.current = {
           mode: "netplay",
@@ -188,6 +220,7 @@ export function useNetplayPeerFactory({
     setChatChannelState,
     setDcState,
     setError,
+    setGameStarted,
     setOpponentProfile,
     setState,
     setStatus,

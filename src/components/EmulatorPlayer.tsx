@@ -2,11 +2,7 @@ import { useEffect, useRef, forwardRef, useImperativeHandle, useCallback } from 
 
 import { appEnvironment } from "@/config/environment";
 import { createEmulatorRuntimeBridge } from "@/lib/emulator-runtime-bridge";
-import {
-  CORE_REMAP,
-  EJS_BUTTONS_CONFIG,
-  KEY_TO_BUTTON,
-} from "../../shared/emulator-protocol";
+import { CORE_REMAP, EJS_BUTTONS_CONFIG, KEY_TO_BUTTON } from "../../shared/emulator-protocol";
 import { buildBackendUrl } from "@/lib/backend-url";
 
 export type SystemCore =
@@ -57,11 +53,29 @@ interface EmulatorPlayerProps {
 
 /** CSS to hide EmulatorJS UI buttons we don't want (keep volume only) */
 const EJS_HIDE_BUTTONS_CSS = [
-  "playPause", "play", "pause", "restart", "mute", "unmute",
-  "screenshot", "saveState", "loadState", "quickSave", "quickLoad",
-  "screenRecord", "saveSavFiles", "loadSavFiles", "cacheManager",
-  "cheat", "exitEmulation", "settings", "fullscreen", "gamepad",
-].map((btn) => `[data-btn="${btn}"]{display:none!important}`).join("");
+  "playPause",
+  "play",
+  "pause",
+  "restart",
+  "mute",
+  "unmute",
+  "screenshot",
+  "saveState",
+  "loadState",
+  "quickSave",
+  "quickLoad",
+  "screenRecord",
+  "saveSavFiles",
+  "loadSavFiles",
+  "cacheManager",
+  "cheat",
+  "exitEmulation",
+  "settings",
+  "fullscreen",
+  "gamepad",
+]
+  .map((btn) => `[data-btn="${btn}"]{display:none!important}`)
+  .join("");
 
 /**
  * Install an AudioContext monkey-patch BEFORE EmulatorJS loads.
@@ -88,7 +102,9 @@ function installAudioCapture(): void {
   // Save originals for cleanup
   (window as unknown as Record<string, unknown>).__rtcade_orig_audio_context = OrigAudioContext;
   const origConnect = AudioNode.prototype.connect as (
-    this: AudioNode, destinationNode: AudioNode | AudioParam, ...args: unknown[]
+    this: AudioNode,
+    destinationNode: AudioNode | AudioParam,
+    ...args: unknown[]
   ) => AudioNode;
   (window as unknown as Record<string, unknown>).__rtcade_orig_connect = origConnect;
 
@@ -98,12 +114,14 @@ function installAudioCapture(): void {
    */
   function ensureSplitter(ctx: AudioContext) {
     const win = window as unknown as Record<string, unknown>;
-    const existing = win.__rtcade_audio_splitter as {
-      stream: MediaStream;
-      ctx: AudioContext;
-      dest: MediaStreamAudioDestinationNode;
-      fakeDestination: GainNode;
-    } | undefined;
+    const existing = win.__rtcade_audio_splitter as
+      | {
+          stream: MediaStream;
+          ctx: AudioContext;
+          dest: MediaStreamAudioDestinationNode;
+          fakeDestination: GainNode;
+        }
+      | undefined;
     if (existing && existing.ctx === ctx) return existing;
 
     try {
@@ -111,7 +129,7 @@ function installAudioCapture(): void {
       const fakeDestination = ctx.createGain();
       fakeDestination.gain.value = 1;
       origConnect.call(fakeDestination, ctx.destination as AudioNode); // speakers
-      origConnect.call(fakeDestination, dest as AudioNode);             // WebRTC capture
+      origConnect.call(fakeDestination, dest as AudioNode); // WebRTC capture
 
       const splitter = { stream: dest.stream, ctx, dest, fakeDestination };
       win.__rtcade_audio_splitter = splitter;
@@ -141,7 +159,10 @@ function installAudioCapture(): void {
   } as typeof AudioNode.prototype.connect;
 
   // ── Layer 1: AudioContext constructor patch with destination override ──
-  const patchedCtor = function (this: AudioContext, ...args: ConstructorParameters<typeof AudioContext>) {
+  const patchedCtor = function (
+    this: AudioContext,
+    ...args: ConstructorParameters<typeof AudioContext>
+  ) {
     const ctx = new OrigAudioContext(...args);
 
     try {
@@ -155,7 +176,9 @@ function installAudioCapture(): void {
           configurable: true,
         });
       }
-      console.log("[EMULATOR] Audio capture installed via destination override + connect intercept");
+      console.log(
+        "[EMULATOR] Audio capture installed via destination override + connect intercept",
+      );
     } catch (e) {
       console.warn("[EMULATOR] Audio capture setup failed:", e);
     }
@@ -190,13 +213,23 @@ function removeAudioCapture(): void {
   }
 
   // Disconnect splitter nodes to release resources
-  const splitter = win.__rtcade_audio_splitter as {
-    fakeDestination?: GainNode;
-    dest?: MediaStreamAudioDestinationNode;
-  } | undefined;
+  const splitter = win.__rtcade_audio_splitter as
+    | {
+        fakeDestination?: GainNode;
+        dest?: MediaStreamAudioDestinationNode;
+      }
+    | undefined;
   if (splitter) {
-    try { splitter.fakeDestination?.disconnect(); } catch { /* */ }
-    try { splitter.dest?.disconnect(); } catch { /* */ }
+    try {
+      splitter.fakeDestination?.disconnect();
+    } catch {
+      /* */
+    }
+    try {
+      splitter.dest?.disconnect();
+    } catch {
+      /* */
+    }
   }
   delete win.__rtcade_audio_splitter;
   delete win.__rtcade_audio_patched;
@@ -209,11 +242,53 @@ function removeAudioCapture(): void {
  * React Strict Mode double-invoke.
  */
 const OUR_EJS_GLOBALS = [
-  "EJS_player", "EJS_core", "EJS_pathtodata", "EJS_color",
-  "EJS_startOnLoaded", "EJS_language", "EJS_disableAutoLang",
-  "EJS_gameID", "EJS_Buttons", "EJS_ready", "EJS_onGameStart",
-  "EJS_gameUrl", "EJS_biosUrl",
+  "EJS_player",
+  "EJS_core",
+  "EJS_pathtodata",
+  "EJS_color",
+  "EJS_startOnLoaded",
+  "EJS_language",
+  "EJS_disableAutoLang",
+  "EJS_gameID",
+  "EJS_Buttons",
+  "EJS_ready",
+  "EJS_onGameStart",
+  "EJS_gameUrl",
+  "EJS_biosUrl",
 ] as const;
+
+function buildLoadedEmulatorConfig(win: Record<string, unknown>) {
+  const config: Record<string, unknown> = {
+    gameUrl: win.EJS_gameUrl,
+    dataPath: win.EJS_pathtodata,
+    system: win.EJS_core,
+    biosUrl: win.EJS_biosUrl,
+    color: win.EJS_color,
+    buttonOpts: win.EJS_Buttons,
+    startOnLoad: win.EJS_startOnLoaded,
+    gameId: win.EJS_gameID,
+  };
+
+  return config;
+}
+
+function bindLoadedEmulatorEvents(win: Record<string, unknown>) {
+  const emulator = win.EJS_emulator as
+    | { on?: (event: string, handler: () => void) => void }
+    | undefined;
+
+  if (!emulator?.on) {
+    return;
+  }
+
+  if (typeof win.EJS_ready === "function") {
+    emulator.on("ready", win.EJS_ready as () => void);
+  }
+
+  if (typeof win.EJS_onGameStart === "function") {
+    emulator.on("start", win.EJS_onGameStart as () => void);
+  }
+}
 
 /**
  * Clean up EJS globals that we set, and destroy the EmulatorJS instance.
@@ -225,12 +300,18 @@ function cleanupEJSGlobals() {
 
   // Destroy the running EmulatorJS instance if it exists and has a gameManager
   // (partially initialized instances don't have callEvent and crash on exit)
-  const emu = win.EJS_emulator as {
-    callEvent?: (name: string) => void;
-    gameManager?: unknown;
-  } | undefined;
+  const emu = win.EJS_emulator as
+    | {
+        callEvent?: (name: string) => void;
+        gameManager?: unknown;
+      }
+    | undefined;
   if (emu?.gameManager) {
-    try { emu.callEvent?.("exit"); } catch { /* best-effort */ }
+    try {
+      emu.callEvent?.("exit");
+    } catch {
+      /* best-effort */
+    }
   }
   delete win.EJS_emulator;
 
@@ -352,13 +433,16 @@ const EmulatorPlayer = forwardRef<HTMLDivElement, EmulatorPlayerProps>(function 
     // Aborted flag — prevents async script callbacks from running
     // after React Strict Mode cleanup.
     let aborted = false;
+    let initTimerId: number | null = null;
+    let gameUrlObjectUrl: string | null = null;
 
     // Install audio capture before EJS loads
     installAudioCapture();
 
     // Create the game mount point
     const gameDiv = document.createElement("div");
-    gameDiv.id = "game";
+    const gameId = `game-${Math.random().toString(36).slice(2, 10)}`;
+    gameDiv.id = gameId;
     gameDiv.style.width = "100%";
     gameDiv.style.height = "100%";
     container.appendChild(gameDiv);
@@ -394,13 +478,13 @@ const EmulatorPlayer = forwardRef<HTMLDivElement, EmulatorPlayerProps>(function 
     }
 
     // Set EJS globals
-    win.EJS_player = "#game";
+    win.EJS_player = `#${gameId}`;
     win.EJS_core = ejsCore;
     win.EJS_pathtodata = appEnvironment.emulatorJsDataUrl;
     win.EJS_color = "#00d4ff";
     win.EJS_startOnLoaded = true;
-    win.EJS_language = "en";
-    win.EJS_disableAutoLang = true;
+    win.EJS_language = "en-US";
+    win.EJS_disableAutoLang = false;
     win.EJS_gameID = 1;
     win.EJS_Buttons = { ...EJS_BUTTONS_CONFIG };
 
@@ -459,6 +543,46 @@ const EmulatorPlayer = forwardRef<HTMLDivElement, EmulatorPlayerProps>(function 
       };
     }
 
+    function loadEJSScript() {
+      if (aborted) return;
+
+      // If loader.js was already evaluated on a previous mount (EJS_STORAGE exists),
+      // we cannot re-evaluate it — `class EJS_STORAGE` is a block-scoped declaration
+      // that throws on redeclaration. Recreate the EmulatorJS instance with the
+      // same constructor shape loader.js uses: new EmulatorJS(EJS_player, config).
+      if (win.EJS_STORAGE && typeof win.EmulatorJS === "function") {
+        const EmulatorJSCtor = win.EmulatorJS as new (
+          selector: string,
+          config: Record<string, unknown>,
+        ) => unknown;
+
+        win.EJS_emulator = new EmulatorJSCtor(
+          String(win.EJS_player),
+          buildLoadedEmulatorConfig(win),
+        );
+        bindLoadedEmulatorEvents(win);
+        return;
+      }
+
+      const script = document.createElement("script");
+      script.src = appEnvironment.emulatorJsLoaderUrl;
+      script.async = true;
+      document.body.appendChild(script);
+      scriptRef.current = script;
+    }
+
+    function scheduleEJSLoad() {
+      if (aborted) return;
+
+      // Delay actual loader execution to the next macrotask so React Strict Mode's
+      // dev-only mount/unmount probe can cancel before EmulatorJS starts any work.
+      initTimerId = window.setTimeout(() => {
+        initTimerId = null;
+        if (aborted) return;
+        loadEJSScript();
+      }, 0);
+    }
+
     // Set game URL
     if (romPath) {
       // Server ROM
@@ -471,47 +595,27 @@ const EmulatorPlayer = forwardRef<HTMLDivElement, EmulatorPlayerProps>(function 
       romSource.arrayBuffer().then((buffer) => {
         if (aborted) return;
         const blob = new Blob([buffer]);
-        win.EJS_gameUrl = URL.createObjectURL(blob);
+        gameUrlObjectUrl = URL.createObjectURL(blob);
+        win.EJS_gameUrl = gameUrlObjectUrl;
         // Load the script after setting the URL
-        loadEJSScript();
+        scheduleEJSLoad();
       });
       // Return early; script will be loaded after file read
       return () => cleanup();
     }
 
-    // Load EmulatorJS loader script (idempotent — skips if already loaded)
-    function loadEJSScript() {
-      if (aborted) return;
-
-      // If loader.js was already evaluated on a previous mount (EJS_STORAGE exists),
-      // we cannot re-evaluate it — `class EJS_STORAGE` is a block-scoped declaration
-      // that throws on redeclaration. Instead, call the EmulatorJS constructor
-      // directly which was made available globally by emulator.min.js.
-      const win = window as unknown as Record<string, unknown>;
-      if (win.EJS_STORAGE && typeof win.EmulatorJS === "function") {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const EmulatorJSCtor = win.EmulatorJS as new (el: Element) => any;
-        const el = document.querySelector("#game");
-        if (el) {
-          win.EJS_emulator = new EmulatorJSCtor(el);
-        }
-        return;
-      }
-
-      const script = document.createElement("script");
-      script.src = appEnvironment.emulatorJsLoaderUrl;
-      script.async = true;
-      document.body.appendChild(script);
-      scriptRef.current = script;
-    }
-
     // For server ROM, load script immediately
     if (romPath || typeof romSource === "string") {
-      loadEJSScript();
+      scheduleEJSLoad();
     }
 
     function cleanup() {
       aborted = true;
+
+      if (initTimerId !== null) {
+        window.clearTimeout(initTimerId);
+        initTimerId = null;
+      }
 
       // Remove injected elements
       if (scriptRef.current) {
@@ -526,14 +630,20 @@ const EmulatorPlayer = forwardRef<HTMLDivElement, EmulatorPlayerProps>(function 
       // Stop any video streams
       streamReadyFiredRef.current = false;
 
-      // Clear the container
-      if (container) {
-        container.innerHTML = "";
-      }
-
       // Clean up EJS globals (preserves EJS_STORAGE for next mount)
       cleanupEJSGlobals();
       removeAudioCapture();
+
+      if (gameUrlObjectUrl) {
+        URL.revokeObjectURL(gameUrlObjectUrl);
+        gameUrlObjectUrl = null;
+      }
+
+      // Clear the container after EmulatorJS cleanup so any in-flight exit logic
+      // still sees the DOM it mounted into.
+      if (container) {
+        container.innerHTML = "";
+      }
 
       // Reset game-running flag
       (window as unknown as Record<string, unknown>).__rtcade_game_running = false;
@@ -667,9 +777,12 @@ const EmulatorPlayer = forwardRef<HTMLDivElement, EmulatorPlayerProps>(function 
       }
 
       // Check if the audio splitter has been created (game must be playing)
-      const audioSplitter = (window as unknown as Record<string, unknown>).__rtcade_audio_splitter as {
-        stream?: MediaStream;
-      } | undefined;
+      const audioSplitter = (window as unknown as Record<string, unknown>)
+        .__rtcade_audio_splitter as
+        | {
+            stream?: MediaStream;
+          }
+        | undefined;
       const hasAudio = !!audioSplitter?.stream;
 
       if (!hasAudio) {
@@ -705,7 +818,7 @@ const EmulatorPlayer = forwardRef<HTMLDivElement, EmulatorPlayerProps>(function 
     <div
       ref={containerRef}
       tabIndex={0}
-      className="relative w-full aspect-[4/3] bg-neutral-900 rounded-lg overflow-hidden outline-none focus:ring-2 focus:ring-primary/60"
+      className="relative aspect-4/3 w-full overflow-hidden rounded-lg bg-neutral-900 outline-none focus:ring-2 focus:ring-primary/60"
       style={{ contain: "layout style paint" }}
     />
   );

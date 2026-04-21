@@ -1,7 +1,12 @@
 import { useCallback, useEffect } from "react";
 
 import { buildBackendUrl } from "@/lib/backend-url";
-import type { LobbyState, PublicRoomInfo, RomInfo } from "@/stores/useNetplayLobbyStore";
+import type {
+  LobbyState,
+  PlayingRoomInfo,
+  PublicRoomInfo,
+  RomInfo,
+} from "@/stores/useNetplayLobbyStore";
 import { NETPLAY_COPY } from "@/netplay/netplayCopy";
 import { toast } from "sonner";
 
@@ -22,24 +27,27 @@ export function useNetplayDiscovery({
   setError,
   setMenuPublicRooms,
 }: UseNetplayDiscoveryOptions) {
-  const fetchRoms = useCallback(async (mode: DiscoveryMode = "netplay") => {
-    setError("");
-    try {
-      const response = await fetch(buildBackendUrl("/api/roms"));
-      const roms: RomInfo[] = await response.json();
-      if (roms.length === 0) {
-        const message = NETPLAY_COPY.romsUnavailable;
+  const fetchRoms = useCallback(
+    async (mode: DiscoveryMode = "netplay") => {
+      setError("");
+      try {
+        const response = await fetch(buildBackendUrl("/api/roms"));
+        const roms: RomInfo[] = await response.json();
+        if (roms.length === 0) {
+          const message = NETPLAY_COPY.romsUnavailable;
+          setError(message);
+          toast.error(message);
+          return;
+        }
+        setLobbyState({ step: mode === "solo" ? "solo-browse" : "browse", roms });
+      } catch {
+        const message = NETPLAY_COPY.romsLoadFailed;
         setError(message);
         toast.error(message);
-        return;
       }
-      setLobbyState({ step: mode === "solo" ? "solo-browse" : "browse", roms });
-    } catch {
-      const message = NETPLAY_COPY.romsLoadFailed;
-      setError(message);
-      toast.error(message);
-    }
-  }, [setError, setLobbyState]);
+    },
+    [setError, setLobbyState],
+  );
 
   const fetchPublicRooms = useCallback(
     async (openScreen = false, announceFailure = openScreen) => {
@@ -56,6 +64,7 @@ export function useNetplayDiscovery({
         setLobbyState((previous) => {
           if (
             previous.step === "playing" ||
+            previous.step === "watching" ||
             previous.step === "waiting" ||
             previous.step === "session-summary"
           ) {
@@ -80,6 +89,47 @@ export function useNetplayDiscovery({
       }
     },
     [setError, setLobbyState, setMenuPublicRooms],
+  );
+
+  const fetchPlayingRooms = useCallback(
+    async (openScreen = false, announceFailure = openScreen) => {
+      setError("");
+
+      try {
+        const response = await fetch(buildBackendUrl("/api/rooms/playing"));
+        if (!response.ok) {
+          throw new Error("failed");
+        }
+
+        const rooms: PlayingRoomInfo[] = await response.json();
+        setLobbyState((previous) => {
+          if (
+            previous.step === "playing" ||
+            previous.step === "watching" ||
+            previous.step === "waiting" ||
+            previous.step === "session-summary"
+          ) {
+            return previous;
+          }
+
+          if (openScreen || previous.step === "watch-rooms") {
+            return { step: "watch-rooms", rooms };
+          }
+
+          return previous;
+        });
+      } catch {
+        const message = NETPLAY_COPY.playingRoomsLoadFailed;
+        setError(message);
+        if (openScreen) {
+          setLobbyState({ step: "watch-rooms", rooms: [] });
+        }
+        if (announceFailure) {
+          toast.error(message);
+        }
+      }
+    },
+    [setError, setLobbyState],
   );
 
   const fetchMenuPublicRooms = useCallback(async () => {
@@ -114,7 +164,18 @@ export function useNetplayDiscovery({
     return () => clearInterval(intervalId);
   }, [currentStep, fetchPublicRooms]);
 
+  useEffect(() => {
+    if (currentStep !== "watch-rooms") return;
+
+    const intervalId = setInterval(() => {
+      void fetchPlayingRooms(false, false);
+    }, 5000);
+
+    return () => clearInterval(intervalId);
+  }, [currentStep, fetchPlayingRooms]);
+
   return {
+    fetchPlayingRooms,
     fetchPublicRooms,
     fetchRoms,
   };
