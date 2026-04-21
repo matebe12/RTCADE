@@ -34,3 +34,6 @@ server/roms/**/*.bin
 *.njsproj
 *.sln
 *.sw?
+
+# Tool artifacts
+.playwright-mcp/
