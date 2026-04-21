@@ -1,32 +1,47 @@
 ---
-description: "Use when modifying netplay sync, P2P connection, WebRTC DataChannel, resync logic, peer.ts, signaling.ts, or NetplayLobby.tsx playing state"
-applyTo: "src/netplay/**"
+description: "Use when modifying netplay sync, P2P connection, WebRTC DataChannel, resync logic, peer.ts, signaling.ts, NetplayLobby.tsx playing state, GuestVideoDisplay.tsx, or shared netplay protocol constants"
+applyTo:
+  - "src/components/NetplayLobby.tsx"
+  - "src/components/NetplayPlayingScreen.tsx"
+  - "src/components/netplay/**"
+  - "src/netplay/**"
+  - "shared/emulator-protocol.ts"
 ---
 
 # Netplay 수정 가이드
 
-## 아키텍처 제약
+## 아키텍처
 
-- **HOST = source of truth**: 상태는 항상 HOST→GUEST 단방향 전송. GUEST→HOST 상태 전송 금지
-- **서버는 시그널링만**: 게임 데이터(입력/세이브스테이트)는 반드시 DataChannel P2P로 교환
-- **입력은 즉시 적용**: 프레임 버퍼링/딜레이 없음 (과거 시도 실패, copilot-instructions.md 참조)
+- HOST가 source of truth다.
+- 서버는 WebSocket signaling만 담당하고, 게임 데이터는 DataChannel P2P로만 교환한다.
+- 현재 넷플레이는 video streaming 우선이다. HOST는 캔버스와 오디오 스트림을 보내고 GUEST는 `GuestVideoDisplay`로 렌더한다.
+- `useNetplayResyncLoop`는 `videoStreamingMode`일 때 periodic resync를 건너뛴다.
 
-## peer.ts 수정 시 주의사항
+## DataChannel 분리
 
-- `_closing` 플래그: `close()` 호출 시 자신의 `onDisconnected` 콜백 방지용. 새 disconnect 경로 추가 시 반드시 `if (!this._closing)` 가드 포함
-- DataChannel 메시지: JSON(입력/시그널)과 Binary(상태 청크)가 혼합됨. `onmessage`에서 `instanceof ArrayBuffer` 분기 필수
-- Binary 청크: 초기 상태 64KB, 리싱크 256KB. 두 스트림(`pendingState`, `pendingResync`)이 동시에 올 수 있음
-- `resetRemoteSeq()`: 리싱크 후 시퀀스 카운터 리셋 필수, 안 하면 불필요한 gap 경고 발생
+- `input`: 버튼 이벤트, unordered / unreliable.
+- `control`: `peer-ready`, `state-loaded`, `start-signal`, `resync-loaded`, `resync-failed`, `heartbeat`.
+- `state`: save-state와 resync state chunk 전송.
+- `repair`: `input-sync` held mask 보정용.
+- `chat`: 채팅 메시지와 typing 상태.
+- channel type을 추가하거나 바꾸면 `peer.ts`, hook 소비처, UI 표시 상태를 함께 맞춘다.
 
-## NetplayLobby.tsx 리싱크 수정 시 주의사항
+## peer.ts 주의사항
 
-- `resyncInProgressRef`: 3초 타임아웃 안전장치 있음. 새 resync 경로 추가 시 반드시 `false`로 리셋하는 코드 포함
-- idle 체크 제거됨: 과거 `IDLE_THRESHOLD_MS` 체크가 있었으나 격투 게임에서 resync 미실행 버그로 제거. **idle 기반 resync 다시 도입 금지**
-- `resyncActiveRef`: cleanup 시 false로 설정 + 타이머 clear 필수
+- `_closing` 가드는 disconnect 경로마다 유지한다.
+- `resetRemoteSeq(nextExpectedSeq)`는 guest resync 후 stale input을 버리기 위한 장치이므로 지우지 않는다.
+- `sendInput()`은 local held mask 갱신, input 전송, repair sync 갱신을 한 묶음으로 유지한다.
+- `startVideoStreaming()`는 renegotiation을 유발하므로 track 추가/삭제 시 `onnegotiationneeded` 흐름을 깨지 말 것.
 
-## 시그널링 메시지 추가 시
+## 동기화 훅
 
-1. `src/netplay/signaling.ts` — `SignalingMessage` 타입에 추가
-2. `src/netplay/peer.ts` — `onSignaling` switch case 추가
-3. `server/index.ts` — WebSocket 메시지 핸들러에 추가
-4. 3곳 모두 일관되게 수정
+- `useNetplaySession`는 chat, peer-room, initial sync, resync, lifecycle, history 훅을 합친 오케스트레이터다.
+- `useNetplayInitialSync`와 `useNetplayResyncLoop`는 항상 같이 본다.
+- 현재 resync는 `resyncInProgressRef`, timeout, backoff, deferred idle window를 함께 쓰는 구조다. 한 부분만 바꾸지 말고 전체를 맞춰야 한다.
+- `videoStreamingMode`가 바뀌면 `NetplayPlayingScreen`, `GuestVideoDisplay`, `useNetplayInitialSync`, `useNetplayResyncLoop`를 같이 손본다.
+- `HEARTBEAT_*` 임계값을 바꾸면 `shared/emulator-protocol.ts`와 disconnect UI도 같이 검토한다.
+
+## signaling 추가
+
+- 메시지 타입은 `src/netplay/signaling.ts`와 `server/signaling.ts`를 항상 같이 수정한다.
+- 새 signaling 타입이 room state나 UI에 영향을 주면 `useNetplayPeerFactory`, `useNetplayRoomEntry`, store도 같이 점검한다.

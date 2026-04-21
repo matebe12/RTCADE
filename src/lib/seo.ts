@@ -8,7 +8,10 @@ type PageSeoOptions = {
   noIndex?: boolean;
 };
 
-const DEFAULT_OG_IMAGE = "/game_container.png";
+const DEFAULT_OG_IMAGE = "/og_image.png";
+const DEFAULT_OG_IMAGE_ALT = "RTCADE 레트로 아케이드 쇼다운 홍보 이미지";
+const DEFAULT_OG_IMAGE_WIDTH = "662";
+const DEFAULT_OG_IMAGE_HEIGHT = "662";
 
 function updateMetaByName(name: string, content: string) {
   let element = document.head.querySelector(`meta[name="${name}"]`);
@@ -58,9 +61,13 @@ export function usePageSeo({ title, description, noIndex = false }: PageSeoOptio
     updateMetaByName("twitter:title", fullTitle);
     updateMetaByName("twitter:description", description);
     updateMetaByName("twitter:image", DEFAULT_OG_IMAGE);
+    updateMetaByName("twitter:image:alt", DEFAULT_OG_IMAGE_ALT);
     updateMetaByProperty("og:title", fullTitle);
     updateMetaByProperty("og:description", description);
     updateMetaByProperty("og:image", DEFAULT_OG_IMAGE);
+    updateMetaByProperty("og:image:width", DEFAULT_OG_IMAGE_WIDTH);
+    updateMetaByProperty("og:image:height", DEFAULT_OG_IMAGE_HEIGHT);
+    updateMetaByProperty("og:image:alt", DEFAULT_OG_IMAGE_ALT);
     updateMetaByProperty("og:url", currentUrl);
     updateCanonical(currentUrl);
   }, [description, noIndex, title]);
