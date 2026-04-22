@@ -18,6 +18,7 @@ import { useOperationsStats } from "@/hooks/useOperationsStats";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import type { PopularGameSummary } from "@/lib/operations-api";
 import { usePageSeo } from "@/lib/seo";
 import {
@@ -116,7 +117,10 @@ function PopularGamesCard({ emptyCopy, games, periodKey, title }: PopularGamesCa
                         className="size-8 rounded-full"
                         aria-label={`${game.gameName} 같이하기`}
                       >
-                        <NavLink to={buildPopularGameEntryHref("create-room", game)}>
+                        <NavLink
+                          to={buildPopularGameEntryHref("create-room", game)}
+                          title={`${game.gameName} 같이하기`}
+                        >
                           <Globe className="size-4" />
                         </NavLink>
                       </Button>
@@ -127,7 +131,10 @@ function PopularGamesCard({ emptyCopy, games, periodKey, title }: PopularGamesCa
                         className="size-8 rounded-full"
                         aria-label={`${game.gameName} 혼자하기`}
                       >
-                        <NavLink to={buildPopularGameEntryHref("solo", game)}>
+                        <NavLink
+                          to={buildPopularGameEntryHref("solo", game)}
+                          title={`${game.gameName} 혼자하기`}
+                        >
                           <Gamepad2 className="size-4" />
                         </NavLink>
                       </Button>
@@ -502,7 +509,7 @@ export default function HomePage({ hasProfile }: HomePageProps) {
             </div>
           </div>
 
-          <div className="flex h-full flex-col rounded-[24px] bg-gradient-to-br from-primary/10 via-background/70 to-background/40 px-5 py-5 lg:px-6">
+          <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-[24px] bg-gradient-to-br from-primary/10 via-background/70 to-background/40 px-5 py-5 lg:px-6">
             <div className="flex items-center justify-between gap-3">
               <div>
                 <div className="text-xs font-medium uppercase tracking-[0.2em] text-primary">
@@ -515,7 +522,7 @@ export default function HomePage({ hasProfile }: HomePageProps) {
               <Trophy className="size-5 text-primary" />
             </div>
 
-            <div className="mt-4 flex flex-1 flex-col gap-4">
+            <div className="mt-4 flex min-h-0 flex-1 flex-col gap-4">
               <div className="flex flex-wrap gap-2">
                 {popularGamesSections.map((section) => (
                   <Button
@@ -531,12 +538,16 @@ export default function HomePage({ hasProfile }: HomePageProps) {
                 ))}
               </div>
 
-              <PopularGamesCard
-                periodKey={activePopularSection.key}
-                title={activePopularSection.title}
-                games={activePopularSection.games}
-                emptyCopy={activePopularSection.emptyCopy}
-              />
+              <ScrollArea className="h-0 flex-1">
+                <div className="pr-3">
+                  <PopularGamesCard
+                    periodKey={activePopularSection.key}
+                    title={activePopularSection.title}
+                    games={activePopularSection.games}
+                    emptyCopy={activePopularSection.emptyCopy}
+                  />
+                </div>
+              </ScrollArea>
             </div>
           </div>
         </div>
