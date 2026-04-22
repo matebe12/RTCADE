@@ -14,11 +14,13 @@ import NetplayWatchingRoomsScreen from "@/components/netplay/NetplayWatchingRoom
 import NetplayWatchingScreen from "@/components/netplay/NetplayWatchingScreen";
 import SoloBrowseRomsScreen from "@/components/netplay/SoloBrowseRomsScreen";
 import SoloPlayingScreen from "@/components/netplay/SoloPlayingScreen";
+import { buildBackendUrl } from "@/lib/backend-url";
 import { getUserProfile, toggleFavoriteGame } from "@/lib/user-profile";
 import { useNetplayDiscovery } from "@/netplay/useNetplayDiscovery";
 import { useNetplaySession } from "@/netplay/useNetplaySession";
 import { useSoloSession } from "@/solo/useSoloSession";
-import { useNetplayLobbyStore } from "@/stores/useNetplayLobbyStore";
+import { type RomInfo, useNetplayLobbyStore } from "@/stores/useNetplayLobbyStore";
+import { toast } from "sonner";
 
 export default function NetplayLobby() {
   const location = useLocation();
@@ -154,6 +156,7 @@ export default function NetplayLobby() {
   // GUEST: video stream received from HOST via WebRTC
   const [guestVideoStream, setGuestVideoStream] = useState<MediaStream | null>(null);
   const handledEntryRequestRef = useRef<string | null>(null);
+  const currentLobbyStepRef = useRef(state.step);
 
   useEffect(() => {
     setVideoStreamCallbackRef.current = setGuestVideoStream;
@@ -163,47 +166,132 @@ export default function NetplayLobby() {
   }, [setVideoStreamCallbackRef]);
 
   useEffect(() => {
-    const entry = new URLSearchParams(location.search).get("entry");
+    currentLobbyStepRef.current = state.step;
+  }, [state.step]);
+
+  useEffect(() => {
+    const searchParams = new URLSearchParams(location.search);
+    const entry = searchParams.get("entry");
 
     if (!entry) {
       handledEntryRequestRef.current = null;
       return;
     }
 
-    const entryRequestKey = `${location.pathname}?${entry}`;
+    const entryRequestKey = `${location.pathname}?${searchParams.toString()}`;
     if (handledEntryRequestRef.current === entryRequestKey) {
       return;
     }
 
     handledEntryRequestRef.current = entryRequestKey;
 
-    const timerId = window.setTimeout(() => {
-      navigate(location.pathname, { replace: true });
-
-      if (state.step !== "menu") {
-        return;
-      }
-
+    const openEntryFallback = (nextEntry: "create-room" | "solo", roms?: RomInfo[]) => {
       setError("");
       setStatus("");
       setSearchQuery("");
 
-      if (entry === "solo") {
+      if (nextEntry === "solo") {
         setMode("solo");
+        if (roms) {
+          setState({ step: "solo-browse", roms });
+          return;
+        }
+
         void fetchRoms("solo");
         return;
       }
 
-      if (entry === "create-room") {
-        setMode("netplay");
-        void fetchRoms();
+      setMode("netplay");
+      if (roms) {
+        setState({ step: "browse", roms });
+        return;
       }
-    }, 0);
+
+      void fetchRoms();
+    };
+
+    let cancelled = false;
+
+    const runEntry = async () => {
+      if (currentLobbyStepRef.current !== "menu") {
+        navigate(location.pathname, { replace: true });
+        return;
+      }
+
+      if (entry !== "solo" && entry !== "create-room") {
+        navigate(location.pathname, { replace: true });
+        return;
+      }
+
+      const romPath = searchParams.get("romPath");
+      const core = searchParams.get("core");
+
+      if (!romPath || !core) {
+        openEntryFallback(entry);
+        navigate(location.pathname, { replace: true });
+        return;
+      }
+
+      try {
+        const response = await fetch(buildBackendUrl("/api/roms"));
+        if (!response.ok) {
+          throw new Error("failed");
+        }
+
+        const roms: RomInfo[] = await response.json();
+        if (cancelled) {
+          return;
+        }
+
+        const matchedRom = roms.find((rom) => rom.path === romPath && rom.core === core);
+
+        if (!matchedRom) {
+          const message = "선택한 인기 게임을 찾지 못해 목록 화면으로 이동합니다.";
+          setError(message);
+          toast(message);
+          openEntryFallback(entry, roms);
+          navigate(location.pathname, { replace: true });
+          return;
+        }
+
+        setError("");
+        setStatus("");
+        setSearchQuery("");
+
+        if (entry === "solo") {
+          setMode("solo");
+          startSoloGame(matchedRom);
+          navigate(location.pathname, { replace: true });
+          return;
+        }
+
+        setMode("netplay");
+        await handleCreateRoom(matchedRom);
+        if (cancelled) {
+          return;
+        }
+
+        navigate(location.pathname, { replace: true });
+      } catch {
+        if (cancelled) {
+          return;
+        }
+
+        const message = "게임 목록을 불러오지 못해 목록 화면으로 이동합니다.";
+        setError(message);
+        toast.error(message);
+        openEntryFallback(entry);
+        navigate(location.pathname, { replace: true });
+      }
+    };
+
+    void runEntry();
 
     return () => {
-      window.clearTimeout(timerId);
+      cancelled = true;
     };
   }, [
+    handleCreateRoom,
     fetchRoms,
     location.pathname,
     location.search,
@@ -211,8 +299,9 @@ export default function NetplayLobby() {
     setError,
     setMode,
     setSearchQuery,
+    setState,
     setStatus,
-    state.step,
+    startSoloGame,
   ]);
 
   const handleToggleFavoriteGame = useCallback(

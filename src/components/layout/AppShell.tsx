@@ -1,4 +1,4 @@
-import { ArrowRight, Bell, Globe, Home, Moon, Pin, Settings, Sun } from "lucide-react";
+import { ArrowRight, Bell, BookOpen, Globe, Home, Moon, Pin, Settings, Sun } from "lucide-react";
 import { NavLink, Outlet } from "react-router-dom";
 
 import { appEnvironment } from "@/config/environment";
@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { UserProfile } from "@/lib/user-profile";
 import { useTheme } from "@/providers/ThemeProvider";
+import { useAppTutorial } from "@/tutorial/app-tutorial-context";
 
 interface AppShellProps {
   profile: UserProfile | null;
@@ -25,6 +26,7 @@ const navigationItems = [
 export default function AppShell({ profile, onOpenProfile }: AppShellProps) {
   const { resolvedTheme, setTheme } = useTheme();
   const { error: noticeError, notices } = useOperationsNotices();
+  const { startTutorial } = useAppTutorial();
   const pinnedNotice = noticeError ? null : (notices.find((notice) => notice.isPinned) ?? null);
   const isDarkMode = resolvedTheme === "dark";
   const ThemeIcon = isDarkMode ? Sun : Moon;
@@ -70,6 +72,18 @@ export default function AppShell({ profile, onOpenProfile }: AppShellProps) {
           </nav>
 
           <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              className="h-10 w-10 rounded-full"
+              onClick={startTutorial}
+              aria-label="사용자 여정 튜토리얼 다시 보기"
+              title="사용자 여정 튜토리얼"
+            >
+              <BookOpen className="size-4" />
+            </Button>
+
             <Button
               type="button"
               variant="outline"

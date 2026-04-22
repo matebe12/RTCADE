@@ -33,8 +33,10 @@ export interface VisitorCounts {
 }
 
 export interface PopularGameRecord {
+  core: string;
   gameName: string;
   playCount: number;
+  romPath: string;
 }
 
 export interface GameMetrics {
@@ -200,26 +202,32 @@ function normalizePublishedAt(value: string | undefined) {
 
 function mapPopularGameRows(
   rows: Array<{
+    core: string;
     game_name: string;
     play_count: string;
+    rom_path: string;
   }>,
 ): PopularGameRecord[] {
   return rows.map((row) => ({
+    core: row.core,
     gameName: row.game_name,
     playCount: Number(row.play_count || "0"),
+    romPath: row.rom_path,
   }));
 }
 
 async function listPopularGames(pool: Pool, whereClause: string) {
   const result = await pool.query<{
+    core: string;
     game_name: string;
     play_count: string;
+    rom_path: string;
   }>(
     `
-      SELECT game_name, COUNT(*)::text AS play_count
+      SELECT game_name, rom_path, core, COUNT(*)::text AS play_count
       FROM game_sessions
       ${whereClause}
-      GROUP BY game_name
+      GROUP BY game_name, rom_path, core
       ORDER BY COUNT(*) DESC, MAX(started_at) DESC
       LIMIT ${POPULAR_GAMES_LIMIT}
     `,

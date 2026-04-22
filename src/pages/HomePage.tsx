@@ -8,8 +8,10 @@ import {
   Trophy,
   Users,
 } from "lucide-react";
+import { useState } from "react";
 import { NavLink } from "react-router-dom";
 
+import { SYSTEM_OPTIONS } from "@/components/EmulatorPlayer";
 import { useOperationsNotices } from "@/hooks/useOperationsNotices";
 import { useOperationsStats } from "@/hooks/useOperationsStats";
 import { Badge } from "@/components/ui/badge";
@@ -23,11 +25,12 @@ import {
   getTotalPlayedCount,
   getUserProfile,
 } from "@/lib/user-profile";
-import { useAppTutorial } from "@/tutorial/app-tutorial-context";
 
 interface HomePageProps {
   hasProfile: boolean;
 }
+
+type PopularGamesPeriod = "today" | "weekly" | "monthly";
 
 const numberFormatter = new Intl.NumberFormat("ko-KR");
 
@@ -41,39 +44,97 @@ const relativeTimeFormatter = new Intl.DateTimeFormat("ko-KR", {
 interface PopularGamesCardProps {
   emptyCopy: string;
   games: PopularGameSummary[];
+  periodKey: PopularGamesPeriod;
   title: string;
-  toneClassName: string;
 }
 
-function PopularGamesCard({ emptyCopy, games, title, toneClassName }: PopularGamesCardProps) {
+function buildPopularGameEntryHref(entry: "create-room" | "solo", game: PopularGameSummary) {
+  const searchParams = new URLSearchParams({ entry });
+
+  if (game.romPath) {
+    searchParams.set("romPath", game.romPath);
+  }
+
+  if (game.core) {
+    searchParams.set("core", game.core);
+  }
+
+  return `/netplay?${searchParams.toString()}`;
+}
+
+function getPopularGameCoreLabel(core?: string) {
+  if (!core) {
+    return null;
+  }
+
+  return SYSTEM_OPTIONS.find((system) => system.value === core)?.label ?? core;
+}
+
+function PopularGamesCard({ emptyCopy, games, periodKey, title }: PopularGamesCardProps) {
   return (
-    <div className={toneClassName}>
-      <div className="text-xs text-muted-foreground">{title}</div>
+    <div className="rounded-[24px] border border-primary/20 bg-background/80 p-4 shadow-sm shadow-primary/5">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <div className="text-xs text-muted-foreground">{title}</div>
+          <div className="mt-1 text-sm text-muted-foreground">
+            {games.length > 0
+              ? `${numberFormatter.format(games.length)}개 인기 게임에서 바로 시작할 수 있어요.`
+              : emptyCopy}
+          </div>
+        </div>
+        <Badge variant="secondary" className="w-fit text-[10px]">
+          Top 5
+        </Badge>
+      </div>
+
       {games.length > 0 ? (
-        <div className="mt-3 space-y-2">
+        <div className="mt-4 space-y-3">
           {games.map((game, index) => (
             <div
-              key={`${title}-${game.gameName}`}
-              className="flex items-start justify-between gap-3 rounded-xl border border-border/70 bg-background/55 px-3 py-2.5"
+              key={`${periodKey}-${game.gameName}-${game.romPath ?? index}-${game.core ?? "unknown"}`}
+              className="rounded-2xl border border-border/70 bg-background/55 px-3 py-3"
             >
-              <div className="flex min-w-0 items-start gap-3">
-                <span className="inline-flex size-6 shrink-0 items-center justify-center rounded-full border border-primary/20 bg-primary/10 text-[11px] font-semibold text-primary">
-                  {index + 1}
-                </span>
-                <div className="min-w-0">
-                  <div className="truncate text-sm font-medium text-foreground">
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="inline-flex size-6 shrink-0 items-center justify-center rounded-full border border-primary/20 bg-primary/10 text-[11px] font-semibold text-primary">
+                      {index + 1}
+                    </span>
+                    {getPopularGameCoreLabel(game.core) ? (
+                      <Badge variant="secondary" className="text-[10px]">
+                        {getPopularGameCoreLabel(game.core)}
+                      </Badge>
+                    ) : null}
+                    <span className="text-[11px] text-muted-foreground">
+                      {numberFormatter.format(game.playCount)}회 플레이
+                    </span>
+                  </div>
+                  <div className="mt-2 truncate text-sm font-medium text-foreground">
                     {game.gameName}
                   </div>
                 </div>
-              </div>
-              <div className="shrink-0 pt-0.5 text-[11px] text-muted-foreground">
-                {numberFormatter.format(game.playCount)}회
+
+                <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+                  <Button asChild size="sm" className="h-8 text-[11px] sm:min-w-[88px]">
+                    <NavLink to={buildPopularGameEntryHref("create-room", game)}>같이하기</NavLink>
+                  </Button>
+                  <Button
+                    asChild
+                    variant="outline"
+                    size="sm"
+                    className="h-8 text-[11px] sm:min-w-[88px]"
+                  >
+                    <NavLink to={buildPopularGameEntryHref("solo", game)}>혼자하기</NavLink>
+                  </Button>
+                </div>
               </div>
             </div>
           ))}
         </div>
       ) : (
-        <div className="mt-2 text-sm text-muted-foreground">{emptyCopy}</div>
+        <div className="mt-4 rounded-2xl border border-dashed border-border/70 bg-background/35 px-4 py-8 text-center text-sm text-muted-foreground">
+          {emptyCopy}
+        </div>
       )}
     </div>
   );
@@ -88,7 +149,6 @@ export default function HomePage({ hasProfile }: HomePageProps) {
 
   const { error: noticeError, isLoading: noticesLoading, notices } = useOperationsNotices();
   const { error: statsError, isLoading: statsLoading, stats, updatedAt } = useOperationsStats();
-  const { startTutorial } = useAppTutorial();
   const profile = getUserProfile();
   const recentGames = getRecentGames();
   const recentOpponents = getRecentOpponents();
@@ -105,6 +165,40 @@ export default function HomePage({ hasProfile }: HomePageProps) {
   const todayPopularGames = stats?.todayPopularGames ?? [];
   const weeklyPopularGames = stats?.weeklyPopularGames ?? [];
   const monthlyPopularGames = stats?.monthlyPopularGames ?? [];
+  const [activePopularPeriod, setActivePopularPeriod] = useState<PopularGamesPeriod>("today");
+
+  const popularGamesSections: Array<{
+    emptyCopy: string;
+    games: PopularGameSummary[];
+    key: PopularGamesPeriod;
+    label: string;
+    title: string;
+  }> = [
+    {
+      key: "today",
+      label: "오늘",
+      title: "오늘 가장 많이 플레이된 게임",
+      games: todayPopularGames,
+      emptyCopy: "오늘 기록이 쌓이면 자동으로 보여드려요.",
+    },
+    {
+      key: "weekly",
+      label: "이번 주",
+      title: "이번 주 가장 많이 플레이된 게임",
+      games: weeklyPopularGames,
+      emptyCopy: "주간 기록이 쌓이면 자동으로 보여드려요.",
+    },
+    {
+      key: "monthly",
+      label: "이번 달",
+      title: "이번 달 가장 많이 플레이된 게임",
+      games: monthlyPopularGames,
+      emptyCopy: "월간 기록이 쌓이면 자동으로 보여드려요.",
+    },
+  ];
+  const activePopularSection =
+    popularGamesSections.find((section) => section.key === activePopularPeriod) ??
+    popularGamesSections[0];
 
   const recentPlayDescription = recentGame
     ? recentOpponent
@@ -178,19 +272,10 @@ export default function HomePage({ hasProfile }: HomePageProps) {
             <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               <div className="flex flex-wrap gap-3">
                 <Button asChild size="lg" className="font-arcade text-[11px]">
-                  <NavLink to="/netplay?entry=create-room" data-tutorial="home-play-start">
-                    같이하기
+                  <NavLink to="/netplay" data-tutorial="home-play-start">
+                    플레이 시작
                     <ArrowRight className="size-4" />
                   </NavLink>
-                </Button>
-                <Button asChild variant="secondary" size="lg">
-                  <NavLink to="/netplay?entry=solo">
-                    혼자하기
-                    <ArrowRight className="size-4" />
-                  </NavLink>
-                </Button>
-                <Button type="button" variant="ghost" size="lg" onClick={startTutorial}>
-                  사용자 여정 튜토리얼
                 </Button>
                 <Button asChild variant="outline" size="lg">
                   <NavLink to="/notices">공지사항 보기</NavLink>
@@ -198,7 +283,7 @@ export default function HomePage({ hasProfile }: HomePageProps) {
               </div>
 
               <div className="rounded-lg border border-border/70 bg-background/60 px-3 py-2 text-xs text-muted-foreground">
-                원하는 모드로 바로 들어가서 게임을 고를 수 있어요.
+                인기 게임 목록에서 바로 같이하거나 혼자 시작할 수 있어요.
               </div>
             </div>
           </CardContent>
@@ -416,26 +501,27 @@ export default function HomePage({ hasProfile }: HomePageProps) {
               <Trophy className="size-5 text-primary" />
             </div>
 
-            <div className="mt-4 flex flex-1 flex-col gap-3">
-              <PopularGamesCard
-                title="오늘 가장 많이 플레이된 게임"
-                games={todayPopularGames}
-                emptyCopy="오늘 기록이 쌓이면 자동으로 보여드려요."
-                toneClassName="flex-1 rounded-[24px] border border-primary/20 bg-background/80 p-4 shadow-sm shadow-primary/5"
-              />
+            <div className="mt-4 flex flex-1 flex-col gap-4">
+              <div className="flex flex-wrap gap-2">
+                {popularGamesSections.map((section) => (
+                  <Button
+                    key={section.key}
+                    type="button"
+                    size="sm"
+                    variant={section.key === activePopularPeriod ? "default" : "outline"}
+                    className="h-8 rounded-full px-3 text-[11px]"
+                    onClick={() => setActivePopularPeriod(section.key)}
+                  >
+                    {section.label}
+                  </Button>
+                ))}
+              </div>
 
               <PopularGamesCard
-                title="이번 주 가장 많이 플레이된 게임"
-                games={weeklyPopularGames}
-                emptyCopy="주간 기록이 쌓이면 자동으로 보여드려요."
-                toneClassName="flex-1 rounded-[24px] border border-primary/20 bg-background/80 p-4 shadow-sm shadow-primary/5"
-              />
-
-              <PopularGamesCard
-                title="이번 달 가장 많이 플레이된 게임"
-                games={monthlyPopularGames}
-                emptyCopy="월간 기록이 쌓이면 자동으로 보여드려요."
-                toneClassName="flex-1 rounded-[24px] border border-border/70 bg-background/70 p-4"
+                periodKey={activePopularSection.key}
+                title={activePopularSection.title}
+                games={activePopularSection.games}
+                emptyCopy={activePopularSection.emptyCopy}
               />
             </div>
           </div>

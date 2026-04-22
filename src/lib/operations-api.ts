@@ -3,8 +3,10 @@ import { buildBackendUrl } from "@/lib/backend-url";
 const OPERATIONS_STATS_REFRESH_EVENT = "rtcade:operations-stats-refresh";
 
 export interface PopularGameSummary {
+  core?: string;
   gameName: string;
   playCount: number;
+  romPath?: string;
 }
 
 export interface OperationsStats {
@@ -65,15 +67,28 @@ function toPopularGameSummary(value: unknown): PopularGameSummary | null {
     return null;
   }
 
-  const candidate = value as { gameName?: unknown; playCount?: unknown };
+  const candidate = value as {
+    core?: unknown;
+    gameName?: unknown;
+    playCount?: unknown;
+    romPath?: unknown;
+  };
 
   if (typeof candidate.gameName !== "string" || candidate.gameName.trim().length === 0) {
     return null;
   }
 
   return {
+    core:
+      typeof candidate.core === "string" && candidate.core.trim().length > 0
+        ? candidate.core
+        : undefined,
     gameName: candidate.gameName,
     playCount: toNumber(candidate.playCount),
+    romPath:
+      typeof candidate.romPath === "string" && candidate.romPath.trim().length > 0
+        ? candidate.romPath
+        : undefined,
   };
 }
 
