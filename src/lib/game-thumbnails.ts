@@ -158,6 +158,7 @@ const MAME_THUMBNAIL_NAMES: Record<string, string> = {
   gradius: "Gradius (Japan, ROM version)",
   gradius2: "Gradius II - GOFER no Yabou (World, set 1)",
   gradius3: "Gradius III (World, program code R)",
+  grdians: "Guardians - Denjin Makai II",
   growl: "Growl (World)",
   gunbird: "Gunbird (World)",
   gunbird2: "Gunbird 2",
@@ -181,8 +182,10 @@ const MAME_THUMBNAIL_NAMES: Record<string, string> = {
 
   // ── J ──
   jackal: "Jackal (World, 8-way Joystick)",
+  jjsquawk: "J. J. Squawkers",
   jojo: "JoJo's Venture _ JoJo no Kimyou na Bouken (Europe 990108)",
-  jojoba: "JoJo's Bizarre Adventure_ Heritage for the Future _ JoJo no Kimyou na Bouken_ Mirai e no Isan (Japan 990927)",
+  jojoba:
+    "JoJo's Bizarre Adventure_ Heritage for the Future _ JoJo no Kimyou na Bouken_ Mirai e no Isan (Japan 990927)",
   joust: "Joust (White_Green label)",
 
   // ── K ──
@@ -230,6 +233,7 @@ const MAME_THUMBNAIL_NAMES: Record<string, string> = {
   mooncrst: "Moon Cresta (Nichibutsu)",
   moonpatr: "Moon Patrol",
   moonwlk: "Michael Jackson's Moonwalker (World)",
+  mooua: "Wild West C.O.W.-Boys of Moo Mesa (ver UA)",
   mpatrol: "Moon Patrol",
   mrdo: "Mr. Do!",
   mrdrillr: "Mr. Driller (US, DRI3_VER.A2)",
@@ -412,23 +416,14 @@ const MAME_THUMBNAIL_NAMES: Record<string, string> = {
   doapp: "Dead Or Alive++ (Japan)",
 };
 
-const THUMBNAIL_CDN_BASE =
-  "https://thumbnails.libretro.com/MAME/Named_Snaps/";
+const THUMBNAIL_CDN_BASE = "https://thumbnails.libretro.com/MAME/Named_Snaps/";
 
 /**
  * ROM shortcode에 해당하는 썸네일 이미지 URL을 반환.
  * 매핑에 없으면 null.
  */
-export function getGameThumbnailUrl(
-  filename: string,
-  core: string,
-): string | null {
-  if (
-    core !== "mame2003" &&
-    core !== "mame2003_plus" &&
-    core !== "arcade" &&
-    core !== "fbneo"
-  ) {
+export function getGameThumbnailUrl(filename: string, core: string): string | null {
+  if (core !== "mame2003" && core !== "mame2003_plus" && core !== "arcade" && core !== "fbneo") {
     return null;
   }
   const base = filename.replace(/\.\w+$/, "").toLowerCase();
