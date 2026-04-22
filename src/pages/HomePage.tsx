@@ -4,6 +4,7 @@ import {
   Bell,
   CalendarDays,
   Gamepad2,
+  Globe,
   Radio,
   Trophy,
   Users,
@@ -94,38 +95,51 @@ function PopularGamesCard({ emptyCopy, games, periodKey, title }: PopularGamesCa
               key={`${periodKey}-${game.gameName}-${game.romPath ?? index}-${game.core ?? "unknown"}`}
               className="rounded-2xl border border-border/70 bg-background/55 px-3 py-3"
             >
-              <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+              <div className="flex flex-col gap-3">
                 <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="inline-flex size-6 shrink-0 items-center justify-center rounded-full border border-primary/20 bg-primary/10 text-[11px] font-semibold text-primary">
-                      {index + 1}
-                    </span>
-                    {getPopularGameCoreLabel(game.core) ? (
-                      <Badge variant="secondary" className="text-[10px]">
-                        {getPopularGameCoreLabel(game.core)}
-                      </Badge>
-                    ) : null}
-                    <span className="text-[11px] text-muted-foreground">
-                      {numberFormatter.format(game.playCount)}회 플레이
-                    </span>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex min-w-0 flex-wrap items-center gap-2">
+                      <span className="inline-flex size-6 shrink-0 items-center justify-center rounded-full border border-primary/20 bg-primary/10 text-[11px] font-semibold text-primary">
+                        {index + 1}
+                      </span>
+                      {getPopularGameCoreLabel(game.core) ? (
+                        <Badge variant="secondary" className="text-[10px]">
+                          {getPopularGameCoreLabel(game.core)}
+                        </Badge>
+                      ) : null}
+                    </div>
+
+                    <div className="flex shrink-0 items-center gap-2">
+                      <Button
+                        asChild
+                        size="icon"
+                        className="size-8 rounded-full"
+                        aria-label={`${game.gameName} 같이하기`}
+                      >
+                        <NavLink to={buildPopularGameEntryHref("create-room", game)}>
+                          <Globe className="size-4" />
+                        </NavLink>
+                      </Button>
+                      <Button
+                        asChild
+                        variant="outline"
+                        size="icon"
+                        className="size-8 rounded-full"
+                        aria-label={`${game.gameName} 혼자하기`}
+                      >
+                        <NavLink to={buildPopularGameEntryHref("solo", game)}>
+                          <Gamepad2 className="size-4" />
+                        </NavLink>
+                      </Button>
+                    </div>
                   </div>
+
                   <div className="mt-2 truncate text-sm font-medium text-foreground">
                     {game.gameName}
                   </div>
-                </div>
-
-                <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
-                  <Button asChild size="sm" className="h-8 text-[11px] sm:min-w-[88px]">
-                    <NavLink to={buildPopularGameEntryHref("create-room", game)}>같이하기</NavLink>
-                  </Button>
-                  <Button
-                    asChild
-                    variant="outline"
-                    size="sm"
-                    className="h-8 text-[11px] sm:min-w-[88px]"
-                  >
-                    <NavLink to={buildPopularGameEntryHref("solo", game)}>혼자하기</NavLink>
-                  </Button>
+                  <div className="mt-1 text-[11px] text-muted-foreground">
+                    {numberFormatter.format(game.playCount)}회 플레이
+                  </div>
                 </div>
               </div>
             </div>
