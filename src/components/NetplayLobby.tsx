@@ -180,14 +180,7 @@ export default function NetplayLobby() {
     const timerId = window.setTimeout(() => {
       navigate(location.pathname, { replace: true });
 
-      if (
-        state.step !== "menu" ||
-        state.step === "playing" ||
-        state.step === "watching" ||
-        state.step === "waiting" ||
-        state.step === "solo-playing" ||
-        state.step === "session-summary"
-      ) {
+      if (state.step !== "menu") {
         return;
       }
 
