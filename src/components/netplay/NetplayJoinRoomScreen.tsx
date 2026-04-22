@@ -22,9 +22,18 @@ export default function NetplayJoinRoomScreen({
   onJoinRoom,
 }: NetplayJoinRoomScreenProps) {
   return (
-    <Card className="flex h-full w-full flex-col border-border/70 bg-card/95">
+    <Card
+      className="flex h-full w-full flex-col border-border/70 bg-card/95"
+      data-tutorial="netplay-join-input-panel"
+    >
       <CardHeader className="flex flex-row items-center gap-3">
-        <Button variant="ghost" size="icon" className="size-8" onClick={onBack}>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="size-8"
+          data-tutorial="join-input-back"
+          onClick={onBack}
+        >
           <ArrowLeft className="size-4" />
         </Button>
         <CardTitle className="text-sm">방 참가</CardTitle>

@@ -43,9 +43,15 @@ export default function NetplayWatchingRoomsScreen({
   onSpectateRoom,
 }: NetplayWatchingRoomsScreenProps) {
   return (
-    <Card className="w-full">
+    <Card className="w-full" data-tutorial="netplay-watch-rooms-panel">
       <CardHeader className="flex flex-row items-center gap-3 pb-3">
-        <Button variant="ghost" size="icon" className="size-8" onClick={onBack}>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="size-8"
+          data-tutorial="watch-rooms-back"
+          onClick={onBack}
+        >
           <ArrowLeft className="size-4" />
         </Button>
         <div className="flex min-w-0 flex-1 flex-col gap-1">
@@ -54,7 +60,13 @@ export default function NetplayWatchingRoomsScreen({
             지금 플레이 중인 공개 방을 관전할 수 있습니다.
           </p>
         </div>
-        <Button variant="ghost" size="icon" className="size-8" onClick={onOpenSpectateCode}>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="size-8"
+          data-tutorial="watch-rooms-open-code"
+          onClick={onOpenSpectateCode}
+        >
           <ScanSearch className="size-4" />
         </Button>
         <Button variant="ghost" size="icon" className="size-8" onClick={onRefresh}>

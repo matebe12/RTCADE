@@ -63,11 +63,13 @@ export default function NetplayMenuScreen({
       </CardHeader>
       <CardContent className="flex flex-1 flex-col gap-3">
         <div
+          data-tutorial="netplay-menu-actions"
           className={cn("flex flex-col gap-3", !hasSecondarySections && "flex-1 justify-between")}
         >
           <Button
             variant="outline"
             className={cn("w-full", !hasSecondarySections && "min-h-13")}
+            data-tutorial="netplay-open-browse"
             onClick={onOpenBrowse}
           >
             방 만들기
@@ -75,6 +77,7 @@ export default function NetplayMenuScreen({
           <Button
             variant="outline"
             className={cn("w-full", !hasSecondarySections && "min-h-13")}
+            data-tutorial="netplay-open-public-rooms"
             onClick={onOpenPublicRooms}
           >
             공개 방 둘러보기
@@ -82,6 +85,7 @@ export default function NetplayMenuScreen({
           <Button
             variant="outline"
             className={cn("w-full", !hasSecondarySections && "min-h-13")}
+            data-tutorial="netplay-open-join"
             onClick={onOpenJoinInput}
           >
             방 참가
@@ -89,6 +93,7 @@ export default function NetplayMenuScreen({
           <Button
             variant="outline"
             className={cn("w-full", !hasSecondarySections && "min-h-13")}
+            data-tutorial="netplay-open-watch-rooms"
             onClick={onOpenWatchingRooms}
           >
             관전하기

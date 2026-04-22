@@ -12,6 +12,7 @@ interface GameCardProps {
   core: string;
   systemLabel: string;
   displayName?: string;
+  dataTutorial?: string;
   disabled?: boolean;
   selected?: boolean;
   onClick?: () => void;
@@ -24,6 +25,7 @@ export function GameCard({
   core,
   systemLabel,
   displayName,
+  dataTutorial,
   disabled = false,
   selected,
   onClick,
@@ -38,6 +40,7 @@ export function GameCard({
 
   return (
     <div
+      data-tutorial={dataTutorial}
       className={cn(
         "flex w-full items-start gap-3 rounded-lg border p-3 text-left transition-all",
         !disabled && "hover:bg-accent hover:border-primary/30",

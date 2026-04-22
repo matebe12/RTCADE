@@ -15,6 +15,7 @@ import { useOperationsStats } from "@/hooks/useOperationsStats";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import type { PopularGameSummary } from "@/lib/operations-api";
 import { usePageSeo } from "@/lib/seo";
 import {
   getRecentGames,
@@ -22,6 +23,7 @@ import {
   getTotalPlayedCount,
   getUserProfile,
 } from "@/lib/user-profile";
+import { useAppTutorial } from "@/tutorial/app-tutorial-context";
 
 interface HomePageProps {
   hasProfile: boolean;
@@ -36,6 +38,47 @@ const relativeTimeFormatter = new Intl.DateTimeFormat("ko-KR", {
   day: "numeric",
 });
 
+interface PopularGamesCardProps {
+  emptyCopy: string;
+  games: PopularGameSummary[];
+  title: string;
+  toneClassName: string;
+}
+
+function PopularGamesCard({ emptyCopy, games, title, toneClassName }: PopularGamesCardProps) {
+  return (
+    <div className={toneClassName}>
+      <div className="text-xs text-muted-foreground">{title}</div>
+      {games.length > 0 ? (
+        <div className="mt-3 space-y-2">
+          {games.map((game, index) => (
+            <div
+              key={`${title}-${game.gameName}`}
+              className="flex items-start justify-between gap-3 rounded-xl border border-border/70 bg-background/55 px-3 py-2.5"
+            >
+              <div className="flex min-w-0 items-start gap-3">
+                <span className="inline-flex size-6 shrink-0 items-center justify-center rounded-full border border-primary/20 bg-primary/10 text-[11px] font-semibold text-primary">
+                  {index + 1}
+                </span>
+                <div className="min-w-0">
+                  <div className="truncate text-sm font-medium text-foreground">
+                    {game.gameName}
+                  </div>
+                </div>
+              </div>
+              <div className="shrink-0 pt-0.5 text-[11px] text-muted-foreground">
+                {numberFormatter.format(game.playCount)}회
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="mt-2 text-sm text-muted-foreground">{emptyCopy}</div>
+      )}
+    </div>
+  );
+}
+
 export default function HomePage({ hasProfile }: HomePageProps) {
   usePageSeo({
     title: "홈",
@@ -45,6 +88,7 @@ export default function HomePage({ hasProfile }: HomePageProps) {
 
   const { error: noticeError, isLoading: noticesLoading, notices } = useOperationsNotices();
   const { error: statsError, isLoading: statsLoading, stats, updatedAt } = useOperationsStats();
+  const { startTutorial } = useAppTutorial();
   const profile = getUserProfile();
   const recentGames = getRecentGames();
   const recentOpponents = getRecentOpponents();
@@ -58,9 +102,9 @@ export default function HomePage({ hasProfile }: HomePageProps) {
   const soloSessions = stats?.soloSessions ?? 0;
   const openRooms = stats?.openRooms ?? 0;
   const waitingRooms = stats?.waitingRooms ?? 0;
-  const todayPopularGame = stats?.todayPopularGame;
-  const weeklyPopularGame = stats?.weeklyPopularGame;
-  const monthlyPopularGame = stats?.monthlyPopularGame;
+  const todayPopularGames = stats?.todayPopularGames ?? [];
+  const weeklyPopularGames = stats?.weeklyPopularGames ?? [];
+  const monthlyPopularGames = stats?.monthlyPopularGames ?? [];
 
   const recentPlayDescription = recentGame
     ? recentOpponent
@@ -134,10 +178,19 @@ export default function HomePage({ hasProfile }: HomePageProps) {
             <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               <div className="flex flex-wrap gap-3">
                 <Button asChild size="lg" className="font-arcade text-[11px]">
-                  <NavLink to="/netplay">
-                    플레이 시작
+                  <NavLink to="/netplay?entry=create-room" data-tutorial="home-play-start">
+                    같이하기
                     <ArrowRight className="size-4" />
                   </NavLink>
+                </Button>
+                <Button asChild variant="secondary" size="lg">
+                  <NavLink to="/netplay?entry=solo">
+                    혼자하기
+                    <ArrowRight className="size-4" />
+                  </NavLink>
+                </Button>
+                <Button type="button" variant="ghost" size="lg" onClick={startTutorial}>
+                  사용자 여정 튜토리얼
                 </Button>
                 <Button asChild variant="outline" size="lg">
                   <NavLink to="/notices">공지사항 보기</NavLink>
@@ -145,7 +198,7 @@ export default function HomePage({ hasProfile }: HomePageProps) {
               </div>
 
               <div className="rounded-lg border border-border/70 bg-background/60 px-3 py-2 text-xs text-muted-foreground">
-                기록은 최근 플레이 순서대로 자동으로 정리돼요.
+                원하는 모드로 바로 들어가서 게임을 고를 수 있어요.
               </div>
             </div>
           </CardContent>
@@ -250,8 +303,7 @@ export default function HomePage({ hasProfile }: HomePageProps) {
             <div className="grid gap-4 md:grid-cols-3">
               <div className="rounded-[22px] border border-primary/15 bg-background/80 px-5 py-5 shadow-sm shadow-primary/5 lg:px-6">
                 <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-                  <Users className="size-3.5 text-primary" />
-                  총 방문자
+                  <Users className="size-3.5 text-primary" />총 방문자
                 </div>
                 <div className="mt-3 text-4xl font-semibold tracking-tight text-foreground lg:text-5xl">
                   {stats ? `${numberFormatter.format(stats.totalVisitors)}명` : "--"}
@@ -280,8 +332,7 @@ export default function HomePage({ hasProfile }: HomePageProps) {
 
               <div className="rounded-[22px] border border-primary/15 bg-background/80 px-5 py-5 shadow-sm shadow-primary/5 lg:px-6">
                 <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-                  <Gamepad2 className="size-3.5 text-primary" />
-                  총 플레이 게임
+                  <Gamepad2 className="size-3.5 text-primary" />총 플레이 게임
                 </div>
                 <div className="mt-3 text-4xl font-semibold tracking-tight text-foreground lg:text-5xl">
                   {stats ? `${numberFormatter.format(stats.totalGames)}판` : "--"}
@@ -307,7 +358,8 @@ export default function HomePage({ hasProfile }: HomePageProps) {
                       {stats ? `${numberFormatter.format(activeNetplayRooms)}개` : "--"}
                     </div>
                     <div className="mt-1 text-xs text-muted-foreground">
-                      열린 방 {numberFormatter.format(openRooms)}개 · 대기 {numberFormatter.format(waitingRooms)}개
+                      열린 방 {numberFormatter.format(openRooms)}개 · 대기{" "}
+                      {numberFormatter.format(waitingRooms)}개
                     </div>
                   </div>
                   <div className="rounded-2xl border border-border/70 bg-card/80 p-4">
@@ -349,7 +401,6 @@ export default function HomePage({ hasProfile }: HomePageProps) {
                 </div>
               </div>
             </div>
-
           </div>
 
           <div className="flex h-full flex-col rounded-[24px] bg-gradient-to-br from-primary/10 via-background/70 to-background/40 px-5 py-5 lg:px-6">
@@ -358,52 +409,38 @@ export default function HomePage({ hasProfile }: HomePageProps) {
                 <div className="text-xs font-medium uppercase tracking-[0.2em] text-primary">
                   Popular Now
                 </div>
-                <div className="mt-1 text-lg font-semibold text-foreground">인기 게임 스포트라이트</div>
+                <div className="mt-1 text-lg font-semibold text-foreground">
+                  인기 게임 스포트라이트
+                </div>
               </div>
               <Trophy className="size-5 text-primary" />
             </div>
 
             <div className="mt-4 flex flex-1 flex-col gap-3">
-              <div className="flex-1 rounded-[24px] border border-primary/20 bg-background/80 p-4 shadow-sm shadow-primary/5">
-                <div className="text-xs text-muted-foreground">오늘 가장 많이 플레이된 게임</div>
-                <div className="mt-2 text-xl font-semibold leading-snug text-foreground lg:text-2xl">
-                  {todayPopularGame?.gameName ?? "아직 없어요."}
-                </div>
-                <div className="mt-2 text-sm text-muted-foreground">
-                  {todayPopularGame
-                    ? `오늘 ${numberFormatter.format(todayPopularGame.playCount)}번 플레이됐어요.`
-                    : "오늘 기록이 쌓이면 자동으로 보여드려요."}
-                </div>
-              </div>
+              <PopularGamesCard
+                title="오늘 가장 많이 플레이된 게임"
+                games={todayPopularGames}
+                emptyCopy="오늘 기록이 쌓이면 자동으로 보여드려요."
+                toneClassName="flex-1 rounded-[24px] border border-primary/20 bg-background/80 p-4 shadow-sm shadow-primary/5"
+              />
 
-              <div className="flex-1 rounded-[24px] border border-primary/20 bg-background/80 p-4 shadow-sm shadow-primary/5">
-                <div className="text-xs text-muted-foreground">이번 주 가장 많이 플레이된 게임</div>
-                <div className="mt-2 text-xl font-semibold leading-snug text-foreground lg:text-2xl">
-                  {weeklyPopularGame?.gameName ?? "아직 없어요."}
-                </div>
-                <div className="mt-2 text-sm text-muted-foreground">
-                  {weeklyPopularGame
-                    ? `${numberFormatter.format(weeklyPopularGame.playCount)}번 플레이됐어요.`
-                    : "주간 기록이 쌓이면 자동으로 보여드려요."}
-                </div>
-              </div>
+              <PopularGamesCard
+                title="이번 주 가장 많이 플레이된 게임"
+                games={weeklyPopularGames}
+                emptyCopy="주간 기록이 쌓이면 자동으로 보여드려요."
+                toneClassName="flex-1 rounded-[24px] border border-primary/20 bg-background/80 p-4 shadow-sm shadow-primary/5"
+              />
 
-              <div className="flex-1 rounded-[24px] border border-border/70 bg-background/70 p-4">
-                <div className="text-xs text-muted-foreground">이번 달 가장 많이 플레이된 게임</div>
-                <div className="mt-2 text-xl font-semibold leading-snug text-foreground lg:text-2xl">
-                  {monthlyPopularGame?.gameName ?? "아직 없어요."}
-                </div>
-                <div className="mt-2 text-sm text-muted-foreground">
-                  {monthlyPopularGame
-                    ? `${numberFormatter.format(monthlyPopularGame.playCount)}번 플레이됐어요.`
-                    : "월간 기록이 쌓이면 자동으로 보여드려요."}
-                </div>
-              </div>
+              <PopularGamesCard
+                title="이번 달 가장 많이 플레이된 게임"
+                games={monthlyPopularGames}
+                emptyCopy="월간 기록이 쌓이면 자동으로 보여드려요."
+                toneClassName="flex-1 rounded-[24px] border border-border/70 bg-background/70 p-4"
+              />
             </div>
           </div>
         </div>
       </section>
-
     </div>
   );
 }

@@ -1,5 +1,5 @@
-import { type ReactElement, useCallback, useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { type ReactElement, useCallback, useEffect, useRef, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 
 import NetplaySessionSummary from "./NetplaySessionSummary";
 import NetplayBrowseRomsScreen from "@/components/netplay/NetplayBrowseRomsScreen";
@@ -21,6 +21,7 @@ import { useSoloSession } from "@/solo/useSoloSession";
 import { useNetplayLobbyStore } from "@/stores/useNetplayLobbyStore";
 
 export default function NetplayLobby() {
+  const location = useLocation();
   const navigate = useNavigate();
   const {
     mode,
@@ -152,6 +153,7 @@ export default function NetplayLobby() {
 
   // GUEST: video stream received from HOST via WebRTC
   const [guestVideoStream, setGuestVideoStream] = useState<MediaStream | null>(null);
+  const handledEntryRequestRef = useRef<string | null>(null);
 
   useEffect(() => {
     setVideoStreamCallbackRef.current = setGuestVideoStream;
@@ -159,6 +161,66 @@ export default function NetplayLobby() {
       setVideoStreamCallbackRef.current = null;
     };
   }, [setVideoStreamCallbackRef]);
+
+  useEffect(() => {
+    const entry = new URLSearchParams(location.search).get("entry");
+
+    if (!entry) {
+      handledEntryRequestRef.current = null;
+      return;
+    }
+
+    const entryRequestKey = `${location.pathname}?${entry}`;
+    if (handledEntryRequestRef.current === entryRequestKey) {
+      return;
+    }
+
+    handledEntryRequestRef.current = entryRequestKey;
+
+    const timerId = window.setTimeout(() => {
+      navigate(location.pathname, { replace: true });
+
+      if (
+        state.step !== "menu" ||
+        state.step === "playing" ||
+        state.step === "watching" ||
+        state.step === "waiting" ||
+        state.step === "solo-playing" ||
+        state.step === "session-summary"
+      ) {
+        return;
+      }
+
+      setError("");
+      setStatus("");
+      setSearchQuery("");
+
+      if (entry === "solo") {
+        setMode("solo");
+        void fetchRoms("solo");
+        return;
+      }
+
+      if (entry === "create-room") {
+        setMode("netplay");
+        void fetchRoms();
+      }
+    }, 0);
+
+    return () => {
+      window.clearTimeout(timerId);
+    };
+  }, [
+    fetchRoms,
+    location.pathname,
+    location.search,
+    navigate,
+    setError,
+    setMode,
+    setSearchQuery,
+    setStatus,
+    state.step,
+  ]);
 
   const handleToggleFavoriteGame = useCallback(
     (romPath: string) => {

@@ -31,9 +31,15 @@ export default function NetplayPublicRoomsScreen({
   onJoinRoom,
 }: NetplayPublicRoomsScreenProps) {
   return (
-    <Card className="w-full">
+    <Card className="w-full" data-tutorial="netplay-public-rooms-panel">
       <CardHeader className="flex flex-row items-center gap-3 pb-3">
-        <Button variant="ghost" size="icon" className="size-8" onClick={onBack}>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="size-8"
+          data-tutorial="public-rooms-back"
+          onClick={onBack}
+        >
           <ArrowLeft className="size-4" />
         </Button>
         <div className="flex min-w-0 flex-1 flex-col gap-1">

@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { usePageSeo } from "@/lib/seo";
 import type { UserProfile } from "@/lib/user-profile";
+import { useAppTutorial } from "@/tutorial/app-tutorial-context";
 import { useTheme, type ThemePreference } from "@/providers/ThemeProvider";
 
 interface SettingsPageProps {
@@ -58,6 +59,7 @@ export default function SettingsPage({ profile, onOpenProfile }: SettingsPagePro
   });
 
   const { theme, resolvedTheme, setTheme } = useTheme();
+  const { startTutorial } = useAppTutorial();
 
   return (
     <div className="grid w-full gap-4 lg:grid-cols-[0.8fr_1.2fr]">
@@ -86,6 +88,17 @@ export default function SettingsPage({ profile, onOpenProfile }: SettingsPagePro
           <Button onClick={onOpenProfile} className="w-full">
             {profile ? "프로필 다시 설정" : "프로필 설정"}
           </Button>
+          <div className="rounded-lg border border-border/70 bg-background/40 p-4">
+            <div className="space-y-1">
+              <p className="text-sm font-medium text-foreground">사용자 여정 튜토리얼</p>
+              <p className="text-sm text-muted-foreground">
+                플레이 시작부터 혼자하기 실제 실행과 조작 안내까지 다시 따라볼 수 있습니다.
+              </p>
+            </div>
+            <Button type="button" variant="outline" className="mt-3 w-full" onClick={startTutorial}>
+              튜토리얼 다시 보기
+            </Button>
+          </div>
         </CardContent>
       </Card>
 

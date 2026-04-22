@@ -38,10 +38,13 @@ export interface PopularGameRecord {
 }
 
 export interface GameMetrics {
+  monthlyPopularGames: PopularGameRecord[];
   monthlyPopularGame: PopularGameRecord | null;
+  todayPopularGames: PopularGameRecord[];
   todayPopularGame: PopularGameRecord | null;
   todayGames: number;
   totalGames: number;
+  weeklyPopularGames: PopularGameRecord[];
   weeklyPopularGame: PopularGameRecord | null;
 }
 
@@ -69,12 +72,17 @@ const DEFAULT_COUNTS: VisitorCounts = {
 };
 
 const DEFAULT_GAME_METRICS: GameMetrics = {
+  monthlyPopularGames: [],
   monthlyPopularGame: null,
+  todayPopularGames: [],
   todayPopularGame: null,
   todayGames: 0,
   totalGames: 0,
+  weeklyPopularGames: [],
   weeklyPopularGame: null,
 };
+
+const POPULAR_GAMES_LIMIT = 5;
 
 const DEFAULT_NOTICES = [
   {
@@ -190,22 +198,34 @@ function normalizePublishedAt(value: string | undefined) {
   return value ? new Date(value) : new Date();
 }
 
-function mapPopularGameRow(
-  row:
-    | {
-        game_name: string;
-        play_count: string;
-      }
-    | undefined,
-): PopularGameRecord | null {
-  if (!row) {
-    return null;
-  }
-
-  return {
+function mapPopularGameRows(
+  rows: Array<{
+    game_name: string;
+    play_count: string;
+  }>,
+): PopularGameRecord[] {
+  return rows.map((row) => ({
     gameName: row.game_name,
     playCount: Number(row.play_count || "0"),
-  };
+  }));
+}
+
+async function listPopularGames(pool: Pool, whereClause: string) {
+  const result = await pool.query<{
+    game_name: string;
+    play_count: string;
+  }>(
+    `
+      SELECT game_name, COUNT(*)::text AS play_count
+      FROM game_sessions
+      ${whereClause}
+      GROUP BY game_name
+      ORDER BY COUNT(*) DESC, MAX(started_at) DESC
+      LIMIT ${POPULAR_GAMES_LIMIT}
+    `,
+  );
+
+  return mapPopularGameRows(result.rows);
 }
 
 async function seedDefaultNotices(pool: Pool) {
@@ -291,52 +311,28 @@ export function createOperationsDatabase(databaseUrl: string | null): Operations
         const totalGamesResult = await pool!.query<{ count: string }>(
           "SELECT COUNT(*)::text AS count FROM game_sessions",
         );
-        const todayPopularGameResult = await pool!.query<{
-          game_name: string;
-          play_count: string;
-        }>(
-          `
-            SELECT game_name, COUNT(*)::text AS play_count
-            FROM game_sessions
-            WHERE started_at::date = CURRENT_DATE
-            GROUP BY game_name
-            ORDER BY COUNT(*) DESC, MAX(started_at) DESC
-            LIMIT 1
-          `,
+        const todayPopularGames = await listPopularGames(
+          pool!,
+          "WHERE started_at::date = CURRENT_DATE",
         );
-        const weeklyPopularGameResult = await pool!.query<{
-          game_name: string;
-          play_count: string;
-        }>(
-          `
-            SELECT game_name, COUNT(*)::text AS play_count
-            FROM game_sessions
-            WHERE started_at >= NOW() - INTERVAL '7 days'
-            GROUP BY game_name
-            ORDER BY COUNT(*) DESC, MAX(started_at) DESC
-            LIMIT 1
-          `,
+        const weeklyPopularGames = await listPopularGames(
+          pool!,
+          "WHERE started_at >= NOW() - INTERVAL '7 days'",
         );
-        const monthlyPopularGameResult = await pool!.query<{
-          game_name: string;
-          play_count: string;
-        }>(
-          `
-            SELECT game_name, COUNT(*)::text AS play_count
-            FROM game_sessions
-            WHERE started_at >= NOW() - INTERVAL '30 days'
-            GROUP BY game_name
-            ORDER BY COUNT(*) DESC, MAX(started_at) DESC
-            LIMIT 1
-          `,
+        const monthlyPopularGames = await listPopularGames(
+          pool!,
+          "WHERE started_at >= NOW() - INTERVAL '30 days'",
         );
 
         return {
-          monthlyPopularGame: mapPopularGameRow(monthlyPopularGameResult.rows[0]),
-          todayPopularGame: mapPopularGameRow(todayPopularGameResult.rows[0]),
+          monthlyPopularGames,
+          monthlyPopularGame: monthlyPopularGames[0] ?? null,
+          todayPopularGames,
+          todayPopularGame: todayPopularGames[0] ?? null,
           todayGames: Number(todayGamesResult.rows[0]?.count || "0"),
           totalGames: Number(totalGamesResult.rows[0]?.count || "0"),
-          weeklyPopularGame: mapPopularGameRow(weeklyPopularGameResult.rows[0]),
+          weeklyPopularGames,
+          weeklyPopularGame: weeklyPopularGames[0] ?? null,
         };
       }, DEFAULT_GAME_METRICS),
     get isEnabled() {

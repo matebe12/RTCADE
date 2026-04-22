@@ -88,7 +88,12 @@ export default function SoloBrowseRomsScreen({
 
   const categoryCounts = useMemo(() => {
     const counts: Record<GameCategory, number> = {
-      fighting: 0, action: 0, shooting: 0, puzzle: 0, sports: 0, etc: 0,
+      fighting: 0,
+      action: 0,
+      shooting: 0,
+      puzzle: 0,
+      sports: 0,
+      etc: 0,
     };
     browseRoms.forEach((rom) => {
       counts[getRomCategory(rom.filename, rom.core)]++;
@@ -111,6 +116,8 @@ export default function SoloBrowseRomsScreen({
         : browseRoms,
     [browseRoms, categoryFilter],
   );
+  const recommendedRomPath =
+    recentRoms[0]?.path ?? favoriteRoms[0]?.path ?? filteredBrowseRoms[0]?.path ?? null;
 
   const categoryGroups = useMemo(() => {
     if (isSearching || categoryFilter) return [];
@@ -138,7 +145,7 @@ export default function SoloBrowseRomsScreen({
   }, [browseRoms, isSearching, categoryFilter]);
 
   return (
-    <Card className="w-full border-border/70 bg-card/95">
+    <Card className="w-full border-border/70 bg-card/95" data-tutorial="solo-browse-panel">
       <CardHeader className="flex flex-row items-center gap-3 pb-3">
         <Button variant="ghost" size="icon" className="size-8" onClick={onBack}>
           <ArrowLeft className="size-4" />
@@ -212,6 +219,9 @@ export default function SoloBrowseRomsScreen({
                       core={rom.core}
                       systemLabel={sys?.label || rom.core}
                       displayName={rom.displayName}
+                      dataTutorial={
+                        rom.path === recommendedRomPath ? "solo-primary-game" : undefined
+                      }
                       favorite={favoriteGames.includes(rom.path)}
                       disabled={isStarting}
                       selected={startingRomPath === rom.path}
@@ -237,6 +247,9 @@ export default function SoloBrowseRomsScreen({
                       filename={rom.filename}
                       core={rom.core}
                       systemLabel={sys?.label || rom.core}
+                      dataTutorial={
+                        rom.path === recommendedRomPath ? "solo-primary-game" : undefined
+                      }
                       disabled={isStarting}
                       selected={startingRomPath === rom.path}
                       favorite={true}
@@ -256,29 +269,27 @@ export default function SoloBrowseRomsScreen({
             )}
 
             {/* 카테고리별 그룹 (검색/필터 없을 때) */}
-            {!isSearching && !categoryFilter &&
+            {!isSearching &&
+              !categoryFilter &&
               categoryGroups.map((group) => {
                 return (
                   <div key={group.category} className="flex flex-col gap-2 pb-2">
                     <div className="flex items-center gap-1.5 pt-2">
                       <span className="text-xs">{group.icon}</span>
-                      <p className="text-xs font-medium text-foreground">
-                        {group.label}
-                      </p>
-                      <span className="text-[10px] text-muted-foreground">
-                        {group.roms.length}
-                      </span>
+                      <p className="text-xs font-medium text-foreground">{group.label}</p>
+                      <span className="text-[10px] text-muted-foreground">{group.roms.length}</span>
                     </div>
                     {group.roms.map((rom) => {
-                      const sys = SYSTEM_OPTIONS.find(
-                        (system) => system.value === rom.core,
-                      );
+                      const sys = SYSTEM_OPTIONS.find((system) => system.value === rom.core);
                       return (
                         <GameCard
                           key={rom.path}
                           filename={rom.filename}
                           core={rom.core}
                           systemLabel={sys?.label || rom.core}
+                          dataTutorial={
+                            rom.path === recommendedRomPath ? "solo-primary-game" : undefined
+                          }
                           disabled={isStarting}
                           selected={startingRomPath === rom.path}
                           favorite={favoriteGames.includes(rom.path)}
@@ -294,15 +305,14 @@ export default function SoloBrowseRomsScreen({
             {/* 카테고리 필터 또는 검색 결과 (플랫 리스트) */}
             {(isSearching || categoryFilter) &&
               filteredBrowseRoms.map((rom) => {
-                const sys = SYSTEM_OPTIONS.find(
-                  (system) => system.value === rom.core,
-                );
+                const sys = SYSTEM_OPTIONS.find((system) => system.value === rom.core);
                 return (
                   <GameCard
                     key={rom.path}
                     filename={rom.filename}
                     core={rom.core}
                     systemLabel={sys?.label || rom.core}
+                    dataTutorial={rom.path === recommendedRomPath ? "solo-primary-game" : undefined}
                     disabled={isStarting}
                     selected={startingRomPath === rom.path}
                     favorite={favoriteGames.includes(rom.path)}
@@ -314,7 +324,11 @@ export default function SoloBrowseRomsScreen({
 
             {(isSearching || categoryFilter ? filteredBrowseRoms : browseRoms).length === 0 && (
               <p className="py-8 text-center text-xs text-muted-foreground">
-                {isSearching ? "검색 결과가 없습니다" : categoryFilter ? "해당 카테고리에 게임이 없습니다" : "표시할 다른 게임이 없습니다"}
+                {isSearching
+                  ? "검색 결과가 없습니다"
+                  : categoryFilter
+                    ? "해당 카테고리에 게임이 없습니다"
+                    : "표시할 다른 게임이 없습니다"}
               </p>
             )}
           </div>
