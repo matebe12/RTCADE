@@ -511,7 +511,10 @@ export default function HomePage({ hasProfile }: HomePageProps) {
             </div>
           </div>
 
-          <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-[24px] bg-gradient-to-br from-primary/10 via-background/70 to-background/40 px-5 py-5 lg:px-6">
+          <aside
+            className="flex h-full min-h-0 flex-col overflow-hidden rounded-[24px] bg-gradient-to-br from-primary/10 via-background/70 to-background/40 px-5 py-5 lg:px-6"
+            aria-label="인기 게임 스포트라이트"
+          >
             <div className="flex items-center justify-between gap-3">
               <div>
                 <div className="text-xs font-medium uppercase tracking-[0.2em] text-primary">
@@ -547,7 +550,7 @@ export default function HomePage({ hasProfile }: HomePageProps) {
                 emptyCopy={activePopularSection.emptyCopy}
               />
             </div>
-          </div>
+          </aside>
         </div>
       </section>
     </div>
