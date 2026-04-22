@@ -74,7 +74,7 @@ function getPopularGameCoreLabel(core?: string) {
 
 function PopularGamesCard({ emptyCopy, games, periodKey, title }: PopularGamesCardProps) {
   return (
-    <div className="rounded-[24px] border border-primary/20 bg-background/80 p-4 shadow-sm shadow-primary/5">
+    <div className="flex h-full flex-col rounded-[24px] border border-primary/20 bg-background/80 p-4 shadow-sm shadow-primary/5">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <div className="text-xs text-muted-foreground">{title}</div>
@@ -90,68 +90,70 @@ function PopularGamesCard({ emptyCopy, games, periodKey, title }: PopularGamesCa
       </div>
 
       {games.length > 0 ? (
-        <div className="mt-4 space-y-3">
-          {games.map((game, index) => (
-            <div
-              key={`${periodKey}-${game.gameName}-${game.romPath ?? index}-${game.core ?? "unknown"}`}
-              className="rounded-2xl border border-border/70 bg-background/55 px-3 py-3"
-            >
-              <div className="flex flex-col gap-3">
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex min-w-0 flex-wrap items-center gap-2">
-                      <span className="inline-flex size-6 shrink-0 items-center justify-center rounded-full border border-primary/20 bg-primary/10 text-[11px] font-semibold text-primary">
-                        {index + 1}
-                      </span>
-                      {getPopularGameCoreLabel(game.core) ? (
-                        <Badge variant="secondary" className="text-[10px]">
-                          {getPopularGameCoreLabel(game.core)}
-                        </Badge>
-                      ) : null}
+        <ScrollArea className="mt-4 min-h-0 flex-1">
+          <div className="space-y-3 pr-3">
+            {games.map((game, index) => (
+              <div
+                key={`${periodKey}-${game.gameName}-${game.romPath ?? index}-${game.core ?? "unknown"}`}
+                className="rounded-2xl border border-border/70 bg-background/55 px-3 py-3"
+              >
+                <div className="flex flex-col gap-3">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex min-w-0 flex-wrap items-center gap-2">
+                        <span className="inline-flex size-6 shrink-0 items-center justify-center rounded-full border border-primary/20 bg-primary/10 text-[11px] font-semibold text-primary">
+                          {index + 1}
+                        </span>
+                        {getPopularGameCoreLabel(game.core) ? (
+                          <Badge variant="secondary" className="text-[10px]">
+                            {getPopularGameCoreLabel(game.core)}
+                          </Badge>
+                        ) : null}
+                      </div>
+
+                      <div className="flex shrink-0 items-center gap-2">
+                        <Button
+                          asChild
+                          size="icon"
+                          className="size-8 rounded-full"
+                          aria-label={`${game.gameName} 같이하기`}
+                        >
+                          <NavLink
+                            to={buildPopularGameEntryHref("create-room", game)}
+                            title={`${game.gameName} 같이하기`}
+                          >
+                            <Globe className="size-4" />
+                          </NavLink>
+                        </Button>
+                        <Button
+                          asChild
+                          variant="outline"
+                          size="icon"
+                          className="size-8 rounded-full"
+                          aria-label={`${game.gameName} 혼자하기`}
+                        >
+                          <NavLink
+                            to={buildPopularGameEntryHref("solo", game)}
+                            title={`${game.gameName} 혼자하기`}
+                          >
+                            <Gamepad2 className="size-4" />
+                          </NavLink>
+                        </Button>
+                      </div>
                     </div>
 
-                    <div className="flex shrink-0 items-center gap-2">
-                      <Button
-                        asChild
-                        size="icon"
-                        className="size-8 rounded-full"
-                        aria-label={`${game.gameName} 같이하기`}
-                      >
-                        <NavLink
-                          to={buildPopularGameEntryHref("create-room", game)}
-                          title={`${game.gameName} 같이하기`}
-                        >
-                          <Globe className="size-4" />
-                        </NavLink>
-                      </Button>
-                      <Button
-                        asChild
-                        variant="outline"
-                        size="icon"
-                        className="size-8 rounded-full"
-                        aria-label={`${game.gameName} 혼자하기`}
-                      >
-                        <NavLink
-                          to={buildPopularGameEntryHref("solo", game)}
-                          title={`${game.gameName} 혼자하기`}
-                        >
-                          <Gamepad2 className="size-4" />
-                        </NavLink>
-                      </Button>
+                    <div className="mt-2 truncate text-sm font-medium text-foreground">
+                      {game.gameName}
                     </div>
-                  </div>
-
-                  <div className="mt-2 truncate text-sm font-medium text-foreground">
-                    {game.gameName}
-                  </div>
-                  <div className="mt-1 text-[11px] text-muted-foreground">
-                    {numberFormatter.format(game.playCount)}회 플레이
+                    <div className="mt-1 text-[11px] text-muted-foreground">
+                      {numberFormatter.format(game.playCount)}회 플레이
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        </ScrollArea>
       ) : (
         <div className="mt-4 rounded-2xl border border-dashed border-border/70 bg-background/35 px-4 py-8 text-center text-sm text-muted-foreground">
           {emptyCopy}
@@ -538,16 +540,12 @@ export default function HomePage({ hasProfile }: HomePageProps) {
                 ))}
               </div>
 
-              <ScrollArea className="h-0 flex-1">
-                <div className="pr-3">
-                  <PopularGamesCard
-                    periodKey={activePopularSection.key}
-                    title={activePopularSection.title}
-                    games={activePopularSection.games}
-                    emptyCopy={activePopularSection.emptyCopy}
-                  />
-                </div>
-              </ScrollArea>
+              <PopularGamesCard
+                periodKey={activePopularSection.key}
+                title={activePopularSection.title}
+                games={activePopularSection.games}
+                emptyCopy={activePopularSection.emptyCopy}
+              />
             </div>
           </div>
         </div>
