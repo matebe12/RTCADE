@@ -1,2 +1,4 @@
 User-agent: *
 Allow: /
+
+Sitemap: https://rtcade.vercel.app/sitemap.xml
