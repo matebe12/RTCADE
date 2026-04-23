@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, type MutableRefObject, type RefObject } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  type MutableRefObject,
+  type RefObject,
+} from "react";
 
 import type { NetplayChatMessage } from "@/components/NetplayChatPanel";
 import { createEmulatorRuntimeBridge } from "@/lib/emulator-runtime-bridge";
@@ -137,7 +144,7 @@ export function useNetplayChatControls({
   }, [chatChannelState, chatOpen]);
 
   useEffect(() => {
-    if (currentStep !== "playing") return undefined;
+    if (currentStep !== "playing" && currentStep !== "watching") return undefined;
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (
@@ -233,7 +240,7 @@ export function useNetplayChatControls({
   }, [chatOpen, handleChatCancel, focusChatComposer]);
 
   const handleChatShortcut = useCallback(() => {
-    if (currentStep !== "playing") return;
+    if (currentStep !== "playing" && currentStep !== "watching") return;
     focusChatComposer();
   }, [currentStep, focusChatComposer]);
 
@@ -242,7 +249,9 @@ export function useNetplayChatControls({
       appendChatMessage({ ...message, sender: "remote" });
       if (!chatOpenRef.current) {
         incrementUnreadChatCount();
-        toast(`${opponentProfileRef.current?.nickname || "상대방"}: ${message.text}`);
+        toast(
+          `${message.authorName || opponentProfileRef.current?.nickname || "상대방"}: ${message.text}`,
+        );
       }
     },
     [appendChatMessage, incrementUnreadChatCount, opponentProfileRef],

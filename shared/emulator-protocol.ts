@@ -97,3 +97,7 @@ export const HEARTBEAT_DANGER_TIMEOUT_MS = 45_000;
 export const HEARTBEAT_DISCONNECT_TIMEOUT_MS = 60_000;
 
 export type DisconnectSeverity = "connected" | "warning" | "danger" | "disconnected";
+
+export const MAX_SPECTATORS_PER_ROOM = 10;
+
+export type NetplaySessionRole = "host" | "guest" | "spectator";

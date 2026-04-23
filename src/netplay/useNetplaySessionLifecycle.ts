@@ -8,6 +8,7 @@ import {
   type OpponentProfile,
   type SessionSummaryState,
 } from "@/stores/useNetplayLobbyStore";
+import type { NetplaySessionRole } from "../../shared/emulator-protocol";
 
 type SetLobbyState = (next: LobbyState | ((previous: LobbyState) => LobbyState)) => void;
 
@@ -15,7 +16,7 @@ interface UseNetplaySessionLifecycleOptions {
   state: LobbyState;
   setLobbyState: SetLobbyState;
   peerRef: MutableRefObject<NetplayPeer | null>;
-  roleRef: MutableRefObject<"host" | "guest" | null>;
+  roleRef: MutableRefObject<NetplaySessionRole | null>;
   activeSessionRef: MutableRefObject<ActiveSession | null>;
   opponentProfileRef: MutableRefObject<OpponentProfile | null>;
   sessionStartedAtRef: MutableRefObject<number | null>;
@@ -100,6 +101,11 @@ export function useNetplaySessionLifecycle({
   const handleBack = useCallback(() => {
     if (state.step === "playing") {
       completeSession("self-left");
+      return;
+    }
+
+    if (state.step === "watching") {
+      resetToMenu();
       return;
     }
 

@@ -1,5 +1,5 @@
-import { type ReactElement, useCallback, useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { type ReactElement, useCallback, useEffect, useRef, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 
 import NetplaySessionSummary from "./NetplaySessionSummary";
 import NetplayBrowseRomsScreen from "@/components/netplay/NetplayBrowseRomsScreen";
@@ -8,16 +8,22 @@ import NetplayMenuScreen from "@/components/netplay/NetplayMenuScreen";
 import NetplayModeTabs from "@/components/netplay/NetplayModeTabs";
 import NetplayPlayingScreen from "@/components/netplay/NetplayPlayingScreen";
 import NetplayPublicRoomsScreen from "@/components/netplay/NetplayPublicRoomsScreen";
+import NetplaySpectateCodeScreen from "@/components/netplay/NetplaySpectateCodeScreen";
 import NetplayWaitingScreen from "@/components/netplay/NetplayWaitingScreen";
+import NetplayWatchingRoomsScreen from "@/components/netplay/NetplayWatchingRoomsScreen";
+import NetplayWatchingScreen from "@/components/netplay/NetplayWatchingScreen";
 import SoloBrowseRomsScreen from "@/components/netplay/SoloBrowseRomsScreen";
 import SoloPlayingScreen from "@/components/netplay/SoloPlayingScreen";
+import { buildBackendUrl } from "@/lib/backend-url";
 import { getUserProfile, toggleFavoriteGame } from "@/lib/user-profile";
 import { useNetplayDiscovery } from "@/netplay/useNetplayDiscovery";
 import { useNetplaySession } from "@/netplay/useNetplaySession";
 import { useSoloSession } from "@/solo/useSoloSession";
-import { useNetplayLobbyStore } from "@/stores/useNetplayLobbyStore";
+import { type RomInfo, useNetplayLobbyStore } from "@/stores/useNetplayLobbyStore";
+import { toast } from "sonner";
 
 export default function NetplayLobby() {
+  const location = useLocation();
   const navigate = useNavigate();
   const {
     mode,
@@ -48,8 +54,6 @@ export default function NetplayLobby() {
     setFavoriteGames,
     menuPublicRooms,
     setMenuPublicRooms,
-    replayOpponentTarget,
-    setReplayOpponentTarget,
     chatMessages,
     appendChatMessage: appendStoredChatMessage,
     chatOpen,
@@ -69,7 +73,7 @@ export default function NetplayLobby() {
     resetSessionUiState,
   } = useNetplayLobbyStore();
 
-  const { fetchPublicRooms, fetchRoms } = useNetplayDiscovery({
+  const { fetchPlayingRooms, fetchPublicRooms, fetchRoms } = useNetplayDiscovery({
     currentStep: state.step,
     setLobbyState: setState,
     setError,
@@ -104,7 +108,8 @@ export default function NetplayLobby() {
     handleJoinPublicRoom,
     handleJoinRoom,
     handleLocalInput,
-    handleReplayRecentOpponent,
+    handleSpectatePublicRoom,
+    handleSpectateRoom,
     handleResyncFailed,
     handleResyncLoaded,
     handleResyncState,
@@ -116,7 +121,6 @@ export default function NetplayLobby() {
     handleSummaryRematch,
     handleCanvasStreamReady,
     setVideoStreamCallbackRef,
-    videoStreamRef,
     resetToMenu,
   } = useNetplaySession({
     state,
@@ -136,7 +140,6 @@ export default function NetplayLobby() {
     setOpponentProfile,
     setRecentGames,
     setRecentOpponents,
-    setReplayOpponentTarget,
     appendChatMessage: appendStoredChatMessage,
     setChatOpen,
     setChatDraft,
@@ -152,24 +155,154 @@ export default function NetplayLobby() {
 
   // GUEST: video stream received from HOST via WebRTC
   const [guestVideoStream, setGuestVideoStream] = useState<MediaStream | null>(null);
+  const handledEntryRequestRef = useRef<string | null>(null);
+  const currentLobbyStepRef = useRef(state.step);
 
   useEffect(() => {
     setVideoStreamCallbackRef.current = setGuestVideoStream;
-    // If videoStream was already received before this render, sync it
-    if (videoStreamRef.current && !guestVideoStream) {
-      setGuestVideoStream(videoStreamRef.current);
-    }
     return () => {
       setVideoStreamCallbackRef.current = null;
     };
-  }, [guestVideoStream, setVideoStreamCallbackRef, videoStreamRef]);
+  }, [setVideoStreamCallbackRef]);
 
-  // Reset video stream when leaving playing state
   useEffect(() => {
-    if (state.step !== "playing") {
-      setGuestVideoStream(null);
-    }
+    currentLobbyStepRef.current = state.step;
   }, [state.step]);
+
+  useEffect(() => {
+    const searchParams = new URLSearchParams(location.search);
+    const entry = searchParams.get("entry");
+
+    if (!entry) {
+      handledEntryRequestRef.current = null;
+      return;
+    }
+
+    const entryRequestKey = `${location.pathname}?${searchParams.toString()}`;
+    if (handledEntryRequestRef.current === entryRequestKey) {
+      return;
+    }
+
+    handledEntryRequestRef.current = entryRequestKey;
+
+    const openEntryFallback = (nextEntry: "create-room" | "solo", roms?: RomInfo[]) => {
+      setError("");
+      setStatus("");
+      setSearchQuery("");
+
+      if (nextEntry === "solo") {
+        setMode("solo");
+        if (roms) {
+          setState({ step: "solo-browse", roms });
+          return;
+        }
+
+        void fetchRoms("solo");
+        return;
+      }
+
+      setMode("netplay");
+      if (roms) {
+        setState({ step: "browse", roms });
+        return;
+      }
+
+      void fetchRoms();
+    };
+
+    let cancelled = false;
+
+    const runEntry = async () => {
+      if (currentLobbyStepRef.current !== "menu") {
+        navigate(location.pathname, { replace: true });
+        return;
+      }
+
+      if (entry !== "solo" && entry !== "create-room") {
+        navigate(location.pathname, { replace: true });
+        return;
+      }
+
+      const romPath = searchParams.get("romPath");
+      const core = searchParams.get("core");
+
+      if (!romPath || !core) {
+        openEntryFallback(entry);
+        navigate(location.pathname, { replace: true });
+        return;
+      }
+
+      try {
+        const response = await fetch(buildBackendUrl("/api/roms"));
+        if (!response.ok) {
+          throw new Error("failed");
+        }
+
+        const roms: RomInfo[] = await response.json();
+        if (cancelled) {
+          return;
+        }
+
+        const matchedRom = roms.find((rom) => rom.path === romPath && rom.core === core);
+
+        if (!matchedRom) {
+          const message = "선택한 인기 게임을 찾지 못해 목록 화면으로 이동합니다.";
+          setError(message);
+          toast(message);
+          openEntryFallback(entry, roms);
+          navigate(location.pathname, { replace: true });
+          return;
+        }
+
+        setError("");
+        setStatus("");
+        setSearchQuery("");
+
+        if (entry === "solo") {
+          setMode("solo");
+          startSoloGame(matchedRom);
+          navigate(location.pathname, { replace: true });
+          return;
+        }
+
+        setMode("netplay");
+        await handleCreateRoom(matchedRom);
+        if (cancelled) {
+          return;
+        }
+
+        navigate(location.pathname, { replace: true });
+      } catch {
+        if (cancelled) {
+          return;
+        }
+
+        const message = "게임 목록을 불러오지 못해 목록 화면으로 이동합니다.";
+        setError(message);
+        toast.error(message);
+        openEntryFallback(entry);
+        navigate(location.pathname, { replace: true });
+      }
+    };
+
+    void runEntry();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    handleCreateRoom,
+    fetchRoms,
+    location.pathname,
+    location.search,
+    navigate,
+    setError,
+    setMode,
+    setSearchQuery,
+    setState,
+    setStatus,
+    startSoloGame,
+  ]);
 
   const handleToggleFavoriteGame = useCallback(
     (romPath: string) => {
@@ -182,7 +315,12 @@ export default function NetplayLobby() {
   const handleModeChange = useCallback(
     (nextMode: typeof mode) => {
       if (mode === nextMode) return;
-      if (state.step === "playing" || state.step === "waiting" || state.step === "solo-playing") {
+      if (
+        state.step === "playing" ||
+        state.step === "watching" ||
+        state.step === "waiting" ||
+        state.step === "solo-playing"
+      ) {
         return;
       }
 
@@ -224,15 +362,11 @@ export default function NetplayLobby() {
         quickJoinRooms={menuPublicRooms.slice(0, 2)}
         recentOpponentPreview={recentOpponents.slice(0, 3)}
         error={error}
-        replayOpponentTarget={replayOpponentTarget}
         onOpenBrowse={fetchRoms}
         onOpenPublicRooms={() => void fetchPublicRooms(true)}
+        onOpenWatchingRooms={() => void fetchPlayingRooms(true)}
         onOpenJoinInput={() => setState({ step: "join-input" })}
         onJoinPublicRoom={(roomCode) => void handleJoinPublicRoom(roomCode)}
-        onReplayTargetChange={setReplayOpponentTarget}
-        onReplayRecentOpponent={(opponent, isPublic) =>
-          void handleReplayRecentOpponent(opponent, isPublic)
-        }
       />
     );
   }
@@ -246,6 +380,20 @@ export default function NetplayLobby() {
         onBack={handleBack}
         onRefresh={() => void fetchPublicRooms(false, true)}
         onJoinRoom={(roomCode) => void handleJoinPublicRoom(roomCode)}
+      />
+    );
+  }
+
+  if (state.step === "watch-rooms") {
+    content = (
+      <NetplayWatchingRoomsScreen
+        rooms={state.rooms}
+        status={status}
+        error={error}
+        onBack={handleBack}
+        onRefresh={() => void fetchPlayingRooms(false, true)}
+        onOpenSpectateCode={() => setState({ step: "spectate-input" })}
+        onSpectateRoom={(roomCode) => void handleSpectatePublicRoom(roomCode)}
       />
     );
   }
@@ -311,6 +459,19 @@ export default function NetplayLobby() {
     );
   }
 
+  if (state.step === "spectate-input") {
+    content = (
+      <NetplaySpectateCodeScreen
+        joinCode={joinCode}
+        status={status}
+        error={error}
+        onBack={handleBack}
+        onJoinCodeChange={setJoinCode}
+        onSpectateRoom={handleSpectateRoom}
+      />
+    );
+  }
+
   if (state.step === "session-summary") {
     const localSummaryUser = myProfile ?? { nickname: "나", avatar: "🎮" };
 
@@ -364,7 +525,34 @@ export default function NetplayLobby() {
         onResyncFailed={handleResyncFailed}
         onChatShortcut={handleChatShortcut}
         onCanvasStreamReady={handleCanvasStreamReady}
-        videoStream={guestVideoStream}
+        videoStream={state.step === "playing" ? guestVideoStream : null}
+        disconnectSeverity={disconnectSeverity}
+        disconnectCountdown={disconnectCountdown}
+      />
+    );
+  }
+
+  if (state.step === "watching") {
+    content = (
+      <NetplayWatchingScreen
+        session={state}
+        myProfile={myProfile}
+        hostProfile={opponentProfile}
+        chatOpen={chatOpen}
+        unreadChatCount={unreadChatCount}
+        dcState={dcState}
+        chatMessages={chatMessages}
+        chatDraft={chatDraft}
+        isPeerTyping={isPeerTyping}
+        chatChannelState={chatChannelState}
+        inputRef={chatInputRef}
+        emulatorRef={emulatorRef}
+        onBack={handleBack}
+        onChatToggle={handleChatToggle}
+        onChatCancel={handleChatCancel}
+        onChatDraftChange={handleChatDraftChange}
+        onSendChat={handleSendChat}
+        videoStream={state.step === "watching" ? guestVideoStream : null}
         disconnectSeverity={disconnectSeverity}
         disconnectCountdown={disconnectCountdown}
       />
@@ -382,7 +570,10 @@ export default function NetplayLobby() {
   }
 
   const disableModeSwitch =
-    state.step === "playing" || state.step === "waiting" || state.step === "solo-playing";
+    state.step === "playing" ||
+    state.step === "watching" ||
+    state.step === "waiting" ||
+    state.step === "solo-playing";
 
   return (
     <div className="flex h-full flex-col gap-4">

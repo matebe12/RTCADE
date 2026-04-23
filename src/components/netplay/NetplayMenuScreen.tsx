@@ -1,17 +1,8 @@
-import { Globe, Lock, MessageSquare } from "lucide-react";
+import { Globe, MessageSquare } from "lucide-react";
 
 import { UserBadge } from "@/components/UserBadge";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { parseRomName } from "@/lib/game-names";
 import { cn } from "@/lib/utils";
 import type { RecentOpponent } from "@/lib/user-profile";
@@ -21,13 +12,11 @@ interface NetplayMenuScreenProps {
   quickJoinRooms: PublicRoomInfo[];
   recentOpponentPreview: RecentOpponent[];
   error: string;
-  replayOpponentTarget: RecentOpponent | null;
   onOpenBrowse: () => void;
   onOpenPublicRooms: () => void;
+  onOpenWatchingRooms: () => void;
   onOpenJoinInput: () => void;
   onJoinPublicRoom: (roomCode: string) => void;
-  onReplayTargetChange: (opponent: RecentOpponent | null) => void;
-  onReplayRecentOpponent: (opponent: RecentOpponent, isPublic: boolean) => void;
 }
 
 function getRomFilename(romPath: string) {
@@ -59,13 +48,11 @@ export default function NetplayMenuScreen({
   quickJoinRooms,
   recentOpponentPreview,
   error,
-  replayOpponentTarget,
   onOpenBrowse,
   onOpenPublicRooms,
+  onOpenWatchingRooms,
   onOpenJoinInput,
   onJoinPublicRoom,
-  onReplayTargetChange,
-  onReplayRecentOpponent,
 }: NetplayMenuScreenProps) {
   const hasSecondarySections = quickJoinRooms.length > 0 || recentOpponentPreview.length > 0;
 
@@ -76,14 +63,13 @@ export default function NetplayMenuScreen({
       </CardHeader>
       <CardContent className="flex flex-1 flex-col gap-3">
         <div
-          className={cn(
-            "flex flex-col gap-3",
-            !hasSecondarySections && "flex-1 justify-between",
-          )}
+          data-tutorial="netplay-menu-actions"
+          className={cn("flex flex-col gap-3", !hasSecondarySections && "flex-1 justify-between")}
         >
           <Button
             variant="outline"
             className={cn("w-full", !hasSecondarySections && "min-h-13")}
+            data-tutorial="netplay-open-browse"
             onClick={onOpenBrowse}
           >
             방 만들기
@@ -91,6 +77,7 @@ export default function NetplayMenuScreen({
           <Button
             variant="outline"
             className={cn("w-full", !hasSecondarySections && "min-h-13")}
+            data-tutorial="netplay-open-public-rooms"
             onClick={onOpenPublicRooms}
           >
             공개 방 둘러보기
@@ -98,9 +85,18 @@ export default function NetplayMenuScreen({
           <Button
             variant="outline"
             className={cn("w-full", !hasSecondarySections && "min-h-13")}
+            data-tutorial="netplay-open-join"
             onClick={onOpenJoinInput}
           >
             방 참가
+          </Button>
+          <Button
+            variant="outline"
+            className={cn("w-full", !hasSecondarySections && "min-h-13")}
+            data-tutorial="netplay-open-watch-rooms"
+            onClick={onOpenWatchingRooms}
+          >
+            관전하기
           </Button>
         </div>
 
@@ -174,15 +170,6 @@ export default function NetplayMenuScreen({
                       <span>{getRecentOpponentEndReasonCopy(opponent.lastEndReason)}</span>
                     </div>
                   </div>
-
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-7 px-2 text-[11px]"
-                    onClick={() => onReplayTargetChange(opponent)}
-                  >
-                    다시 만나기
-                  </Button>
                 </div>
               ))}
             </div>
@@ -190,72 +177,6 @@ export default function NetplayMenuScreen({
         )}
 
         {error && <p className="text-center text-xs text-destructive-foreground">{error}</p>}
-
-        <Dialog
-          open={replayOpponentTarget !== null}
-          onOpenChange={(open) => {
-            if (!open) {
-              onReplayTargetChange(null);
-            }
-          }}
-        >
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>같은 게임으로 다시 열기</DialogTitle>
-              <DialogDescription>
-                {replayOpponentTarget
-                  ? `${replayOpponentTarget.nickname}님과 했던 ${replayOpponentTarget.gameName} 방을 어떤 방식으로 열지 선택하세요.`
-                  : "방 공개 여부를 선택하세요."}
-              </DialogDescription>
-            </DialogHeader>
-
-            {replayOpponentTarget && (
-              <div className="rounded-lg border border-border/70 bg-muted/10 px-4 py-3 text-sm text-foreground">
-                <div className="flex items-center justify-between gap-3">
-                  <UserBadge
-                    nickname={replayOpponentTarget.nickname}
-                    avatar={replayOpponentTarget.avatar}
-                    size="sm"
-                  />
-                  <Badge variant="secondary" className="text-[10px]">
-                    {replayOpponentTarget.playCount}번 플레이
-                  </Badge>
-                </div>
-                <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
-                  <span>{replayOpponentTarget.gameName}</span>
-                  <span>{formatRelativePlayedAt(replayOpponentTarget.playedAt)}</span>
-                  <span>{getRecentOpponentEndReasonCopy(replayOpponentTarget.lastEndReason)}</span>
-                </div>
-              </div>
-            )}
-
-            <DialogFooter className="gap-2 sm:justify-between sm:space-x-0">
-              <Button
-                variant="outline"
-                className="w-full sm:flex-1"
-                onClick={() => {
-                  if (replayOpponentTarget) {
-                    onReplayRecentOpponent(replayOpponentTarget, false);
-                  }
-                }}
-              >
-                <Lock className="size-4" />
-                초대 코드 방
-              </Button>
-              <Button
-                className="w-full sm:flex-1"
-                onClick={() => {
-                  if (replayOpponentTarget) {
-                    onReplayRecentOpponent(replayOpponentTarget, true);
-                  }
-                }}
-              >
-                <Globe className="size-4" />
-                공개 방
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
       </CardContent>
     </Card>
   );

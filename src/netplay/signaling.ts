@@ -9,10 +9,13 @@ export type SignalingMessage =
       avatar?: string;
     }
   | { type: "join-room"; code: string; nickname?: string; avatar?: string }
+  | { type: "spectate-room"; code: string; nickname?: string; avatar?: string }
+  | { type: "session-started" }
   | { type: "room-created"; code: string }
   | {
       type: "room-joined";
       code: string;
+      role: "guest" | "spectator";
       romFilename: string;
       core: string;
       bios?: string;
@@ -20,11 +23,23 @@ export type SignalingMessage =
       hostAvatar?: string;
     }
   | { type: "guest-joined"; guestNickname?: string; guestAvatar?: string }
+  | {
+      type: "spectator-joined";
+      spectatorId: string;
+      spectatorNickname?: string;
+      spectatorAvatar?: string;
+      spectatorCount: number;
+    }
+  | {
+      type: "spectator-disconnected";
+      spectatorId: string;
+      spectatorCount: number;
+    }
   | { type: "peer-disconnected" }
   | { type: "error"; message: string }
-  | { type: "offer"; sdp: RTCSessionDescriptionInit }
-  | { type: "answer"; sdp: RTCSessionDescriptionInit }
-  | { type: "ice-candidate"; candidate: RTCIceCandidateInit };
+  | { type: "offer"; sdp: RTCSessionDescriptionInit; spectatorId?: string }
+  | { type: "answer"; sdp: RTCSessionDescriptionInit; spectatorId?: string }
+  | { type: "ice-candidate"; candidate: RTCIceCandidateInit; spectatorId?: string };
 
 export type SignalingHandler = (msg: SignalingMessage) => void;
 

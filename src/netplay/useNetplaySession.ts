@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { SystemCore } from "@/components/EmulatorPlayer";
 import type { NetplayChatMessage } from "@/components/NetplayChatPanel";
@@ -22,6 +22,7 @@ import {
   HEARTBEAT_DANGER_TIMEOUT_MS,
   HEARTBEAT_DISCONNECT_TIMEOUT_MS,
   type DisconnectSeverity,
+  type NetplaySessionRole,
 } from "../../shared/emulator-protocol";
 
 type SetLobbyState = (next: LobbyState | ((previous: LobbyState) => LobbyState)) => void;
@@ -52,7 +53,6 @@ interface UseNetplaySessionOptions {
   setOpponentProfile: (opponentProfile: OpponentProfile | null) => void;
   setRecentGames: (recentGames: RecentGame[]) => void;
   setRecentOpponents: (recentOpponents: RecentOpponent[]) => void;
-  setReplayOpponentTarget: (replayOpponentTarget: RecentOpponent | null) => void;
   appendChatMessage: (message: NetplayChatMessage) => void;
   setChatOpen: (chatOpen: boolean) => void;
   setChatDraft: (chatDraft: string) => void;
@@ -84,7 +84,6 @@ export function useNetplaySession({
   setOpponentProfile,
   setRecentGames,
   setRecentOpponents,
-  setReplayOpponentTarget,
   appendChatMessage,
   setChatOpen,
   setChatDraft,
@@ -100,7 +99,7 @@ export function useNetplaySession({
   const syncStatusRef = useRef("");
   const peerRef = useRef<NetplayPeer | null>(null);
   const emulatorRef = useRef<HTMLDivElement>(null);
-  const roleRef = useRef<"host" | "guest" | null>(null);
+  const roleRef = useRef<NetplaySessionRole | null>(null);
   const sessionCoreRef = useRef<SystemCore | null>(null);
   const lastInputTimeRef = useRef(0);
   const remoteHeldMaskRef = useRef(0);
@@ -112,9 +111,17 @@ export function useNetplaySession({
   const videoStreamRef = useRef<MediaStream | null>(null);
   const setVideoStreamCallbackRef = useRef<((stream: MediaStream | null) => void) | null>(null);
   const heartbeatTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const lastHeartbeatRef = useRef<number>(Date.now());
+  const lastHeartbeatRef = useRef(0);
   const disconnectTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const emulatorRuntime = useMemo(() => createEmulatorRuntimeBridge(emulatorRef), [emulatorRef]);
+  const emulatorRuntimeRef = useRef<ReturnType<typeof createEmulatorRuntimeBridge> | null>(null);
+
+  const getEmulatorRuntime = useCallback(() => {
+    if (emulatorRuntimeRef.current === null) {
+      emulatorRuntimeRef.current = createEmulatorRuntimeBridge(emulatorRef);
+    }
+
+    return emulatorRuntimeRef.current;
+  }, []);
 
   // Video streaming mode is always ON for netplay
   const videoStreamingMode = true;
@@ -124,7 +131,8 @@ export function useNetplaySession({
   const [disconnectCountdown, setDisconnectCountdown] = useState<number | undefined>(undefined);
 
   useEffect(() => {
-    sessionCoreRef.current = "core" in state ? state.core : activeSessionRef.current?.core ?? null;
+    sessionCoreRef.current =
+      "core" in state ? state.core : (activeSessionRef.current?.core ?? null);
   }, [state]);
 
   useEffect(() => {
@@ -138,23 +146,26 @@ export function useNetplaySession({
     guestResyncPendingRef.current = false;
   }, [state.step]);
 
-  const reconcileRemoteHeldMask = useCallback((nextMask: number) => {
-    const previousMask = remoteHeldMaskRef.current;
+  const reconcileRemoteHeldMask = useCallback(
+    (nextMask: number) => {
+      const previousMask = remoteHeldMaskRef.current;
 
-    if (previousMask === nextMask) return;
+      if (previousMask === nextMask) return;
 
-    for (let button = 0; button < REMOTE_INPUT_BUTTON_COUNT; button += 1) {
-      const bit = 1 << button;
-      const wasDown = (previousMask & bit) !== 0;
-      const isDown = (nextMask & bit) !== 0;
+      for (let button = 0; button < REMOTE_INPUT_BUTTON_COUNT; button += 1) {
+        const bit = 1 << button;
+        const wasDown = (previousMask & bit) !== 0;
+        const isDown = (nextMask & bit) !== 0;
 
-      if (wasDown !== isDown) {
-        emulatorRuntime.input.sendRemoteInput(button, isDown);
+        if (wasDown !== isDown) {
+          getEmulatorRuntime().input.sendRemoteInput(button, isDown);
+        }
       }
-    }
 
-    remoteHeldMaskRef.current = nextMask;
-  }, [emulatorRuntime]);
+      remoteHeldMaskRef.current = nextMask;
+    },
+    [getEmulatorRuntime],
+  );
 
   const handleGuestResyncState = useCallback((payload: ResyncStatePayload) => {
     if (roleRef.current !== "guest") return;
@@ -186,8 +197,19 @@ export function useNetplaySession({
 
   // --- Heartbeat logic (HOST sends, GUEST monitors) ---
 
+  const clearHeartbeatTimers = useCallback(() => {
+    if (heartbeatTimerRef.current) {
+      clearInterval(heartbeatTimerRef.current);
+      heartbeatTimerRef.current = null;
+    }
+    if (disconnectTimerRef.current) {
+      clearInterval(disconnectTimerRef.current);
+      disconnectTimerRef.current = null;
+    }
+  }, []);
+
   const startHeartbeat = useCallback(() => {
-    if (heartbeatTimerRef.current) clearInterval(heartbeatTimerRef.current);
+    clearHeartbeatTimers();
     lastHeartbeatRef.current = Date.now();
     setDisconnectSeverity("connected");
     setDisconnectCountdown(undefined);
@@ -216,20 +238,27 @@ export function useNetplaySession({
         }
       }, 1000);
     }
-  }, []);
+  }, [clearHeartbeatTimers]);
 
   const stopHeartbeat = useCallback(() => {
-    if (heartbeatTimerRef.current) {
-      clearInterval(heartbeatTimerRef.current);
-      heartbeatTimerRef.current = null;
-    }
-    if (disconnectTimerRef.current) {
-      clearInterval(disconnectTimerRef.current);
-      disconnectTimerRef.current = null;
-    }
+    clearHeartbeatTimers();
     setDisconnectSeverity("connected");
     setDisconnectCountdown(undefined);
-  }, []);
+  }, [clearHeartbeatTimers]);
+
+  const updateGameStarted = useCallback(
+    (nextGameStarted: boolean) => {
+      setGameStarted(nextGameStarted);
+
+      if (nextGameStarted) {
+        startHeartbeat();
+        return;
+      }
+
+      stopHeartbeat();
+    },
+    [setGameStarted, startHeartbeat, stopHeartbeat],
+  );
 
   const handleHeartbeat = useCallback((ts: number) => {
     lastHeartbeatRef.current = Date.now();
@@ -274,34 +303,44 @@ export function useNetplaySession({
     resetStoredChatState,
   });
 
-  const handleRemoteInput = useCallback((msg: InputMessage) => {
-    lastInputTimeRef.current = Date.now();
+  const handleRemoteInput = useCallback(
+    (msg: InputMessage) => {
+      lastInputTimeRef.current = Date.now();
 
-    const nextHeldMask =
-      typeof msg.heldMask === "number"
-        ? msg.heldMask
-        : updateHeldMask(remoteHeldMaskRef.current, msg.button, msg.down);
+      const nextHeldMask =
+        typeof msg.heldMask === "number"
+          ? msg.heldMask
+          : updateHeldMask(remoteHeldMaskRef.current, msg.button, msg.down);
 
-    if (guestResyncPendingRef.current) {
-      queuedRemoteHeldMaskRef.current = nextHeldMask;
-      return;
-    }
+      if (guestResyncPendingRef.current) {
+        queuedRemoteHeldMaskRef.current = nextHeldMask;
+        return;
+      }
 
-    reconcileRemoteHeldMask(nextHeldMask);
-  }, [reconcileRemoteHeldMask]);
+      reconcileRemoteHeldMask(nextHeldMask);
+    },
+    [reconcileRemoteHeldMask],
+  );
 
-  const handleRemoteHeldMask = useCallback((heldMask: number) => {
-    lastInputTimeRef.current = Date.now();
+  const handleRemoteHeldMask = useCallback(
+    (heldMask: number) => {
+      lastInputTimeRef.current = Date.now();
 
-    if (guestResyncPendingRef.current) {
-      queuedRemoteHeldMaskRef.current = heldMask;
-      return;
-    }
+      if (guestResyncPendingRef.current) {
+        queuedRemoteHeldMaskRef.current = heldMask;
+        return;
+      }
 
-    reconcileRemoteHeldMask(heldMask);
-  }, [reconcileRemoteHeldMask]);
+      reconcileRemoteHeldMask(heldMask);
+    },
+    [reconcileRemoteHeldMask],
+  );
 
   const handleLocalInput = useCallback((button: number, down: boolean) => {
+    if (roleRef.current === "spectator") {
+      return;
+    }
+
     lastInputTimeRef.current = Date.now();
     peerRef.current?.sendInput(button, down);
   }, []);
@@ -325,7 +364,9 @@ export function useNetplaySession({
    *  This callback just logs for debugging. */
   const handleStartVideoCapture = useCallback(() => {
     if (roleRef.current !== "host") return;
-    console.log("[LOBBY] HOST: game started, video stream should already be flowing via captureStream()");
+    console.log(
+      "[LOBBY] HOST: game started, video stream should already be flowing via captureStream()",
+    );
   }, []);
 
   const updateSync = useCallback(
@@ -373,9 +414,10 @@ export function useNetplaySession({
     onGuestResyncLoaded: handleGuestResyncLoaded,
     onGuestResyncFailed: handleGuestResyncFailed,
     onGuestResyncState: handleGuestResyncState,
-    setGameStarted,
+    setGameStarted: updateGameStarted,
     updateSync,
     markSessionStarted,
+    onHostGameStarted: () => peerRef.current?.markSessionStarted(),
     onStartVideoCapture: handleStartVideoCapture,
   });
 
@@ -405,7 +447,8 @@ export function useNetplaySession({
     handleCreateRoom,
     handleJoinPublicRoom,
     handleJoinRoom,
-    handleReplayRecentOpponent,
+    handleSpectatePublicRoom,
+    handleSpectateRoom,
     handleSummaryRematch,
   } = useNetplayPeerRoomFlow({
     state,
@@ -419,9 +462,9 @@ export function useNetplaySession({
     setStatus,
     setError,
     setDcState,
+    setGameStarted: updateGameStarted,
     setChatChannelState,
     setOpponentProfile,
-    setReplayOpponentTarget,
     resetSessionRuntime,
     resetToMenu,
     completeSession,
@@ -443,12 +486,12 @@ export function useNetplaySession({
   // Start heartbeat when game starts
   useEffect(() => {
     if (gameStarted) {
-      startHeartbeat();
-    } else {
-      stopHeartbeat();
+      return clearHeartbeatTimers;
     }
-    return () => stopHeartbeat();
-  }, [gameStarted, startHeartbeat, stopHeartbeat]);
+
+    clearHeartbeatTimers();
+    return clearHeartbeatTimers;
+  }, [clearHeartbeatTimers, gameStarted]);
 
   return {
     chatInputRef,
@@ -466,7 +509,8 @@ export function useNetplaySession({
     handleJoinPublicRoom,
     handleJoinRoom,
     handleLocalInput,
-    handleReplayRecentOpponent,
+    handleSpectatePublicRoom,
+    handleSpectateRoom,
     handleResyncFailed,
     handleResyncLoaded,
     handleResyncState,
@@ -479,7 +523,5 @@ export function useNetplaySession({
     handleVideoStream,
     resetToMenu,
     setVideoStreamCallbackRef,
-    stopHeartbeat,
-    videoStreamRef,
   };
 }

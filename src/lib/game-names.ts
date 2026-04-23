@@ -337,6 +337,7 @@ const MAME_NAMES: Record<string, string> = {
   gradius: "그라디우스",
   gradius2: "그라디우스 II",
   gradius3: "그라디우스 III",
+  grdians: "가디언즈 / 전진 마카이 II",
   grainbow: "그레이트 레인보우",
   groundfx: "그라운드 이펙츠",
   growl: "그라울",
@@ -401,6 +402,7 @@ const MAME_NAMES: Record<string, string> = {
   janshin: "장신",
   jchan: "재키찬",
   jjack: "점핑 잭",
+  jjsquawk: "J.J. 스쿼커즈",
   jojo: "죠죠의 기묘한 모험",
   jojoba: "죠죠의 기묘한 모험: 미래의 유산",
   joust: "쥬스트",
@@ -525,6 +527,7 @@ const MAME_NAMES: Record<string, string> = {
   moonpatr: "문 패트롤",
   moonwlk: "문워커",
   moo: "부비 키즈",
+  mooua: "와일드 웨스트 C.O.W.-보이즈 오브 무 메사",
   mosaic: "모자이크",
   mpatrol: "문 패트롤",
   mplanets: "매드 플래닛",
@@ -1038,18 +1041,9 @@ const MAME_NAMES: Record<string, string> = {
 // 카테고리 시스템
 // ────────────────────────────────────────────────────────────────
 
-export type GameCategory =
-  | "fighting"
-  | "action"
-  | "shooting"
-  | "puzzle"
-  | "sports"
-  | "etc";
+export type GameCategory = "fighting" | "action" | "shooting" | "puzzle" | "sports" | "etc";
 
-export const CATEGORY_INFO: Record<
-  GameCategory,
-  { label: string; icon: string; order: number }
-> = {
+export const CATEGORY_INFO: Record<GameCategory, { label: string; icon: string; order: number }> = {
   fighting: { label: "격투", icon: "⚔️", order: 1 },
   action: { label: "액션", icon: "💥", order: 2 },
   shooting: { label: "슈팅", icon: "🚀", order: 3 },
@@ -1184,8 +1178,10 @@ const GAME_CATEGORIES: Record<string, GameCategory> = {
   mysticwr: "action",
   gauntlet: "action",
   gauntlt2: "action",
+  grdians: "action",
   // 플랫폼 / 기타 액션
   bublbobl: "action",
+  jjsquawk: "action",
   snowbro2: "action",
   snowbros: "action",
   neobombe: "action",
@@ -1288,16 +1284,8 @@ const GAME_CATEGORIES: Record<string, GameCategory> = {
 /**
  * ROM shortcode의 카테고리를 반환. 매핑에 없으면 "etc".
  */
-export function getRomCategory(
-  filename: string,
-  core: string,
-): GameCategory {
-  if (
-    core !== "mame2003" &&
-    core !== "mame2003_plus" &&
-    core !== "arcade" &&
-    core !== "fbneo"
-  ) {
+export function getRomCategory(filename: string, core: string): GameCategory {
+  if (core !== "mame2003" && core !== "mame2003_plus" && core !== "arcade" && core !== "fbneo") {
     return "etc";
   }
   const base = filename.replace(/\.\w+$/, "").toLowerCase();

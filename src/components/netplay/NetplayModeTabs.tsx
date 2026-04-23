@@ -30,9 +30,16 @@ const MODE_ITEMS: Array<{
   },
 ];
 
-export default function NetplayModeTabs({ disabled = false, mode, onModeChange }: NetplayModeTabsProps) {
+export default function NetplayModeTabs({
+  disabled = false,
+  mode,
+  onModeChange,
+}: NetplayModeTabsProps) {
   return (
-    <div className="grid gap-2 rounded-xl border border-border/70 bg-card/70 p-2 sm:grid-cols-2">
+    <div
+      className="grid gap-2 rounded-xl border border-border/70 bg-card/70 p-2 sm:grid-cols-2"
+      data-tutorial="netplay-mode-tabs"
+    >
       {MODE_ITEMS.map((item) => {
         const Icon = item.icon;
         const selected = item.value === mode;
@@ -47,6 +54,7 @@ export default function NetplayModeTabs({ disabled = false, mode, onModeChange }
               !selected && "text-muted-foreground",
             )}
             disabled={disabled}
+            data-tutorial={item.value === "solo" ? "netplay-mode-solo" : undefined}
             onClick={() => onModeChange(item.value)}
           >
             <div className="flex items-start gap-3">

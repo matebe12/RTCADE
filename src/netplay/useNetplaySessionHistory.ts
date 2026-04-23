@@ -105,6 +105,10 @@ export function useNetplaySessionHistory({
       const activeSession = activeSessionRef.current;
       if (!activeSession) return null;
 
+      if (activeSession.role === "spectator") {
+        return null;
+      }
+
       const endedAt = Date.now();
       const startedAt = sessionStartedAtRef.current;
 

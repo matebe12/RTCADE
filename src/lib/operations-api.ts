@@ -3,8 +3,10 @@ import { buildBackendUrl } from "@/lib/backend-url";
 const OPERATIONS_STATS_REFRESH_EVENT = "rtcade:operations-stats-refresh";
 
 export interface PopularGameSummary {
+  core?: string;
   gameName: string;
   playCount: number;
+  romPath?: string;
 }
 
 export interface OperationsStats {
@@ -12,15 +14,18 @@ export interface OperationsStats {
   activeNetplayRooms: number;
   connectedPlayers: number;
   dbEnabled: boolean;
+  monthlyPopularGames: PopularGameSummary[];
   monthlyPopularGame: PopularGameSummary | null;
   openRooms: number;
   soloSessions: number;
   todayGames: number;
+  todayPopularGames: PopularGameSummary[];
   todayPopularGame: PopularGameSummary | null;
   totalGames: number;
   todayVisitors: number;
   totalVisitors: number;
   waitingRooms: number;
+  weeklyPopularGames: PopularGameSummary[];
   weeklyPopularGame: PopularGameSummary | null;
 }
 
@@ -62,36 +67,85 @@ function toPopularGameSummary(value: unknown): PopularGameSummary | null {
     return null;
   }
 
-  const candidate = value as { gameName?: unknown; playCount?: unknown };
+  const candidate = value as {
+    core?: unknown;
+    gameName?: unknown;
+    playCount?: unknown;
+    romPath?: unknown;
+  };
 
   if (typeof candidate.gameName !== "string" || candidate.gameName.trim().length === 0) {
     return null;
   }
 
   return {
+    core:
+      typeof candidate.core === "string" && candidate.core.trim().length > 0
+        ? candidate.core
+        : undefined,
     gameName: candidate.gameName,
     playCount: toNumber(candidate.playCount),
+    romPath:
+      typeof candidate.romPath === "string" && candidate.romPath.trim().length > 0
+        ? candidate.romPath
+        : undefined,
   };
+}
+
+function toPopularGameSummaries(value: unknown): PopularGameSummary[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .map((item) => toPopularGameSummary(item))
+    .filter((item): item is PopularGameSummary => item !== null);
+}
+
+function normalizePopularGameSummaries(listValue: unknown, singleValue: unknown) {
+  const list = toPopularGameSummaries(listValue);
+
+  if (list.length > 0) {
+    return list;
+  }
+
+  const single = toPopularGameSummary(singleValue);
+  return single ? [single] : [];
 }
 
 function normalizeOperationsStats(value: unknown): OperationsStats {
   const candidate = value && typeof value === "object" ? (value as Record<string, unknown>) : {};
+  const monthlyPopularGames = normalizePopularGameSummaries(
+    candidate.monthlyPopularGames,
+    candidate.monthlyPopularGame,
+  );
+  const todayPopularGames = normalizePopularGameSummaries(
+    candidate.todayPopularGames,
+    candidate.todayPopularGame,
+  );
+  const weeklyPopularGames = normalizePopularGameSummaries(
+    candidate.weeklyPopularGames,
+    candidate.weeklyPopularGame,
+  );
 
   return {
     activeRooms: toNumber(candidate.activeRooms),
     activeNetplayRooms: toNumber(candidate.activeNetplayRooms),
     connectedPlayers: toNumber(candidate.connectedPlayers),
     dbEnabled: candidate.dbEnabled === true,
-    monthlyPopularGame: toPopularGameSummary(candidate.monthlyPopularGame),
+    monthlyPopularGames,
+    monthlyPopularGame: monthlyPopularGames[0] ?? null,
     openRooms: toNumber(candidate.openRooms),
     soloSessions: toNumber(candidate.soloSessions),
     todayGames: toNumber(candidate.todayGames),
-    todayPopularGame: toPopularGameSummary(candidate.todayPopularGame),
+    todayPopularGames,
+    todayPopularGame: todayPopularGames[0] ?? null,
     totalGames: toNumber(candidate.totalGames),
     todayVisitors: toNumber(candidate.todayVisitors),
     totalVisitors: toNumber(candidate.totalVisitors),
     waitingRooms: toNumber(candidate.waitingRooms),
-    weeklyPopularGame: toPopularGameSummary(candidate.weeklyPopularGame),
+    weeklyPopularGames,
+    weeklyPopularGame: weeklyPopularGames[0] ?? null,
   };
 }
 

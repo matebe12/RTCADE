@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { ChevronDown } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 interface PlayControlsGuideProps {
   mode: "netplay" | "solo";
   className?: string;
+  dataTutorial?: string;
 }
 
 const CONTROLS_GUIDE_COLLAPSED_KEY = "rtcade_play_controls_collapsed";
@@ -44,17 +45,18 @@ function KeyBadge({ value }: { value: string }) {
   );
 }
 
-export default function PlayControlsGuide({ mode, className }: PlayControlsGuideProps) {
-  const [collapsed, setCollapsed] = useState(false);
-
-  useEffect(() => {
+export default function PlayControlsGuide({
+  mode,
+  className,
+  dataTutorial,
+}: PlayControlsGuideProps) {
+  const [collapsed, setCollapsed] = useState(() => {
     if (typeof window === "undefined") {
-      return;
+      return false;
     }
 
-    const storedValue = window.localStorage.getItem(CONTROLS_GUIDE_COLLAPSED_KEY);
-    setCollapsed(storedValue === "true");
-  }, []);
+    return window.localStorage.getItem(CONTROLS_GUIDE_COLLAPSED_KEY) === "true";
+  });
 
   const handleToggle = () => {
     const nextCollapsed = !collapsed;
@@ -66,7 +68,10 @@ export default function PlayControlsGuide({ mode, className }: PlayControlsGuide
   };
 
   return (
-    <Card className={cn("w-full border-border/70 bg-card/95", className)}>
+    <Card
+      className={cn("w-full border-border/70 bg-card/95", className)}
+      data-tutorial={dataTutorial}
+    >
       <CardHeader className="flex flex-row items-center justify-between gap-3 pb-3">
         <div className="space-y-1">
           <CardTitle className="text-sm">키 안내</CardTitle>
@@ -88,7 +93,9 @@ export default function PlayControlsGuide({ mode, className }: PlayControlsGuide
             onClick={handleToggle}
           >
             {collapsed ? "펼치기" : "접기"}
-            <ChevronDown className={cn("size-3 transition-transform", !collapsed && "rotate-180")} />
+            <ChevronDown
+              className={cn("size-3 transition-transform", !collapsed && "rotate-180")}
+            />
           </Button>
         </div>
       </CardHeader>
@@ -113,7 +120,8 @@ export default function PlayControlsGuide({ mode, className }: PlayControlsGuide
 
           {mode === "netplay" && (
             <div className="rounded-lg border border-dashed border-border/70 bg-background/20 p-3 text-[11px] text-muted-foreground">
-              채팅은 <span className="font-semibold text-foreground">Enter</span>로 빠르게 열 수 있습니다.
+              채팅은 <span className="font-semibold text-foreground">Enter</span>로 빠르게 열 수
+              있습니다.
             </div>
           )}
         </CardContent>

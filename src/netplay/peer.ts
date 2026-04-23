@@ -25,6 +25,9 @@ export type ChatMessage = {
   id: string;
   text: string;
   sentAt: number;
+  authorAvatar?: string;
+  authorName?: string;
+  authorRole?: "host" | "guest" | "spectator";
 };
 
 export type InputSyncMessage = {
@@ -42,6 +45,7 @@ export type PeerEventHandler = {
   onRoomCreated?: (code: string) => void;
   onRoomJoined?: (info: {
     code: string;
+    role: "guest" | "spectator";
     romFilename: string;
     core: string;
     bios?: string;
@@ -68,6 +72,24 @@ export type PeerEventHandler = {
 };
 
 type GameplayTransportState = "closed" | "connecting" | "open" | "closing";
+
+type ConnectionMode = "host" | "guest" | "spectator" | null;
+
+type Profile = {
+  avatar?: string;
+  nickname?: string;
+};
+
+type SpectatorPeerState = {
+  chatDc: RTCDataChannel | null;
+  controlDc: RTCDataChannel | null;
+  id: string;
+  nickname?: string;
+  avatar?: string;
+  pc: RTCPeerConnection;
+  senders: RTCRtpSender[];
+  negotiating: boolean;
+};
 
 type PendingBinaryStream = {
   totalBytes: number;
@@ -124,6 +146,11 @@ export class NetplayPeer {
   private _repairZeroFlushRemaining = 0;
   private _videoSenders: RTCRtpSender[] = [];
   private _negotiating = false;
+  private _connectionMode: ConnectionMode = null;
+  private _guestProfile: Profile | null = null;
+  private _localProfile: Profile = {};
+  private _spectatorPeers = new Map<string, SpectatorPeerState>();
+  private _stream: MediaStream | null = null;
 
   constructor(handler: PeerEventHandler) {
     this.handler = handler;
@@ -142,6 +169,9 @@ export class NetplayPeer {
     avatar?: string,
     isPublic?: boolean,
   ) {
+    this._connectionMode = "host";
+    this._guestProfile = null;
+    this._localProfile = { nickname, avatar };
     this.signaling.send({
       type: "create-room",
       romFilename,
@@ -154,7 +184,23 @@ export class NetplayPeer {
   }
 
   joinRoom(code: string, nickname?: string, avatar?: string) {
+    this._connectionMode = "guest";
+    this._localProfile = { nickname, avatar };
     this.signaling.send({ type: "join-room", code, nickname, avatar });
+  }
+
+  spectateRoom(code: string, nickname?: string, avatar?: string) {
+    this._connectionMode = "spectator";
+    this._localProfile = { nickname, avatar };
+    this.signaling.send({ type: "spectate-room", code, nickname, avatar });
+  }
+
+  markSessionStarted() {
+    if (this._connectionMode !== "host") {
+      return;
+    }
+
+    this.signaling.send({ type: "session-started" });
   }
 
   private _inputSeq = 0;
@@ -241,22 +287,44 @@ export class NetplayPeer {
     if (this.controlDc?.readyState === "open") {
       this.controlDc.send(JSON.stringify({ type: "heartbeat", ts: Date.now() }));
     }
+
+    for (const spectator of this._spectatorPeers.values()) {
+      if (spectator.controlDc?.readyState === "open") {
+        spectator.controlDc.send(JSON.stringify({ type: "heartbeat", ts: Date.now() }));
+      }
+    }
   }
 
   sendChatMessage(text: string): ChatMessage | null {
-    if (this.chatDc?.readyState !== "open") return null;
     const trimmed = text.trim().slice(0, 300);
     if (!trimmed) return null;
+
+    const message: ChatMessage = {
+      id: `chat-${Date.now()}-${++this._chatSeq}`,
+      text: trimmed,
+      sentAt: Date.now(),
+      authorName: this._localProfile.nickname,
+      authorAvatar: this._localProfile.avatar,
+      authorRole:
+        this._connectionMode === "spectator"
+          ? "spectator"
+          : this._connectionMode === "guest"
+            ? "guest"
+            : "host",
+    };
+
+    if (this.chatDc?.readyState !== "open") return null;
     if (this.chatDc.bufferedAmount > CHAT_BUFFER_THRESHOLD) {
       console.warn(`[PEER] sendChatMessage: backpressure, buffered=${this.chatDc.bufferedAmount}`);
       return null;
     }
-    const message = {
-      id: `chat-${Date.now()}-${++this._chatSeq}`,
-      text: trimmed,
-      sentAt: Date.now(),
-    };
+
     this.chatDc.send(JSON.stringify({ type: "chat-message", ...message }));
+
+    if (this._connectionMode === "host") {
+      this.broadcastChatToSpectators(message);
+    }
+
     return message;
   }
 
@@ -269,69 +337,31 @@ export class NetplayPeer {
 
   /** Add video+audio tracks from a MediaStream to the peer connection and trigger renegotiation */
   startVideoStreaming(stream: MediaStream) {
+    this._stream = stream;
+
     if (!this.pc) {
       console.warn("[PEER] startVideoStreaming: no peer connection");
-      return;
+    } else {
+      this.replaceStreamTracks(this.pc, this._videoSenders, stream);
     }
 
-    // Remove any previously added video/audio senders
-    for (const sender of this._videoSenders) {
-      try {
-        this.pc.removeTrack(sender);
-      } catch {
-        /* ignore */
-      }
-    }
-    this._videoSenders = [];
-
-    // Add video tracks
-    for (const track of stream.getVideoTracks()) {
-      const sender = this.pc.addTrack(track, stream);
-      this._videoSenders.push(sender);
-
-      // Set encoding parameters for quality + low latency
-      try {
-        const params = sender.getParameters();
-        if (params.encodings && params.encodings.length > 0) {
-          params.encodings[0].maxBitrate = 5_000_000; // 5 Mbps
-          params.encodings[0].maxFramerate = 60;
-          params.encodings[0].scaleResolutionDownBy = 1.0; // no downscale
-        }
-        params.degradationPreference = "maintain-resolution";
-        sender.setParameters(params).catch(() => {});
-      } catch {
-        /* not all browsers support setParameters */
-      }
-    }
-
-    // Add audio tracks (only live & enabled ones)
-    for (const track of stream.getAudioTracks()) {
-      if (track.readyState !== "live" || !track.enabled) {
-        console.warn("[PEER] skipping audio track (not live/enabled):", track.readyState, track.enabled);
-        continue;
-      }
-      const sender = this.pc.addTrack(track, stream);
-      this._videoSenders.push(sender);
+    for (const spectator of this._spectatorPeers.values()) {
+      this.replaceStreamTracks(spectator.pc, spectator.senders, stream);
     }
 
     console.log(
       `[PEER] startVideoStreaming: added ${stream.getVideoTracks().length} video + ${stream.getAudioTracks().length} audio track(s)`,
     );
-    // onnegotiationneeded will fire automatically and handle renegotiation
   }
 
   /** Stop sending video tracks */
   stopVideoStreaming() {
-    if (!this.pc) return;
+    this._stream = null;
+    this.removeStreamTracks(this.pc, this._videoSenders);
 
-    for (const sender of this._videoSenders) {
-      try {
-        this.pc.removeTrack(sender);
-      } catch {
-        /* ignore */
-      }
+    for (const spectator of this._spectatorPeers.values()) {
+      this.removeStreamTracks(spectator.pc, spectator.senders);
     }
-    this._videoSenders = [];
   }
 
   // --- Fire-and-forget resync ---
@@ -382,6 +412,11 @@ export class NetplayPeer {
     this.repairDc?.close();
     this.chatDc?.close();
     this.pc?.close();
+    for (const spectator of this._spectatorPeers.values()) {
+      spectator.chatDc?.close();
+      spectator.controlDc?.close();
+      spectator.pc.close();
+    }
     this.signaling.close();
     this.inputDc = null;
     this.controlDc = null;
@@ -391,6 +426,8 @@ export class NetplayPeer {
     this.pc = null;
     this._gameplayConnected = false;
     this._gameplayTransportState = "closed";
+    this._spectatorPeers.clear();
+    this._stream = null;
   }
 
   // --- Private ---
@@ -406,12 +443,34 @@ export class NetplayPeer {
         break;
 
       case "guest-joined":
+        this._guestProfile = {
+          nickname: msg.guestNickname,
+          avatar: msg.guestAvatar,
+        };
         this.handler.onGuestJoined?.(msg as { guestNickname?: string; guestAvatar?: string });
         this.startAsHost();
         break;
 
+      case "spectator-joined":
+        if (this._connectionMode === "host") {
+          this.createSpectatorConnection(msg);
+        }
+        break;
+
+      case "spectator-disconnected":
+        if (this._connectionMode === "host") {
+          this.cleanupSpectatorPeer(msg.spectatorId);
+        }
+        break;
+
       case "offer":
-        if (this.pc) {
+        if (msg.spectatorId && this._connectionMode === "spectator") {
+          if (this.pc) {
+            this.handleRenegotiationOffer(msg.sdp);
+          } else {
+            this.handleOffer(msg.sdp);
+          }
+        } else if (this.pc) {
           // Renegotiation on existing connection
           this.handleRenegotiationOffer(msg.sdp);
         } else {
@@ -420,11 +479,19 @@ export class NetplayPeer {
         break;
 
       case "answer":
-        this.pc?.setRemoteDescription(msg.sdp);
+        if (msg.spectatorId) {
+          this.handleSpectatorAnswer(msg.spectatorId, msg.sdp);
+        } else {
+          this.pc?.setRemoteDescription(msg.sdp);
+        }
         break;
 
       case "ice-candidate":
-        this.pc?.addIceCandidate(msg.candidate);
+        if (msg.spectatorId) {
+          this.handleSpectatorIceCandidate(msg.spectatorId, msg.candidate);
+        } else {
+          this.pc?.addIceCandidate(msg.candidate);
+        }
         break;
 
       case "peer-disconnected":
@@ -440,17 +507,8 @@ export class NetplayPeer {
   private setupPeerConnection() {
     this.pc = new RTCPeerConnection(RTC_CONFIG);
 
-    // Prefer H264 Constrained Baseline for hardware-accelerated low-latency encode
-    try {
-      const txv = this.pc.addTransceiver("video", { direction: "sendrecv" });
-      const codecs = RTCRtpReceiver.getCapabilities?.("video")?.codecs ?? [];
-      const h264 = codecs.filter((c) => c.mimeType === "video/H264");
-      const rest = codecs.filter((c) => c.mimeType !== "video/H264");
-      if (h264.length > 0) {
-        txv.setCodecPreferences([...h264, ...rest]);
-      }
-    } catch {
-      /* setCodecPreferences not supported — skip */
+    if (this._connectionMode !== "spectator") {
+      this.applyPreferredVideoCodecs(this.pc);
     }
 
     this.pc.onicecandidate = (e) => {
@@ -495,6 +553,39 @@ export class NetplayPeer {
   }
 
   private emitGameplayTransportState() {
+    if (this._connectionMode === "spectator") {
+      const controlState = this.controlDc?.readyState ?? "closed";
+      let nextState: GameplayTransportState = "closed";
+
+      if (controlState === "open") {
+        nextState = "open";
+      } else if (controlState === "closing") {
+        nextState = "closing";
+      } else if (controlState === "connecting") {
+        nextState = "connecting";
+      }
+
+      if (nextState !== this._gameplayTransportState) {
+        this._gameplayTransportState = nextState;
+        this.handler.onDataChannelState?.(nextState);
+      }
+
+      if (!this._gameplayConnected && nextState === "open") {
+        this._gameplayConnected = true;
+        this.handler.onConnected();
+        return;
+      }
+
+      if (this._gameplayConnected && nextState !== "open" && !this._closing) {
+        this._gameplayConnected = false;
+        this.handler.onDisconnected();
+        return;
+      }
+
+      this._gameplayConnected = nextState === "open";
+      return;
+    }
+
     const inputState = this.inputDc?.readyState ?? "closed";
     const controlState = this.controlDc?.readyState ?? "closed";
     const stateState = this.stateDc?.readyState ?? "closed";
@@ -697,12 +788,21 @@ export class NetplayPeer {
         if (!pendingState) return;
 
         const chunk = new Uint8Array(e.data);
-        const nextOffset = Math.min(pendingState.writeOffset + chunk.byteLength, pendingState.totalBytes);
-        pendingState.buffer.set(chunk.subarray(0, nextOffset - pendingState.writeOffset), pendingState.writeOffset);
+        const nextOffset = Math.min(
+          pendingState.writeOffset + chunk.byteLength,
+          pendingState.totalBytes,
+        );
+        pendingState.buffer.set(
+          chunk.subarray(0, nextOffset - pendingState.writeOffset),
+          pendingState.writeOffset,
+        );
         pendingState.writeOffset = nextOffset;
         pendingState.bytesReceived += chunk.byteLength;
         pendingState.chunksReceived += 1;
-        if (pendingState.chunksReceived >= pendingState.chunks || pendingState.writeOffset >= pendingState.totalBytes) {
+        if (
+          pendingState.chunksReceived >= pendingState.chunks ||
+          pendingState.writeOffset >= pendingState.totalBytes
+        ) {
           const full = pendingState.buffer;
           pendingState = null;
           this.handler.onSaveState?.(full.buffer as ArrayBuffer);
@@ -807,14 +907,23 @@ export class NetplayPeer {
         const msg = JSON.parse(e.data);
 
         if (msg.type === "chat-message") {
-          const text = typeof msg.text === "string" ? msg.text.trim().slice(0, 300) : "";
-          if (!text) return;
+          const chatMessage = this.normalizeIncomingChatMessage(msg);
+          if (!chatMessage) return;
 
-          this.handler.onChatMessage?.({
-            id: typeof msg.id === "string" ? msg.id : `chat-${Date.now()}`,
-            text,
-            sentAt: typeof msg.sentAt === "number" ? msg.sentAt : Date.now(),
-          });
+          if (this._connectionMode === "host") {
+            const guestMessage: ChatMessage = {
+              ...chatMessage,
+              authorName: this._guestProfile?.nickname || chatMessage.authorName || "게스트",
+              authorAvatar: this._guestProfile?.avatar || chatMessage.authorAvatar || "🎮",
+              authorRole: "guest",
+            };
+
+            this.handler.onChatMessage?.(guestMessage);
+            this.broadcastChatToSpectators(guestMessage);
+            return;
+          }
+
+          this.handler.onChatMessage?.(chatMessage);
         } else if (msg.type === "chat-typing") {
           this.handler.onChatTyping?.(!!msg.isTyping);
         }
@@ -858,6 +967,9 @@ export class NetplayPeer {
       }
 
       if (e.channel.label === INPUT_CHANNEL_LABEL) {
+        if (this._connectionMode === "spectator") {
+          return;
+        }
         this.setupInputDataChannel(e.channel);
         return;
       }
@@ -868,11 +980,17 @@ export class NetplayPeer {
       }
 
       if (e.channel.label === STATE_CHANNEL_LABEL) {
+        if (this._connectionMode === "spectator") {
+          return;
+        }
         this.setupStateDataChannel(e.channel);
         return;
       }
 
       if (e.channel.label === REPAIR_CHANNEL_LABEL) {
+        if (this._connectionMode === "spectator") {
+          return;
+        }
         this.setupRepairDataChannel(e.channel);
       }
     };
@@ -894,6 +1012,252 @@ export class NetplayPeer {
     } catch (err) {
       console.warn("[PEER] Renegotiation failed:", err);
     }
+  }
+
+  private normalizeIncomingChatMessage(msg: Record<string, unknown>): ChatMessage | null {
+    const text = typeof msg.text === "string" ? msg.text.trim().slice(0, 300) : "";
+    if (!text) {
+      return null;
+    }
+
+    const authorRole =
+      msg.authorRole === "host" || msg.authorRole === "guest" || msg.authorRole === "spectator"
+        ? msg.authorRole
+        : undefined;
+
+    return {
+      id: typeof msg.id === "string" ? msg.id : `chat-${Date.now()}`,
+      text,
+      sentAt: typeof msg.sentAt === "number" ? msg.sentAt : Date.now(),
+      authorAvatar: typeof msg.authorAvatar === "string" ? msg.authorAvatar : undefined,
+      authorName: typeof msg.authorName === "string" ? msg.authorName : undefined,
+      authorRole,
+    };
+  }
+
+  private broadcastChatToGuest(message: ChatMessage) {
+    if (this.chatDc?.readyState !== "open") {
+      return;
+    }
+
+    this.chatDc.send(JSON.stringify({ type: "chat-message", ...message }));
+  }
+
+  private broadcastChatToSpectators(message: ChatMessage, excludedSpectatorId?: string) {
+    for (const spectator of this._spectatorPeers.values()) {
+      if (spectator.id === excludedSpectatorId) {
+        continue;
+      }
+
+      if (spectator.chatDc?.readyState === "open") {
+        spectator.chatDc.send(JSON.stringify({ type: "chat-message", ...message }));
+      }
+    }
+  }
+
+  private createSpectatorConnection(info: {
+    spectatorId: string;
+    spectatorNickname?: string;
+    spectatorAvatar?: string;
+  }) {
+    if (this._spectatorPeers.has(info.spectatorId)) {
+      return;
+    }
+
+    const pc = new RTCPeerConnection(RTC_CONFIG);
+    const spectator: SpectatorPeerState = {
+      id: info.spectatorId,
+      nickname: info.spectatorNickname,
+      avatar: info.spectatorAvatar,
+      pc,
+      chatDc: null,
+      controlDc: null,
+      senders: [],
+      negotiating: false,
+    };
+
+    this._spectatorPeers.set(spectator.id, spectator);
+
+    this.applyPreferredVideoCodecs(pc);
+
+    pc.onicecandidate = (event) => {
+      if (event.candidate) {
+        this.signaling.send({
+          type: "ice-candidate",
+          candidate: event.candidate.toJSON(),
+          spectatorId: spectator.id,
+        });
+      }
+    };
+
+    pc.onconnectionstatechange = () => {
+      if (pc.connectionState === "disconnected" || pc.connectionState === "failed") {
+        this.cleanupSpectatorPeer(spectator.id);
+      }
+    };
+
+    pc.onnegotiationneeded = async () => {
+      if (spectator.negotiating) {
+        return;
+      }
+
+      spectator.negotiating = true;
+      try {
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
+        this.signaling.send({
+          type: "offer",
+          sdp: pc.localDescription!,
+          spectatorId: spectator.id,
+        });
+      } catch (error) {
+        console.warn("[PEER] spectator renegotiation failed:", error);
+      } finally {
+        spectator.negotiating = false;
+      }
+    };
+
+    const controlDc = pc.createDataChannel(CONTROL_CHANNEL_LABEL);
+    spectator.controlDc = controlDc;
+    controlDc.onopen = () => undefined;
+    controlDc.onclose = () => undefined;
+
+    const chatDc = pc.createDataChannel(CHAT_CHANNEL_LABEL);
+    spectator.chatDc = chatDc;
+    chatDc.onmessage = (event) => {
+      if (typeof event.data !== "string") {
+        return;
+      }
+
+      try {
+        const msg = JSON.parse(event.data);
+        if (msg.type !== "chat-message") {
+          return;
+        }
+
+        const chatMessage = this.normalizeIncomingChatMessage(msg);
+        if (!chatMessage) {
+          return;
+        }
+
+        const spectatorMessage: ChatMessage = {
+          ...chatMessage,
+          authorName: spectator.nickname || chatMessage.authorName || "관전자",
+          authorAvatar: spectator.avatar || chatMessage.authorAvatar || "👀",
+          authorRole: "spectator",
+        };
+
+        this.handler.onChatMessage?.(spectatorMessage);
+        this.broadcastChatToGuest(spectatorMessage);
+        this.broadcastChatToSpectators(spectatorMessage, spectator.id);
+      } catch {
+        /* ignore */
+      }
+    };
+
+    if (this._stream) {
+      this.replaceStreamTracks(pc, spectator.senders, this._stream);
+    }
+  }
+
+  private cleanupSpectatorPeer(spectatorId: string) {
+    const spectator = this._spectatorPeers.get(spectatorId);
+    if (!spectator) {
+      return;
+    }
+
+    spectator.chatDc?.close();
+    spectator.controlDc?.close();
+    this.removeStreamTracks(spectator.pc, spectator.senders);
+    spectator.pc.close();
+    this._spectatorPeers.delete(spectatorId);
+  }
+
+  private handleSpectatorAnswer(spectatorId: string, sdp: RTCSessionDescriptionInit) {
+    const spectator = this._spectatorPeers.get(spectatorId);
+    if (!spectator) {
+      return;
+    }
+
+    void spectator.pc.setRemoteDescription(sdp).catch(() => undefined);
+  }
+
+  private handleSpectatorIceCandidate(spectatorId: string, candidate: RTCIceCandidateInit) {
+    const spectator = this._spectatorPeers.get(spectatorId);
+    if (!spectator) {
+      return;
+    }
+
+    void spectator.pc.addIceCandidate(candidate).catch(() => undefined);
+  }
+
+  private applyPreferredVideoCodecs(pc: RTCPeerConnection) {
+    try {
+      const txv = pc.addTransceiver("video", { direction: "sendrecv" });
+      const codecs = RTCRtpReceiver.getCapabilities?.("video")?.codecs ?? [];
+      const h264 = codecs.filter((codec) => codec.mimeType === "video/H264");
+      const rest = codecs.filter((codec) => codec.mimeType !== "video/H264");
+      if (h264.length > 0) {
+        txv.setCodecPreferences([...h264, ...rest]);
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+
+  private replaceStreamTracks(
+    pc: RTCPeerConnection | null,
+    senders: RTCRtpSender[],
+    stream: MediaStream,
+  ) {
+    if (!pc) {
+      return;
+    }
+
+    this.removeStreamTracks(pc, senders);
+
+    for (const track of stream.getVideoTracks()) {
+      const sender = pc.addTrack(track, stream);
+      senders.push(sender);
+
+      try {
+        const params = sender.getParameters();
+        if (params.encodings && params.encodings.length > 0) {
+          params.encodings[0].maxBitrate = 5_000_000;
+          params.encodings[0].maxFramerate = 60;
+          params.encodings[0].scaleResolutionDownBy = 1.0;
+        }
+        params.degradationPreference = "maintain-resolution";
+        void sender.setParameters(params).catch(() => undefined);
+      } catch {
+        /* ignore */
+      }
+    }
+
+    for (const track of stream.getAudioTracks()) {
+      if (track.readyState !== "live" || !track.enabled) {
+        continue;
+      }
+
+      senders.push(pc.addTrack(track, stream));
+    }
+  }
+
+  private removeStreamTracks(pc: RTCPeerConnection | null, senders: RTCRtpSender[]) {
+    if (!pc) {
+      senders.length = 0;
+      return;
+    }
+
+    for (const sender of senders) {
+      try {
+        pc.removeTrack(sender);
+      } catch {
+        /* ignore */
+      }
+    }
+
+    senders.length = 0;
   }
 
   private sendRepairSync() {

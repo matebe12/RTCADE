@@ -5,13 +5,14 @@ import type { ResyncStatePayload } from "@/netplay/peer";
 import { useNetplayInitialSync } from "@/netplay/useNetplayInitialSync";
 import { useNetplayResyncLoop } from "@/netplay/useNetplayResyncLoop";
 import type { SystemCore } from "@/components/EmulatorPlayer";
+import type { NetplaySessionRole } from "../../shared/emulator-protocol";
 
 interface UseNetplaySyncRuntimeOptions {
   dcState: string;
   gameStarted: boolean;
   peerRef: MutableRefObject<NetplayPeer | null>;
   emulatorRef: RefObject<HTMLDivElement | null>;
-  roleRef: MutableRefObject<"host" | "guest" | null>;
+  roleRef: MutableRefObject<NetplaySessionRole | null>;
   lastInputTimeRef: MutableRefObject<number>;
   sessionCoreRef: MutableRefObject<SystemCore | null>;
   /** When true, use video streaming instead of state sync */
@@ -22,6 +23,7 @@ interface UseNetplaySyncRuntimeOptions {
   setGameStarted: (gameStarted: boolean) => void;
   updateSync: (message: string) => void;
   markSessionStarted: () => void;
+  onHostGameStarted?: () => void;
   onStartVideoCapture?: () => void;
 }
 
@@ -40,6 +42,7 @@ export function useNetplaySyncRuntime({
   setGameStarted,
   updateSync,
   markSessionStarted,
+  onHostGameStarted,
   onStartVideoCapture,
 }: UseNetplaySyncRuntimeOptions) {
   const gameStartedRef = useRef(false);
@@ -85,6 +88,7 @@ export function useNetplaySyncRuntime({
     setGameStarted,
     updateSync,
     markSessionStarted,
+    onHostGameStarted,
     startPeriodicResync,
     onStartVideoCapture,
   });

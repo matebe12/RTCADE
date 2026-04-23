@@ -4,6 +4,7 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import { NicknameSetup } from "@/components/NicknameSetup";
 import { Toaster } from "@/components/ui/sonner";
 import { type UserProfile, getUserProfile } from "@/lib/user-profile";
+import { AppTutorialProvider } from "@/tutorial/AppTutorialProvider";
 
 const AppShell = lazy(() => import("@/components/layout/AppShell"));
 const HomePage = lazy(() => import("@/pages/HomePage"));
@@ -29,20 +30,26 @@ function App() {
 
   return (
     <>
-      <Suspense fallback={<RouteFallback />}>
-        <Routes>
-          <Route element={<AppShell profile={profile} onOpenProfile={() => setShowSetup(true)} />}>
-            <Route index element={<HomePage hasProfile={!needsSetup} />} />
-            <Route path="netplay" element={<NetplayPage />} />
-            <Route path="notices" element={<NoticesPage />} />
+      <AppTutorialProvider blocked={needsSetup || showSetup}>
+        <Suspense fallback={<RouteFallback />}>
+          <Routes>
             <Route
-              path="settings"
-              element={<SettingsPage profile={profile} onOpenProfile={() => setShowSetup(true)} />}
-            />
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Route>
-        </Routes>
-      </Suspense>
+              element={<AppShell profile={profile} onOpenProfile={() => setShowSetup(true)} />}
+            >
+              <Route index element={<HomePage hasProfile={!needsSetup} />} />
+              <Route path="netplay" element={<NetplayPage />} />
+              <Route path="notices" element={<NoticesPage />} />
+              <Route
+                path="settings"
+                element={
+                  <SettingsPage profile={profile} onOpenProfile={() => setShowSetup(true)} />
+                }
+              />
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Route>
+          </Routes>
+        </Suspense>
+      </AppTutorialProvider>
 
       <NicknameSetup
         open={needsSetup || showSetup}
