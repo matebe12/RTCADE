@@ -26,17 +26,6 @@ function normalizeOptionalEnv(value: string | undefined) {
   return trimmed && trimmed.length > 0 ? trimmed : undefined;
 }
 
-function normalizeAdProvider(value: string | undefined): AdProvider {
-  switch (value?.trim().toLowerCase()) {
-    case "placeholder":
-    case "coupang":
-    case "adsense":
-      return value.trim().toLowerCase() as AdProvider;
-    default:
-      return "none";
-  }
-}
-
 function normalizeEmulatorJsDataUrl(url: string) {
   return url.endsWith("/") ? url : `${url}/`;
 }

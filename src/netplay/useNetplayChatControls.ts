@@ -46,7 +46,6 @@ export function useNetplayChatControls({
   chatChannelState,
   peerRef,
   emulatorRef,
-  opponentProfileRef,
   appendChatMessage,
   setChatOpen,
   setChatDraft,
