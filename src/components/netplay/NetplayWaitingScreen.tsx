@@ -1,11 +1,14 @@
+import { useEffect, useState } from "react";
 import { ArrowLeft, Globe, Loader2, Lock, Radio, Users } from "lucide-react";
 
+import { SYSTEM_OPTIONS } from "@/components/EmulatorPlayer";
 import { UserBadge } from "@/components/UserBadge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { RoomCodeDisplay } from "@/components/RoomCodeDisplay";
-import { parseRomName } from "@/lib/game-names";
+import { CATEGORY_INFO, getRomCategory, parseRomName } from "@/lib/game-names";
+import { getFallbackGameThumbnailUrl, getGameThumbnailUrl } from "@/lib/game-thumbnails";
 import type { RoomLobbyParticipantInfo } from "@/stores/useNetplayLobbyStore";
 
 interface NetplayWaitingScreenProps {
@@ -75,6 +78,17 @@ export default function NetplayWaitingScreen({
   onStart,
 }: NetplayWaitingScreenProps) {
   const canPressStart = canStart || canStartSolo;
+  const displayName = parseRomName(romFilename, core);
+  const categoryInfo = CATEGORY_INFO[getRomCategory(romFilename, core)];
+  const systemLabel = SYSTEM_OPTIONS.find((option) => option.value === core)?.label ?? core;
+  const thumbnailUrl = getGameThumbnailUrl(romFilename, core);
+  const fallbackThumbnailUrl = getFallbackGameThumbnailUrl(romFilename, core);
+  const [imgError, setImgError] = useState(false);
+  const displayThumbnailUrl = imgError || !thumbnailUrl ? fallbackThumbnailUrl : thumbnailUrl;
+
+  useEffect(() => {
+    setImgError(false);
+  }, [thumbnailUrl, romFilename, core]);
 
   return (
     <Card className="flex h-full w-full flex-col border-border/70 bg-card/95">
@@ -88,18 +102,53 @@ export default function NetplayWaitingScreen({
         <p className="text-xs text-muted-foreground">{getRoleHint(role)}</p>
         <RoomCodeDisplay code={roomCode} />
 
-        <div className="flex flex-wrap items-center gap-2">
-          <Badge variant="secondary" className="gap-1 text-[10px]">
-            {isPublic ? <Globe className="size-3" /> : <Lock className="size-3" />}
-            {isPublic ? "공개 방" : "초대 코드 방"}
-          </Badge>
-          <Badge variant="secondary" className="gap-1 text-[10px]">
-            <Users className="size-3" />
-            관전자 자리 {spectatorSlotsRemaining}개 남음
-          </Badge>
-          <Badge variant="secondary" className="text-[10px]">
-            {parseRomName(romFilename, core)}
-          </Badge>
+        <div className="overflow-hidden rounded-xl border border-border/70 bg-background/45">
+          <div className="grid gap-0 sm:grid-cols-[180px_minmax(0,1fr)]">
+            <div className="bg-black/30">
+              <img
+                src={displayThumbnailUrl}
+                alt={displayName}
+                loading="lazy"
+                onError={displayThumbnailUrl === thumbnailUrl ? () => setImgError(true) : undefined}
+                className="aspect-[4/3] h-full w-full object-contain"
+              />
+            </div>
+
+            <div className="flex min-w-0 flex-col gap-3 p-4">
+              <div className="space-y-1">
+                <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">선택한 게임</p>
+                <h3 className="text-base font-semibold leading-tight text-foreground">{displayName}</h3>
+                <p className="truncate text-xs text-muted-foreground">{romFilename}</p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge variant="secondary" className="text-[10px]">
+                  {systemLabel}
+                </Badge>
+                <Badge variant="secondary" className="text-[10px]">
+                  {categoryInfo.icon} {categoryInfo.label}
+                </Badge>
+              </div>
+
+              <div className="grid gap-2 sm:grid-cols-2">
+                <div className="rounded-lg border border-border/60 bg-background/40 px-3 py-2">
+                  <p className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">방 유형</p>
+                  <div className="mt-1 flex items-center gap-1.5 text-xs font-medium text-foreground">
+                    {isPublic ? <Globe className="size-3.5 text-primary" /> : <Lock className="size-3.5 text-primary" />}
+                    <span>{isPublic ? "공개 방" : "초대 코드 방"}</span>
+                  </div>
+                </div>
+
+                <div className="rounded-lg border border-border/60 bg-background/40 px-3 py-2">
+                  <p className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">관전자 자리</p>
+                  <div className="mt-1 flex items-center gap-1.5 text-xs font-medium text-foreground">
+                    <Users className="size-3.5 text-primary" />
+                    <span>{spectatorSlotsRemaining}개 남음</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
 
         <div className="rounded-lg border border-border/70 bg-background/40 p-3">
