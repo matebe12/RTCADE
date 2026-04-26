@@ -354,6 +354,7 @@ const MAME_THUMBNAIL_NAMES: Record<string, string> = {
   strider: "Strider (World)",
   strider2: "Strider 2 (World 991213)",
   superman: "Superman (World 2 Players)",
+  suprmrio: "Vs. Super Mario Bros.",
   svc: "SNK vs. Capcom - SVC Chaos (MVS)",
 
   // ── T ──
@@ -433,6 +434,8 @@ const VERIFIED_THUMBNAIL_URLS: Record<string, string> = {
     "https://thumbnails.libretro.com/FBNeo%20-%20Arcade%20Games/Named_Snaps/Strikers%201945%20III%20(World)%20_%20Strikers%201999%20(Japan).png",
   samsho2:
     "https://thumbnails.libretro.com/SNK%20-%20Neo%20Geo/Named_Snaps/Samurai%20Shodown%20II%20_%20Shin%20Samurai%20Spirits%20-%20Haohmaru%20jigokuhen%20(NGM-063)(NGH-063).png",
+  suprmrio:
+    "https://thumbnails.libretro.com/MAME/Named_Snaps/Vs.%20Super%20Mario%20Bros..png",
   wboy3:
     "https://thumbnails.libretro.com/MAME/Named_Snaps/Wonder%20Boy%20III%20-%20Monster%20Lair%20(set%201).png",
 };
