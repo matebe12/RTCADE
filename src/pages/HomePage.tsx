@@ -4,7 +4,6 @@ import {
   Bell,
   CalendarDays,
   Gamepad2,
-  Globe,
   Radio,
   Trophy,
   Users,
@@ -167,29 +166,16 @@ function PopularGamesCard({ emptyCopy, games, periodKey, title }: PopularGamesCa
                       <div className="flex shrink-0 items-center gap-2">
                         <Button
                           asChild
-                          size="icon"
-                          className="size-8 rounded-full"
-                          aria-label={`${game.gameName} 같이하기`}
-                        >
-                          <NavLink
-                            to={buildPopularGameEntryHref("create-room", game)}
-                            title={`${game.gameName} 같이하기`}
-                          >
-                            <Globe className="size-4" />
-                          </NavLink>
-                        </Button>
-                        <Button
-                          asChild
-                          variant="outline"
-                          size="icon"
-                          className="size-8 rounded-full"
+                          size="sm"
+                          className="h-8 rounded-full px-3 text-[11px]"
                           aria-label={`${game.gameName} 혼자하기`}
                         >
                           <NavLink
-                            to={buildPopularGameEntryHref("solo", game)}
+                            to={buildPopularGameEntryHref("create-room", game)}
                             title={`${game.gameName} 혼자하기`}
                           >
                             <Gamepad2 className="size-4" />
+                            <span>혼자하기</span>
                           </NavLink>
                         </Button>
                       </div>
