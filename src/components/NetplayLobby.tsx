@@ -15,6 +15,7 @@ import SoloBrowseRomsScreen from "@/components/netplay/SoloBrowseRomsScreen";
 import SoloPlayingScreen from "@/components/netplay/SoloPlayingScreen";
 import { buildBackendUrl } from "@/lib/backend-url";
 import { getUserProfile, toggleFavoriteGame } from "@/lib/user-profile";
+import { NETPLAY_COPY } from "@/netplay/netplayCopy";
 import { useNetplayDiscovery } from "@/netplay/useNetplayDiscovery";
 import { useNetplaySession } from "@/netplay/useNetplaySession";
 import { useSoloSession } from "@/solo/useSoloSession";
@@ -102,10 +103,12 @@ export default function NetplayLobby() {
     handleChatDraftChange,
     handleChatShortcut,
     handleChatToggle,
+    handleChangeRoomGame,
     handleCreateRoom,
     handleEmulatorReady,
     handleJoinPublicRoom,
     handleJoinRoom,
+    handleKickRoomParticipant,
     handleLocalInput,
     handleSetRoomReady,
     handleStartRoomSession,
@@ -156,8 +159,12 @@ export default function NetplayLobby() {
 
   // GUEST: video stream received from HOST via WebRTC
   const [guestVideoStream, setGuestVideoStream] = useState<MediaStream | null>(null);
+  const [waitingRoomRoms, setWaitingRoomRoms] = useState<RomInfo[]>([]);
+  const [roomGamePickerOpen, setRoomGamePickerOpen] = useState(false);
+  const [roomGamePickerLoading, setRoomGamePickerLoading] = useState(false);
   const handledEntryRequestRef = useRef<string | null>(null);
   const currentLobbyStepRef = useRef(state.step);
+  const waitingRoomRole = state.step === "waiting" ? state.role : null;
 
   useEffect(() => {
     setVideoStreamCallbackRef.current = setGuestVideoStream;
@@ -169,6 +176,15 @@ export default function NetplayLobby() {
   useEffect(() => {
     currentLobbyStepRef.current = state.step;
   }, [state.step]);
+
+  useEffect(() => {
+    if (state.step === "waiting" && state.role === "host") {
+      return;
+    }
+
+    setRoomGamePickerOpen(false);
+    setRoomGamePickerLoading(false);
+  }, [state.step, waitingRoomRole]);
 
   useEffect(() => {
     const searchParams = new URLSearchParams(location.search);
@@ -317,6 +333,74 @@ export default function NetplayLobby() {
       setFavoriteGames(nextFavorites);
     },
     [setFavoriteGames],
+  );
+
+  const handleOpenRoomGamePicker = useCallback(async () => {
+    if (state.step !== "waiting" || state.role !== "host") {
+      return;
+    }
+
+    if (waitingRoomRoms.length > 0) {
+      setRoomGamePickerOpen(true);
+      return;
+    }
+
+    setRoomGamePickerLoading(true);
+    setError("");
+
+    try {
+      const response = await fetch(buildBackendUrl("/api/roms"));
+      if (!response.ok) {
+        throw new Error("failed");
+      }
+
+      const roms: RomInfo[] = await response.json();
+      if (roms.length === 0) {
+        setError(NETPLAY_COPY.romsUnavailable);
+        toast.error(NETPLAY_COPY.romsUnavailable);
+        return;
+      }
+
+      setWaitingRoomRoms(roms);
+      setRoomGamePickerOpen(true);
+    } catch {
+      setError(NETPLAY_COPY.romsLoadFailed);
+      toast.error(NETPLAY_COPY.romsLoadFailed);
+    } finally {
+      setRoomGamePickerLoading(false);
+    }
+  }, [setError, state.step, waitingRoomRole, waitingRoomRoms.length]);
+
+  const handleCloseRoomGamePicker = useCallback(() => {
+    setRoomGamePickerOpen(false);
+  }, []);
+
+  const handleChangeWaitingRoomGame = useCallback(
+    (rom: RomInfo) => {
+      if (state.step !== "waiting" || state.role !== "host") {
+        return;
+      }
+
+      setRoomGamePickerOpen(false);
+
+      if (
+        rom.path === state.romPath &&
+        rom.core === state.core &&
+        (rom.bios ?? undefined) === (state.biosPath ?? undefined)
+      ) {
+        return;
+      }
+
+      handleChangeRoomGame(rom);
+    },
+    [handleChangeRoomGame, state],
+  );
+
+  const handleKickWaitingRoomParticipant = useCallback(
+    (participantId: string) => {
+      handleKickRoomParticipant(participantId);
+    },
+    [handleKickRoomParticipant],
   );
 
   const canStartSoloFromLobby =
@@ -471,7 +555,9 @@ export default function NetplayLobby() {
         roomCode={state.code}
         role={state.role}
         romFilename={state.romFilename}
+        romPath={state.romPath}
         core={state.core}
+        biosPath={state.biosPath}
         isPublic={state.isPublic}
         participants={state.participants}
         canStart={state.canStart}
@@ -479,8 +565,15 @@ export default function NetplayLobby() {
         isReady={state.isReady}
         spectatorSlotsRemaining={state.spectatorSlotsRemaining}
         status={status}
+        availableRoomRoms={waitingRoomRoms}
+        roomGamePickerOpen={roomGamePickerOpen}
+        roomGamePickerLoading={roomGamePickerLoading}
         onBack={handleBack}
         onReadyChange={handleSetRoomReady}
+        onOpenRoomGamePicker={() => void handleOpenRoomGamePicker()}
+        onCloseRoomGamePicker={handleCloseRoomGamePicker}
+        onChangeRoomGame={handleChangeWaitingRoomGame}
+        onKickParticipant={handleKickWaitingRoomParticipant}
         onStart={handleWaitingRoomStart}
       />
     );

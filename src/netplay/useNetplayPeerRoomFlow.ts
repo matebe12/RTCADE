@@ -14,6 +14,7 @@ import {
   type ActiveSession,
   type LobbyState,
   type OpponentProfile,
+  type RomInfo,
   type RoomVisibility,
 } from "@/stores/useNetplayLobbyStore";
 import type { NetplaySessionRole } from "../../shared/emulator-protocol";
@@ -151,6 +152,22 @@ export function useNetplayPeerRoomFlow({
 
       setStatus(NETPLAY_COPY.roomStartRequested);
       peerRef.current?.markSessionStarted();
+    },
+    handleKickRoomParticipant: (participantId: string) => {
+      if (state.step !== "waiting" || state.role !== "host" || !participantId || participantId === "host") {
+        return;
+      }
+
+      setStatus(NETPLAY_COPY.roomKickRequested);
+      peerRef.current?.kickRoomParticipant(participantId);
+    },
+    handleChangeRoomGame: (rom: RomInfo) => {
+      if (state.step !== "waiting" || state.role !== "host") {
+        return;
+      }
+
+      setStatus(NETPLAY_COPY.roomGameChangeRequested);
+      peerRef.current?.updateRoomGame(rom.path, rom.core, rom.bios);
     },
     handleSpectatePublicRoom,
     handleSpectateRoom,

@@ -53,6 +53,7 @@ export type PeerEventHandler = {
     participantId: string;
     role: "guest" | "spectator";
     romFilename: string;
+    romPath: string;
     core: string;
     bios?: string;
     hostNickname?: string;
@@ -77,6 +78,7 @@ export type PeerEventHandler = {
   onHeartbeat?: (ts: number) => void;
   onRoomLobbyUpdated?: (info: Omit<RoomLobbySnapshotMessage, "type">) => void;
   onSessionStarted?: (info: Omit<RoomSessionStartedMessage, "type">) => void;
+  onRoomKicked?: (message: string) => void;
 };
 
 type GameplayTransportState = "closed" | "connecting" | "open" | "closing";
@@ -232,6 +234,22 @@ export class NetplayPeer {
     }
 
     this.signaling.send({ type: "set-room-ready", ready });
+  }
+
+  updateRoomGame(romPath: string, core: string, bios?: string) {
+    if (this._connectionMode !== "host" || this._sessionStarted) {
+      return;
+    }
+
+    this.signaling.send({ type: "update-room-game", romPath, core, bios });
+  }
+
+  kickRoomParticipant(participantId: string) {
+    if (this._connectionMode !== "host" || !participantId || participantId === "host") {
+      return;
+    }
+
+    this.signaling.send({ type: "kick-room-participant", participantId });
   }
 
   markSessionStarted() {
@@ -533,6 +551,11 @@ export class NetplayPeer {
         this.handler.onRoomLobbyUpdated?.({
           code: msg.code,
           roomState: msg.roomState,
+          romFilename: msg.romFilename,
+          romPath: msg.romPath,
+          core: msg.core,
+          bios: msg.bios,
+          isPublic: msg.isPublic,
           participants: msg.participants,
           canStart: msg.canStart,
           hasGuest: msg.hasGuest,
@@ -590,11 +613,16 @@ export class NetplayPeer {
           code: msg.code,
           role: msg.role,
           romFilename: msg.romFilename,
+          romPath: msg.romPath,
           core: msg.core,
           bios: msg.bios,
           hostNickname: msg.hostNickname,
           hostAvatar: msg.hostAvatar,
         });
+        break;
+
+      case "room-kicked":
+        this.handler.onRoomKicked?.(msg.message);
         break;
 
       case "offer":

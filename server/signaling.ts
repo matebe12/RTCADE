@@ -23,6 +23,10 @@ function parseMessage(raw: RawData): Record<string, unknown> | null {
   }
 }
 
+function getRomFilename(romPath: string) {
+  return romPath.split("/").pop() ?? romPath;
+}
+
 function broadcastRoomLobby(room: Room, roomStore: RoomStore) {
   const message = {
     type: "room-lobby-updated",
@@ -41,6 +45,8 @@ function broadcastRoomLobby(room: Room, roomStore: RoomStore) {
 }
 
 export function attachSignalingServer(wss: WebSocketServer, roomStore: RoomStore) {
+  const kickedSockets = new WeakSet<WebSocket>();
+
   wss.on("connection", (ws) => {
     let myRoom: Room | null = null;
     let role: ClientRole = null;
@@ -117,7 +123,8 @@ export function attachSignalingServer(wss: WebSocketServer, roomStore: RoomStore
             code: room.code,
             participantId: "guest",
             role: "guest",
-            romFilename: room.romFilename,
+            romFilename: getRomFilename(room.romFilename),
+            romPath: room.romFilename,
             core: room.core,
             bios: room.bios,
             hostNickname: room.hostNickname,
@@ -166,7 +173,8 @@ export function attachSignalingServer(wss: WebSocketServer, roomStore: RoomStore
             code: room.code,
             participantId: attachedSpectator.id,
             role: "spectator",
-            romFilename: room.romFilename,
+            romFilename: getRomFilename(room.romFilename),
+            romPath: room.romFilename,
             core: room.core,
             bios: room.bios,
             hostNickname: room.hostNickname,
@@ -198,6 +206,65 @@ export function attachSignalingServer(wss: WebSocketServer, roomStore: RoomStore
           break;
         }
 
+        case "update-room-game": {
+          if (!myRoom || myRoom.state !== "waiting" || role !== "host") {
+            return;
+          }
+
+          const romPath = typeof message.romPath === "string" ? String(message.romPath) : "";
+
+          if (!romPath) {
+            send(ws, { type: "error", message: "변경할 게임 정보를 확인하지 못했습니다." });
+            return;
+          }
+
+          roomStore.updateRoomGame(myRoom, {
+            romPath,
+            core: String(message.core || "nes"),
+            bios: message.bios ? String(message.bios) : undefined,
+          });
+          broadcastRoomLobby(myRoom, roomStore);
+          break;
+        }
+
+        case "kick-room-participant": {
+          if (!myRoom || myRoom.state !== "waiting" || role !== "host") {
+            return;
+          }
+
+          const participantId =
+            typeof message.participantId === "string" ? String(message.participantId) : null;
+
+          if (!participantId || participantId === "host") {
+            return;
+          }
+
+          let target: WebSocket | null = null;
+
+          if (participantId === "guest" && myRoom.guest) {
+            target = myRoom.guest.socket;
+            roomStore.detachGuest(myRoom);
+          } else {
+            target = roomStore.findSpectatorSocket(myRoom, participantId);
+            if (target) {
+              roomStore.detachSpectator(myRoom, participantId);
+            }
+          }
+
+          if (!target) {
+            send(ws, { type: "error", message: "해당 참가자를 찾을 수 없습니다." });
+            return;
+          }
+
+          kickedSockets.add(target);
+          send(target, {
+            type: "room-kicked",
+            message: "방장이 대기실에서 내보냈습니다. 다시 참여하려면 방에 재입장해 주세요.",
+          });
+          broadcastRoomLobby(myRoom, roomStore);
+          break;
+        }
+
         case "session-started": {
           if (role === "host" && myRoom) {
             if (!roomStore.markPlaying(myRoom)) {
@@ -213,7 +280,8 @@ export function attachSignalingServer(wss: WebSocketServer, roomStore: RoomStore
               type: "room-session-started",
               code: myRoom.code,
               role: "host",
-              romFilename: myRoom.romFilename,
+              romFilename: getRomFilename(myRoom.romFilename),
+              romPath: myRoom.romFilename,
               core: myRoom.core,
               bios: myRoom.bios,
               hostNickname: myRoom.hostNickname,
@@ -225,7 +293,8 @@ export function attachSignalingServer(wss: WebSocketServer, roomStore: RoomStore
                 type: "room-session-started",
                 code: myRoom.code,
                 role: "guest",
-                romFilename: myRoom.romFilename,
+                romFilename: getRomFilename(myRoom.romFilename),
+                romPath: myRoom.romFilename,
                 core: myRoom.core,
                 bios: myRoom.bios,
                 hostNickname: myRoom.hostNickname,
@@ -238,7 +307,8 @@ export function attachSignalingServer(wss: WebSocketServer, roomStore: RoomStore
                 type: "room-session-started",
                 code: myRoom.code,
                 role: "spectator",
-                romFilename: myRoom.romFilename,
+                romFilename: getRomFilename(myRoom.romFilename),
+                romPath: myRoom.romFilename,
                 core: myRoom.core,
                 bios: myRoom.bios,
                 hostNickname: myRoom.hostNickname,
@@ -287,6 +357,11 @@ export function attachSignalingServer(wss: WebSocketServer, roomStore: RoomStore
       clearInterval(pingTimer);
 
       if (!myRoom) {
+        return;
+      }
+
+      if (kickedSockets.has(ws)) {
+        kickedSockets.delete(ws);
         return;
       }
 

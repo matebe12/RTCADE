@@ -11,6 +11,11 @@ export interface RoomLobbySnapshotMessage {
   type: "room-lobby-updated";
   code: string;
   roomState: "waiting" | "playing";
+  romFilename: string;
+  romPath: string;
+  core: string;
+  bios?: string;
+  isPublic: boolean;
   participants: RoomLobbyParticipant[];
   canStart: boolean;
   hasGuest: boolean;
@@ -23,6 +28,7 @@ export interface RoomSessionStartedMessage {
   code: string;
   role: "host" | "guest" | "spectator";
   romFilename: string;
+  romPath: string;
   core: string;
   bios?: string;
   hostNickname?: string;
@@ -42,6 +48,8 @@ export type SignalingMessage =
   | { type: "join-room"; code: string; nickname?: string; avatar?: string }
   | { type: "spectate-room"; code: string; nickname?: string; avatar?: string }
   | { type: "set-room-ready"; ready: boolean }
+  | { type: "update-room-game"; romPath: string; core: string; bios?: string }
+  | { type: "kick-room-participant"; participantId: string }
   | { type: "session-started" }
   | { type: "room-created"; code: string }
   | {
@@ -50,6 +58,7 @@ export type SignalingMessage =
       participantId: string;
       role: "guest" | "spectator";
       romFilename: string;
+      romPath: string;
       core: string;
       bios?: string;
       hostNickname?: string;
@@ -68,6 +77,7 @@ export type SignalingMessage =
       spectatorId: string;
       spectatorCount: number;
     }
+  | { type: "room-kicked"; message: string }
   | RoomLobbySnapshotMessage
   | RoomSessionStartedMessage
   | { type: "peer-disconnected" }

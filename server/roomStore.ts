@@ -18,6 +18,11 @@ export interface RoomLobbyParticipantSummary {
 export interface RoomLobbySnapshot {
   code: string;
   roomState: RoomState;
+  romFilename: string;
+  romPath: string;
+  core: string;
+  bios?: string;
+  isPublic: boolean;
   participants: RoomLobbyParticipantSummary[];
   canStart: boolean;
   hasGuest: boolean;
@@ -117,6 +122,7 @@ export interface RoomStore {
   listPublicRooms: () => PublicRoomSummary[];
   markPlaying: (room: Room) => boolean;
   setParticipantReady: (room: Room, socket: WebSocket, ready: boolean) => boolean;
+  updateRoomGame: (room: Room, options: { romPath: string; core: string; bios?: string }) => boolean;
 }
 
 function generateCode(rooms: Map<string, Room>): string {
@@ -133,6 +139,10 @@ function clearSpectators(room: Room) {
   const spectators = Array.from(room.spectators.values());
   room.spectators.clear();
   return spectators;
+}
+
+function getRomFilename(romPath: string) {
+  return romPath.split("/").pop() ?? romPath;
 }
 
 function canStartRoomSession(room: Room) {
@@ -288,6 +298,11 @@ export function createRoomStore(): RoomStore {
     getLobbySnapshot: (room) => ({
       code: room.code,
       roomState: room.state,
+      romFilename: getRomFilename(room.romFilename),
+      romPath: room.romFilename,
+      core: room.core,
+      bios: room.bios,
+      isPublic: room.isPublic,
       participants: buildLobbyParticipants(room),
       canStart: canStartRoomSession(room),
       hasGuest: room.guest !== null,
@@ -349,6 +364,25 @@ export function createRoomStore(): RoomStore {
       }
 
       return false;
+    },
+    updateRoomGame: (room, options) => {
+      if (room.state !== "waiting") {
+        return false;
+      }
+
+      room.romFilename = options.romPath;
+      room.core = options.core;
+      room.bios = options.bios;
+
+      if (room.guest) {
+        room.guest.ready = false;
+      }
+
+      for (const spectator of room.spectators.values()) {
+        spectator.ready = false;
+      }
+
+      return true;
     },
   };
 }

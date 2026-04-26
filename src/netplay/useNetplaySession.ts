@@ -448,8 +448,10 @@ export function useNetplaySession({
 
   const {
     handleCreateRoom,
+    handleChangeRoomGame,
     handleJoinPublicRoom,
     handleJoinRoom,
+    handleKickRoomParticipant,
     handleSetRoomReady,
     handleStartRoomSession,
     handleSpectatePublicRoom,
@@ -510,9 +512,11 @@ export function useNetplaySession({
     handleChatShortcut,
     handleChatToggle,
     handleCreateRoom,
+    handleChangeRoomGame,
     handleEmulatorReady,
     handleJoinPublicRoom,
     handleJoinRoom,
+    handleKickRoomParticipant,
     handleLocalInput,
     handleSetRoomReady,
     handleStartRoomSession,

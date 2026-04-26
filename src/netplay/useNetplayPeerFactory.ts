@@ -124,6 +124,10 @@ export function useNetplayPeerFactory({
       },
       onVideoStream: (stream) => handleVideoStream?.(stream),
       onHeartbeat: (ts) => handleHeartbeat?.(ts),
+      onRoomKicked: (message) => {
+        toast.error(message || NETPLAY_COPY.roomKicked);
+        resetToMenu();
+      },
       onRoomCreated: () => {
         roleRef.current = "host";
         setState((previous) => {
@@ -153,7 +157,7 @@ export function useNetplayPeerFactory({
           participantId: info.participantId,
           role: info.role,
           romFilename: info.romFilename,
-          romPath: info.romFilename,
+          romPath: info.romPath,
           core: info.core as SystemCore,
           biosPath: info.bios,
           participants: [],
@@ -166,10 +170,17 @@ export function useNetplayPeerFactory({
         );
       },
       onRoomLobbyUpdated: (info) => {
+        let roomGameChanged = false;
+
         setState((previous) => {
           if (previous.step !== "waiting" || previous.code !== info.code) {
             return previous;
           }
+
+          roomGameChanged =
+            previous.romPath !== info.romPath ||
+            previous.core !== info.core ||
+            previous.biosPath !== info.bios;
 
           const selfParticipant = info.participants.find(
             (participant) => participant.id === previous.participantId,
@@ -177,12 +188,26 @@ export function useNetplayPeerFactory({
 
           return {
             ...previous,
+            romFilename: info.romFilename,
+            romPath: info.romPath,
+            core: info.core as SystemCore,
+            biosPath: info.bios,
+            isPublic: info.isPublic,
             participants: info.participants,
             canStart: info.canStart,
             isReady: previous.role === "host" ? true : (selfParticipant?.ready ?? previous.isReady),
             spectatorSlotsRemaining: info.spectatorSlotsRemaining,
           };
         });
+
+        if (roomGameChanged) {
+          setStatus(
+            roleRef.current === "host"
+              ? NETPLAY_COPY.roomGameUpdated
+              : NETPLAY_COPY.roomGameChangedByHost,
+          );
+          return;
+        }
 
         if (roleRef.current === "host") {
           setStatus(info.canStart ? NETPLAY_COPY.roomReadyToStart : NETPLAY_COPY.waitingForRoomReady);
@@ -204,29 +229,29 @@ export function useNetplayPeerFactory({
 
           nextSessionBox.current = {
             mode: "netplay",
-            romPath: previous.romPath,
-            core: previous.core,
+            romPath: info.romPath,
+            core: info.core as SystemCore,
             role: info.role,
-            biosPath: previous.biosPath,
+            biosPath: info.bios,
             isPublic: previous.isPublic,
           };
 
           if (info.role === "spectator") {
             return {
               step: "watching",
-              romPath: previous.romPath,
-              core: previous.core,
+              romPath: info.romPath,
+              core: info.core as SystemCore,
               role: "spectator",
-              biosPath: previous.biosPath,
+              biosPath: info.bios,
             };
           }
 
           return {
             step: "playing",
-            romPath: previous.romPath,
-            core: previous.core,
+            romPath: info.romPath,
+            core: info.core as SystemCore,
             role: info.role === "host" ? "host" : "guest",
-            biosPath: previous.biosPath,
+            biosPath: info.bios,
           };
         });
 
