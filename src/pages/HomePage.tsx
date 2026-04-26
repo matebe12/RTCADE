@@ -17,7 +17,16 @@ import { useOperationsStats } from "@/hooks/useOperationsStats";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { parseRomName } from "@/lib/game-names";
 import { getFallbackGameThumbnailUrl, getGameThumbnailUrl } from "@/lib/game-thumbnails";
 import type { PopularGameSummary } from "@/lib/operations-api";
 import { usePageSeo } from "@/lib/seo";
@@ -84,34 +93,152 @@ function getPopularGameFilename(romPath?: string) {
   return romPath.split("/").pop() ?? romPath;
 }
 
-function PopularGameThumbnail({ game }: { game: PopularGameSummary }) {
-  const [imgError, setImgError] = useState(false);
+function getPopularGameDisplayName(game: PopularGameSummary) {
   const filename = getPopularGameFilename(game.romPath);
+
+  if (filename && game.core) {
+    return parseRomName(filename, game.core);
+  }
+
+  return game.gameName;
+}
+
+function PopularGameSpotlightItem({
+  game,
+  index,
+}: {
+  game: PopularGameSummary;
+  index: number;
+}) {
+  const [imgError, setImgError] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const filename = getPopularGameFilename(game.romPath);
+  const displayName = getPopularGameDisplayName(game);
+  const coreLabel = getPopularGameCoreLabel(game.core);
   const thumbnailUrl = filename && game.core ? getGameThumbnailUrl(filename, game.core) : null;
-  const fallbackThumbnailUrl = filename && game.core ? getFallbackGameThumbnailUrl(filename, game.core) : null;
+  const fallbackThumbnailUrl =
+    filename && game.core ? getFallbackGameThumbnailUrl(filename, game.core) : null;
   const displayThumbnailUrl = imgError || !thumbnailUrl ? fallbackThumbnailUrl : thumbnailUrl;
+  const playHref = buildPopularGameEntryHref("create-room", game);
 
   useEffect(() => {
     setImgError(false);
   }, [thumbnailUrl]);
 
   return (
-    <div className="relative size-16 shrink-0 overflow-hidden rounded-2xl border border-primary/15 bg-background/70 shadow-sm shadow-primary/10">
-      {displayThumbnailUrl ? (
-        <img
-          src={displayThumbnailUrl}
-          alt={game.gameName}
-          loading="lazy"
-          onError={displayThumbnailUrl === thumbnailUrl ? () => setImgError(true) : undefined}
-          className="size-full object-cover"
-        />
-      ) : (
-        <div className="flex size-full items-center justify-center bg-gradient-to-br from-primary/15 via-background/40 to-background/80 text-primary/70">
-          <Gamepad2 className="size-6" />
+    <>
+      <div className="rounded-2xl border border-border/70 bg-background/55 px-3 py-3">
+        <div className="flex items-start gap-3">
+          <button
+            type="button"
+            onClick={() => setPreviewOpen(true)}
+            className="relative size-16 shrink-0 overflow-hidden rounded-2xl border border-primary/15 bg-background/70 shadow-sm shadow-primary/10"
+            aria-label={`${displayName} 썸네일 크게 보기`}
+          >
+            {displayThumbnailUrl ? (
+              <img
+                src={displayThumbnailUrl}
+                alt={displayName}
+                loading="lazy"
+                onError={displayThumbnailUrl === thumbnailUrl ? () => setImgError(true) : undefined}
+                className="size-full object-cover"
+              />
+            ) : (
+              <div className="flex size-full items-center justify-center bg-gradient-to-br from-primary/15 via-background/40 to-background/80 text-primary/70">
+                <Gamepad2 className="size-6" />
+              </div>
+            )}
+            <div className="pointer-events-none absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-black/45 to-transparent" />
+            <span className="pointer-events-none absolute inset-x-0 bottom-1 text-center text-[9px] font-medium text-white">
+              크게 보기
+            </span>
+          </button>
+
+          <div className="min-w-0 flex-1">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex min-w-0 flex-wrap items-center gap-2">
+                <span className="inline-flex size-6 shrink-0 items-center justify-center rounded-full border border-primary/20 bg-primary/10 text-[11px] font-semibold text-primary">
+                  {index + 1}
+                </span>
+                {coreLabel ? (
+                  <Badge variant="secondary" className="text-[10px]">
+                    {coreLabel}
+                  </Badge>
+                ) : null}
+              </div>
+
+              <div className="flex shrink-0 items-center gap-2">
+                <Button
+                  asChild
+                  size="sm"
+                  className="h-8 rounded-full px-3 text-[11px]"
+                  aria-label={`${displayName} 플레이`}
+                >
+                  <NavLink to={playHref} title={`${displayName} 플레이`}>
+                    <Gamepad2 className="size-4" />
+                    <span>플레이</span>
+                  </NavLink>
+                </Button>
+              </div>
+            </div>
+
+            <div className="mt-2 truncate text-sm font-medium text-foreground">{displayName}</div>
+            <div className="mt-1 text-[11px] text-muted-foreground">
+              {numberFormatter.format(game.playCount)}회 플레이 · {formatPlayTime(game.totalPlayTimeMs)}
+            </div>
+          </div>
         </div>
-      )}
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-black/45 to-transparent" />
-    </div>
+      </div>
+
+      <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
+        <DialogContent className="max-w-3xl overflow-hidden border-border/80 bg-card/95 p-0 shadow-2xl backdrop-blur-xl sm:rounded-2xl">
+          <div className="border-b border-border/70 bg-[radial-gradient(circle_at_top_left,rgba(0,160,255,0.16),transparent_28%),radial-gradient(circle_at_bottom_right,rgba(255,135,61,0.12),transparent_28%)] p-4 sm:p-5">
+            <div className="overflow-hidden rounded-2xl border border-primary/20 bg-black/40 shadow-lg shadow-primary/10">
+              {displayThumbnailUrl ? (
+                <img
+                  src={displayThumbnailUrl}
+                  alt={displayName}
+                  className="aspect-[4/3] w-full object-contain"
+                />
+              ) : (
+                <div className="flex aspect-[4/3] w-full items-center justify-center text-muted-foreground">
+                  <Gamepad2 className="size-16" />
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="space-y-4 p-5">
+            <DialogHeader className="space-y-2 text-left">
+              <div className="flex flex-wrap items-center gap-2">
+                {coreLabel ? (
+                  <Badge variant="secondary" className="text-[10px]">
+                    {coreLabel}
+                  </Badge>
+                ) : null}
+                {filename ? <span className="text-xs text-muted-foreground">{filename}</span> : null}
+              </div>
+              <DialogTitle className="text-xl leading-tight text-foreground">{displayName}</DialogTitle>
+              <DialogDescription>
+                스포트라이트 게임을 크게 보고 바로 공개방으로 시작할 수 있습니다.
+              </DialogDescription>
+            </DialogHeader>
+
+            <DialogFooter className="gap-2 border-t border-border/70 pt-4 sm:justify-between sm:space-x-0">
+              <Button type="button" variant="outline" onClick={() => setPreviewOpen(false)}>
+                닫기
+              </Button>
+              <Button asChild type="button">
+                <NavLink to={playHref} title={`${displayName} 공개방 만들기`}>
+                  <Gamepad2 className="size-4" />
+                  <span>공개방 만들기</span>
+                </NavLink>
+              </Button>
+            </DialogFooter>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 
@@ -153,52 +280,11 @@ function PopularGamesCard({ emptyCopy, games, periodKey, title }: PopularGamesCa
         <ScrollArea className="mt-4 min-h-0 flex-1">
           <div className="space-y-3 pr-3">
             {games.map((game, index) => (
-              <div
+              <PopularGameSpotlightItem
                 key={`${periodKey}-${game.gameName}-${game.romPath ?? index}-${game.core ?? "unknown"}`}
-                className="rounded-2xl border border-border/70 bg-background/55 px-3 py-3"
-              >
-                <div className="flex items-start gap-3">
-                  <PopularGameThumbnail game={game} />
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex min-w-0 flex-wrap items-center gap-2">
-                        <span className="inline-flex size-6 shrink-0 items-center justify-center rounded-full border border-primary/20 bg-primary/10 text-[11px] font-semibold text-primary">
-                          {index + 1}
-                        </span>
-                        {getPopularGameCoreLabel(game.core) ? (
-                          <Badge variant="secondary" className="text-[10px]">
-                            {getPopularGameCoreLabel(game.core)}
-                          </Badge>
-                        ) : null}
-                      </div>
-
-                      <div className="flex shrink-0 items-center gap-2">
-                        <Button
-                          asChild
-                          size="sm"
-                          className="h-8 rounded-full px-3 text-[11px]"
-                          aria-label={`${game.gameName} 플레이`}
-                        >
-                          <NavLink
-                            to={buildPopularGameEntryHref("create-room", game)}
-                            title={`${game.gameName} 플레이`}
-                          >
-                            <Gamepad2 className="size-4" />
-                            <span>플레이</span>
-                          </NavLink>
-                        </Button>
-                      </div>
-                    </div>
-
-                    <div className="mt-2 truncate text-sm font-medium text-foreground">
-                      {game.gameName}
-                    </div>
-                    <div className="mt-1 text-[11px] text-muted-foreground">
-                      {numberFormatter.format(game.playCount)}회 플레이 · {formatPlayTime(game.totalPlayTimeMs)}
-                    </div>
-                  </div>
-                </div>
-              </div>
+                game={game}
+                index={index}
+              />
             ))}
           </div>
         </ScrollArea>

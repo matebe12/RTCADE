@@ -51,7 +51,7 @@ export default function NetplayBrowseRomsScreen({
         .map((game) => {
           const rom = romLookup.get(game.romPath);
           if (!rom) return null;
-          return { ...rom, displayName: game.displayName };
+          return { ...rom, displayName: parseRomName(rom.filename, rom.core) };
         })
         .filter(
           (

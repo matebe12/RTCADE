@@ -25,7 +25,8 @@ interface SoloBrowseRomsScreenProps {
 }
 
 function getDisplayName(rom: RomInfo, recentGames: RecentGame[]) {
-  return recentGames.find((game) => game.romPath === rom.path)?.displayName;
+  void recentGames;
+  return parseRomName(rom.filename, rom.core);
 }
 
 export default function SoloBrowseRomsScreen({
@@ -56,7 +57,7 @@ export default function SoloBrowseRomsScreen({
         .map((game) => {
           const rom = romLookup.get(game.romPath);
           if (!rom) return null;
-          return { ...rom, displayName: game.displayName };
+          return { ...rom, displayName: parseRomName(rom.filename, rom.core) };
         })
         .filter(
           (

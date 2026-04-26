@@ -1,3 +1,5 @@
+import { parseRomName } from "@/lib/game-names";
+
 export type UserProfile = {
   nickname: string;
   avatar: string;
@@ -98,23 +100,38 @@ function writeNumber(storageKey: string, value: number): void {
   localStorage.setItem(storageKey, JSON.stringify(value));
 }
 
+function getRomFilename(romPath: string) {
+  return romPath.split("/").pop() ?? romPath;
+}
+
+function getNormalizedRecentGameDisplayName(romPath: string, core: string) {
+  return parseRomName(getRomFilename(romPath), core);
+}
+
 export function getRecentGames(): RecentGame[] {
   return readJsonArray<RecentGame>(RECENT_GAMES_STORAGE_KEY)
     .filter(
       (game) =>
         typeof game?.romPath === "string" &&
         typeof game?.core === "string" &&
-        typeof game?.displayName === "string" &&
         typeof game?.playedAt === "number",
     )
+    .map((game) => ({
+      ...game,
+      displayName: getNormalizedRecentGameDisplayName(game.romPath, game.core),
+    }))
     .sort((left, right) => right.playedAt - left.playedAt)
     .slice(0, MAX_RECENT_GAMES);
 }
 
 export function upsertRecentGame(game: RecentGame): RecentGame[] {
+  const normalizedGame = {
+    ...game,
+    displayName: getNormalizedRecentGameDisplayName(game.romPath, game.core),
+  };
   const nextGames = [
-    game,
-    ...getRecentGames().filter((entry) => entry.romPath !== game.romPath),
+    normalizedGame,
+    ...getRecentGames().filter((entry) => entry.romPath !== normalizedGame.romPath),
   ].slice(0, MAX_RECENT_GAMES);
   writeJsonArray(RECENT_GAMES_STORAGE_KEY, nextGames);
   return nextGames;

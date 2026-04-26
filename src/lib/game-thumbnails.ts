@@ -418,6 +418,24 @@ const MAME_THUMBNAIL_NAMES: Record<string, string> = {
 
 const THUMBNAIL_CDN_BASE = "https://thumbnails.libretro.com/MAME/Named_Snaps/";
 const ROM_FILENAME_EXTENSION_PATTERN = /\.\w+$/;
+const VERIFIED_THUMBNAIL_URLS: Record<string, string> = {
+  fatfursp:
+    "https://thumbnails.libretro.com/SNK%20-%20Neo%20Geo/Named_Snaps/Fatal%20Fury%20Special%20_%20Garou%20Densetsu%20Special%20(set%201)(NGM-058)(NGH-058).png",
+  kof98:
+    "https://thumbnails.libretro.com/SNK%20-%20Neo%20Geo/Named_Snaps/The%20King%20of%20Fighters%20%2798%20-%20The%20Slugfest%20_%20King%20of%20Fighters%20%2798%20-%20dream%20match%20never%20ends%20(NGM-2420).png",
+  lastblad:
+    "https://thumbnails.libretro.com/SNK%20-%20Neo%20Geo/Named_Snaps/The%20Last%20Blade%20_%20Bakumatsu%20Roman%20-%20Gekka%20no%20Kenshi%20(NGM-2340).png",
+  pbobblen:
+    "https://thumbnails.libretro.com/SNK%20-%20Neo%20Geo/Named_Snaps/Puzzle%20Bobble%20_%20Bust-A-Move%20(Neo-Geo)%20(NGM-083).png",
+  rbff2:
+    "https://thumbnails.libretro.com/SNK%20-%20Neo%20Geo/Named_Snaps/Real%20Bout%20Fatal%20Fury%202%20-%20The%20Newcomers%20_%20Real%20Bout%20Garou%20Densetsu%202%20-%20the%20newcomers%20(NGM-2400).png",
+  s1945iii:
+    "https://thumbnails.libretro.com/FBNeo%20-%20Arcade%20Games/Named_Snaps/Strikers%201945%20III%20(World)%20_%20Strikers%201999%20(Japan).png",
+  samsho2:
+    "https://thumbnails.libretro.com/SNK%20-%20Neo%20Geo/Named_Snaps/Samurai%20Shodown%20II%20_%20Shin%20Samurai%20Spirits%20-%20Haohmaru%20jigokuhen%20(NGM-063)(NGH-063).png",
+  wboy3:
+    "https://thumbnails.libretro.com/MAME/Named_Snaps/Wonder%20Boy%20III%20-%20Monster%20Lair%20(set%201).png",
+};
 
 function getThumbnailBadgeLabel(core: string) {
   switch (core) {
@@ -509,6 +527,11 @@ export function getFallbackGameThumbnailUrl(filename: string, core: string) {
 export function getGameThumbnailUrl(filename: string, core: string): string | null {
   if (!isArcadeCore(core)) {
     return null;
+  }
+
+  const verifiedUrl = resolveArcadeLookupValue(filename, VERIFIED_THUMBNAIL_URLS);
+  if (verifiedUrl) {
+    return verifiedUrl;
   }
 
   const englishName = resolveArcadeLookupValue(filename, MAME_THUMBNAIL_NAMES);
