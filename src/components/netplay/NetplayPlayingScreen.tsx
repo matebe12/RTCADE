@@ -2,7 +2,9 @@ import { useCallback, useEffect, useRef, useState, type RefObject } from "react"
 
 import EmulatorPlayer, { type SystemCore } from "@/components/EmulatorPlayer";
 import GuestVideoDisplay from "@/components/netplay/GuestVideoDisplay";
-import NetplayChatPanel, { type NetplayChatMessage } from "@/components/NetplayChatPanel";
+import NetplayChatOverlayComposer from "@/components/netplay/NetplayChatOverlayComposer";
+import type { NetplayChatMessage } from "@/components/NetplayChatPanel";
+import NetplayChatOverlayPreview from "@/components/netplay/NetplayChatOverlayPreview";
 import PlayControlsGuide from "@/components/netplay/PlayControlsGuide";
 import { UserBadge } from "@/components/UserBadge";
 import {
@@ -51,7 +53,7 @@ interface NetplayPlayingScreenProps {
   onChatToggle: () => void;
   onChatCancel: () => void;
   onChatDraftChange: (value: string) => void;
-  onSendChat: () => void;
+  onSendChat: () => boolean;
   onLocalInput: (button: number, down: boolean) => void;
   onEmulatorReady: () => void;
   onSaveState: (state: ArrayBuffer) => void;
@@ -105,6 +107,12 @@ export default function NetplayPlayingScreen({
   const gameAreaRef = useRef<HTMLDivElement>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
+  const handleOverlaySend = useCallback(() => {
+    if (onSendChat()) {
+      onChatCancel();
+    }
+  }, [onChatCancel, onSendChat]);
+
   const toggleFullscreen = useCallback(() => {
     const el = gameAreaRef.current;
     if (!el) return;
@@ -120,23 +128,6 @@ export default function NetplayPlayingScreen({
     document.addEventListener("fullscreenchange", handler);
     return () => document.removeEventListener("fullscreenchange", handler);
   }, []);
-
-  const chatPanel = (
-    <NetplayChatPanel
-      open={chatOpen}
-      onCancel={onChatCancel}
-      messages={chatMessages}
-      draft={chatDraft}
-      onDraftChange={onChatDraftChange}
-      onSend={onSendChat}
-      unreadCount={unreadChatCount}
-      isPeerTyping={isPeerTyping}
-      chatChannelState={chatChannelState}
-      localUser={localChatUser}
-      remoteUser={opponentProfile}
-      inputRef={inputRef}
-    />
-  );
 
   return (
     <div className="flex w-full flex-col gap-3">
@@ -309,32 +300,54 @@ export default function NetplayPlayingScreen({
               </Button>
             </div>
           )}
-        </div>
 
-        {/* Chat panel — real flex column in fullscreen, inline otherwise */}
-        {isFullscreen ? (
-          chatOpen && (
-            <div className="flex h-full w-[340px] shrink-0 border-l border-white/10 bg-background">
-              <NetplayChatPanel
-                open
+          {!isFullscreen && (
+            <div className="absolute right-3 top-3 z-20 xl:hidden">
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                className="relative h-8 gap-1.5 rounded-full bg-black/60 text-xs text-white backdrop-blur-sm hover:bg-black/80"
+                onClick={onChatToggle}
+              >
+                <MessageSquare className="size-3.5" />
+                채팅
+                {unreadChatCount > 0 && (
+                  <Badge
+                    variant="destructive"
+                    className="absolute -right-1.5 -top-1.5 px-1 py-0 text-[9px]"
+                  >
+                    {unreadChatCount}
+                  </Badge>
+                )}
+              </Button>
+            </div>
+          )}
+
+          <NetplayChatOverlayPreview
+            visible
+            messages={chatMessages}
+            localUser={localChatUser}
+            remoteUser={opponentProfile}
+            className={chatOpen ? "bottom-20 sm:bottom-24" : undefined}
+          />
+
+          {chatOpen && (
+            <div className="absolute bottom-2 left-2 z-30 flex w-[min(20rem,calc(100%-1rem))] justify-start sm:w-[20rem]">
+              <NetplayChatOverlayComposer
+                open={chatOpen}
                 onCancel={onChatCancel}
-                messages={chatMessages}
                 draft={chatDraft}
                 onDraftChange={onChatDraftChange}
-                onSend={onSendChat}
-                unreadCount={unreadChatCount}
+                onSend={handleOverlaySend}
                 isPeerTyping={isPeerTyping}
                 chatChannelState={chatChannelState}
-                localUser={localChatUser}
                 remoteUser={opponentProfile}
                 inputRef={inputRef}
-                className="h-full xl:h-full rounded-none border-none"
               />
             </div>
-          )
-        ) : (
-          chatPanel
-        )}
+          )}
+        </div>
       </div>
     </div>
   );

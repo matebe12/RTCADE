@@ -209,18 +209,19 @@ export function useNetplayChatControls({
 
   const handleSendChat = useCallback(() => {
     const trimmed = chatDraft.trim();
-    if (!trimmed) return;
+    if (!trimmed) return false;
 
     const sentMessage = peerRef.current?.sendChatMessage(trimmed);
     if (!sentMessage) {
       toast.error(NETPLAY_COPY.chatNotReady);
-      return;
+      return false;
     }
 
     appendChatMessage({ ...sentMessage, sender: "local" });
     setChatDraft("");
     stopLocalTyping();
     focusEmulatorPlayer();
+    return true;
   }, [appendChatMessage, chatDraft, focusEmulatorPlayer, peerRef, setChatDraft, stopLocalTyping]);
 
   const handleChatCancel = useCallback(() => {
@@ -249,12 +250,9 @@ export function useNetplayChatControls({
       appendChatMessage({ ...message, sender: "remote" });
       if (!chatOpenRef.current) {
         incrementUnreadChatCount();
-        toast(
-          `${message.authorName || opponentProfileRef.current?.nickname || "상대방"}: ${message.text}`,
-        );
       }
     },
-    [appendChatMessage, incrementUnreadChatCount, opponentProfileRef],
+    [appendChatMessage, incrementUnreadChatCount],
   );
 
   const handleIncomingTypingState = useCallback(

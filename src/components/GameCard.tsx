@@ -21,6 +21,7 @@ interface GameCardProps {
   systemLabel: string;
   displayName?: string;
   dataTutorial?: string;
+  actionDataTutorial?: string;
   disabled?: boolean;
   selected?: boolean;
   onClick?: () => void;
@@ -35,6 +36,7 @@ export function GameCard({
   systemLabel,
   displayName,
   dataTutorial,
+  actionDataTutorial,
   disabled = false,
   selected,
   onClick,
@@ -48,6 +50,10 @@ export function GameCard({
   const [imgError, setImgError] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
   const displayThumbnailUrl = imgError || !thumbnailUrl ? fallbackThumbnailUrl : thumbnailUrl;
+  const previewDescription =
+    previewActionLabel === "방 만들기"
+      ? "썸네일을 크게 보고 선택하면 바로 새 방이 만들어집니다."
+      : "썸네일을 크게 보고 바로 시작할 수 있습니다.";
 
   const handleImgError = useCallback(() => setImgError(true), []);
   const handlePreviewAction = useCallback(() => {
@@ -99,6 +105,7 @@ export function GameCard({
           type="button"
           onClick={onClick}
           disabled={disabled}
+          data-tutorial={actionDataTutorial}
           className="flex min-w-0 flex-1 flex-col items-start gap-1.5 text-left"
         >
           <span className="text-sm font-medium leading-tight text-card-foreground">
@@ -161,9 +168,7 @@ export function GameCard({
               <DialogTitle className="text-xl leading-tight text-foreground">
                 {resolvedDisplayName}
               </DialogTitle>
-              <DialogDescription>
-                썸네일을 크게 보고 바로 시작할 수 있습니다.
-              </DialogDescription>
+              <DialogDescription>{previewDescription}</DialogDescription>
             </DialogHeader>
 
             <DialogFooter className="gap-2 border-t border-border/70 pt-4 sm:justify-between sm:space-x-0">

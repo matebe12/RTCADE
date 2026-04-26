@@ -8,13 +8,15 @@ import { useNetplayLobbyStore } from "@/stores/useNetplayLobbyStore";
 import { AppTutorialContext, type AppTutorialContextValue } from "@/tutorial/app-tutorial-context";
 
 const APP_TUTORIAL_STORAGE_KEY = "rtcade_app_tutorial_v1";
-const APP_TUTORIAL_VERSION = 1;
+const APP_TUTORIAL_VERSION = 4;
 const AUTO_START_DELAY_MS = 700;
 
 type TutorialStage =
   | "home-cta"
   | "netplay-modes"
   | "netplay-menu"
+  | "netplay-create-room"
+  | "waiting-room-solo"
   | "public-rooms"
   | "join-input"
   | "watch-rooms"
@@ -71,6 +73,9 @@ export function AppTutorialProvider({ blocked = false, children }: AppTutorialPr
   const navigate = useNavigate();
   const mode = useNetplayLobbyStore((store) => store.mode);
   const lobbyStep = useNetplayLobbyStore((store) => store.state.step);
+  const waitingRoomRole = useNetplayLobbyStore((store) =>
+    store.state.step === "waiting" ? store.state.role : null,
+  );
   const soloBrowseRomCount = useNetplayLobbyStore((store) =>
     store.state.step === "solo-browse" ? store.state.roms.length : 0,
   );
@@ -215,11 +220,11 @@ export function AppTutorialProvider({ blocked = false, children }: AppTutorialPr
       popover: {
         title: "플레이 시작",
         description:
-          "여기서 전체 여정이 시작됩니다. 같이하기와 혼자하기로 바로 들어갈 수 있고, 로비 안에서 관전하기까지 이어집니다.",
+          "여기서 전체 여정이 시작됩니다. 플레이 시작으로 전체 로비에 들어갈 수 있고, 홈의 인기 게임 스포트라이트에서는 공개방을 바로 만들 수도 있습니다.",
         nextBtnText: "로비 보기",
         showButtons: ["next", "close"],
         onNextClick: () => {
-          advanceTo("netplay-modes", () => navigate("/netplay"));
+          advanceTo("netplay-menu", () => navigate("/netplay"));
         },
       },
     });
@@ -261,15 +266,110 @@ export function AppTutorialProvider({ blocked = false, children }: AppTutorialPr
       element: '[data-tutorial="netplay-menu-actions"]',
       disableActiveInteraction: true,
       popover: {
-        title: "같이하기와 관전하기",
+        title: "로비 시작 동선",
         description:
-          "방 만들기, 공개 방 둘러보기, 코드 참가, 관전하기가 여기 모여 있습니다. 관전하기는 이미 플레이 중인 방을 보는 흐름입니다.",
-        nextBtnText: "공개 방 보기",
+          "직접 게임을 고를 때는 방 만들기로 들어가고, 이미 열린 방은 공개 방 둘러보기나 코드 참가로 들어갑니다. 관전하기는 이미 플레이 중인 방을 보는 흐름입니다.",
+        nextBtnText: "방 만들기 보기",
         showButtons: ["next", "close"],
-        onNextClick: () => advanceTo("public-rooms"),
+        onNextClick: () => advanceTo("netplay-create-room"),
       },
     });
   }, [activeStage, advanceTo, blocked, highlightStage, lobbyStep, location.pathname]);
+
+  useEffect(() => {
+    if (blocked || activeStage !== "netplay-create-room") {
+      return;
+    }
+
+    if (location.pathname !== "/netplay") {
+      return;
+    }
+
+    if (lobbyStep === "menu") {
+      clickTutorialTarget('[data-tutorial="netplay-open-browse"]');
+      return;
+    }
+
+    if (lobbyStep === "waiting" && waitingRoomRole === "host") {
+      advanceTo("waiting-room-solo");
+      return;
+    }
+
+    if (lobbyStep !== "browse") {
+      return;
+    }
+
+    const highlightedPrimaryGame = highlightStage("netplay-create-room", {
+      element: '[data-tutorial="netplay-primary-game"]',
+      popover: {
+        title: "게임 선택과 즉시 방 생성",
+        description:
+          "이 버튼을 누르면 확인 단계 없이 바로 새 방이 만들어지고 대기실로 이동합니다. 다음을 누르면 첫 게임으로 실제 방을 만들어 봅니다.",
+        nextBtnText: "방 만들기",
+        showButtons: ["next", "close"],
+        onNextClick: () =>
+          advanceTo("waiting-room-solo", () =>
+            clickTutorialTarget('[data-tutorial="netplay-primary-game"]'),
+          ),
+      },
+    });
+
+    if (highlightedPrimaryGame) {
+      return;
+    }
+
+    highlightStage("netplay-create-room", {
+      element: '[data-tutorial="netplay-browse-panel"]',
+      popover: {
+        title: "게임 선택과 즉시 방 생성",
+        description:
+          "여기서는 게임 카드를 누르거나 썸네일 미리보기의 방 만들기를 눌러 바로 새 방을 만듭니다. 목록이 준비되면 첫 게임 카드에 바로 튜토리얼이 이어집니다.",
+        showButtons: ["close"],
+      },
+    });
+  }, [
+    activeStage,
+    advanceTo,
+    blocked,
+    clickTutorialTarget,
+    highlightStage,
+    lobbyStep,
+    location.pathname,
+    waitingRoomRole,
+  ]);
+
+  useEffect(() => {
+    if (blocked || activeStage !== "waiting-room-solo") {
+      return;
+    }
+
+    if (location.pathname !== "/netplay" || lobbyStep !== "waiting" || waitingRoomRole !== "host") {
+      return;
+    }
+
+    highlightStage("waiting-room-solo", {
+      element: '[data-tutorial="waiting-room-start"]',
+      disableActiveInteraction: true,
+      popover: {
+        title: "대기실에서 바로 혼자 시작",
+        description:
+          "방장이 혼자 들어와 있으면 여기서 바로 혼자 시작을 눌러 solo 플레이로 전환할 수 있습니다. 다음을 누르면 실제로 혼자하기를 시작합니다.",
+        nextBtnText: "혼자 시작",
+        showButtons: ["next", "close"],
+        onNextClick: () =>
+          advanceTo("solo-controls", () => clickTutorialTarget('[data-tutorial="waiting-room-start"]')),
+      },
+    });
+  }, [
+    activeStage,
+    advanceTo,
+    blocked,
+    clickTutorialTarget,
+    highlightStage,
+    lobbyStep,
+    location.pathname,
+    waitingRoomRole,
+  ]);
 
   useEffect(() => {
     if (blocked || activeStage !== "public-rooms") {
@@ -277,6 +377,11 @@ export function AppTutorialProvider({ blocked = false, children }: AppTutorialPr
     }
 
     if (location.pathname !== "/netplay") {
+      return;
+    }
+
+    if (lobbyStep === "browse") {
+      clickTutorialTarget('[data-tutorial="netplay-browse-back"]');
       return;
     }
 
@@ -426,16 +531,16 @@ export function AppTutorialProvider({ blocked = false, children }: AppTutorialPr
         title: "코드로 관전",
         description:
           "비공개 방이나 목록에 아직 안 뜬 방은 코드로 바로 관전할 수 있습니다. 이렇게 같이하기와 관전하기의 핵심 진입점이 모두 연결됩니다.",
-        nextBtnText: "혼자하기로 이동",
+        nextBtnText: "튜토리얼 완료",
         showButtons: ["next", "close"],
-        onNextClick: () => advanceTo("solo-tab"),
+        onNextClick: () => finishTutorial("completed"),
       },
     });
   }, [
     activeStage,
-    advanceTo,
     blocked,
     clickTutorialTarget,
+    finishTutorial,
     highlightStage,
     lobbyStep,
     location.pathname,

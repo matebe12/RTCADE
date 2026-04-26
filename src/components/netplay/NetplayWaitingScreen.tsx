@@ -152,7 +152,10 @@ export default function NetplayWaitingScreen({
 
   return (
     <>
-      <Card className="flex h-full w-full flex-col border-border/70 bg-card/95">
+      <Card
+        className="flex h-full w-full flex-col border-border/70 bg-card/95"
+        data-tutorial="waiting-room-panel"
+      >
         <CardHeader className="flex flex-row items-center gap-3">
           <Button variant="ghost" size="icon" className="size-8" onClick={onBack}>
             <ArrowLeft className="size-4" />
@@ -298,7 +301,7 @@ export default function NetplayWaitingScreen({
             </div>
 
             {role === "host" ? (
-              <Button onClick={onStart} disabled={!canPressStart}>
+              <Button onClick={onStart} disabled={!canPressStart} data-tutorial="waiting-room-start">
                 {canStartSolo ? "혼자 시작" : "게임 시작"}
               </Button>
             ) : (

@@ -106,6 +106,8 @@ export default function NetplayBrowseRomsScreen({
         : browseRoms,
     [browseRoms, categoryFilter],
   );
+  const recommendedRomPath =
+    recentRoms[0]?.path ?? favoriteRoms[0]?.path ?? filteredBrowseRoms[0]?.path ?? null;
 
   const categoryGroups = useMemo(() => {
     if (isSearching || categoryFilter) return [];
@@ -133,9 +135,15 @@ export default function NetplayBrowseRomsScreen({
   }, [browseRoms, isSearching, categoryFilter]);
 
   return (
-    <Card className="w-full">
+    <Card className="w-full" data-tutorial="netplay-browse-panel">
       <CardHeader className="flex flex-row items-center gap-3 pb-3">
-        <Button variant="ghost" size="icon" className="size-8" onClick={onBack}>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="size-8"
+          onClick={onBack}
+          data-tutorial="netplay-browse-back"
+        >
           <ArrowLeft className="size-4" />
         </Button>
         <CardTitle className="text-sm">게임을 선택하세요</CardTitle>
@@ -218,6 +226,9 @@ export default function NetplayBrowseRomsScreen({
                       systemLabel={sys?.label || rom.core}
                       displayName={rom.displayName}
                       previewActionLabel="방 만들기"
+                      actionDataTutorial={
+                        rom.path === recommendedRomPath ? "netplay-primary-game" : undefined
+                      }
                       favorite={favoriteGames.includes(rom.path)}
                       onToggleFavorite={() => onToggleFavoriteGame(rom.path)}
                       onClick={() => onCreateRoom(rom)}
@@ -242,6 +253,9 @@ export default function NetplayBrowseRomsScreen({
                       core={rom.core}
                       systemLabel={sys?.label || rom.core}
                       previewActionLabel="방 만들기"
+                      actionDataTutorial={
+                        rom.path === recommendedRomPath ? "netplay-primary-game" : undefined
+                      }
                       favorite={true}
                       onToggleFavorite={() => onToggleFavoriteGame(rom.path)}
                       onClick={() => onCreateRoom(rom)}
@@ -283,6 +297,9 @@ export default function NetplayBrowseRomsScreen({
                           core={rom.core}
                           systemLabel={sys?.label || rom.core}
                           previewActionLabel="방 만들기"
+                          actionDataTutorial={
+                            rom.path === recommendedRomPath ? "netplay-primary-game" : undefined
+                          }
                           favorite={favoriteGames.includes(rom.path)}
                           onToggleFavorite={() => onToggleFavoriteGame(rom.path)}
                           onClick={() => onCreateRoom(rom)}
@@ -306,6 +323,9 @@ export default function NetplayBrowseRomsScreen({
                     core={rom.core}
                     systemLabel={sys?.label || rom.core}
                     previewActionLabel="방 만들기"
+                    actionDataTutorial={
+                      rom.path === recommendedRomPath ? "netplay-primary-game" : undefined
+                    }
                     favorite={favoriteGames.includes(rom.path)}
                     onToggleFavorite={() => onToggleFavoriteGame(rom.path)}
                     onClick={() => onCreateRoom(rom)}

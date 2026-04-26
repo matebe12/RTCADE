@@ -1,4 +1,4 @@
-import { Monitor, Moon, Sun } from "lucide-react";
+import { Monitor, Moon, ShieldAlert, Sun } from "lucide-react";
 
 import { UserBadge } from "@/components/UserBadge";
 import { Badge } from "@/components/ui/badge";
@@ -92,7 +92,7 @@ export default function SettingsPage({ profile, onOpenProfile }: SettingsPagePro
             <div className="space-y-1">
               <p className="text-sm font-medium text-foreground">사용자 여정 튜토리얼</p>
               <p className="text-sm text-muted-foreground">
-                플레이 시작부터 혼자하기 실제 실행과 조작 안내까지 다시 따라볼 수 있습니다.
+                홈에서 플레이 시작 후 방 만들기, 대기실, 혼자 시작, 실제 플레이 화면까지 다시 따라볼 수 있습니다.
               </p>
             </div>
             <Button type="button" variant="outline" className="mt-3 w-full" onClick={startTutorial}>
@@ -143,6 +143,42 @@ export default function SettingsPage({ profile, onOpenProfile }: SettingsPagePro
               </button>
             );
           })}
+        </CardContent>
+      </Card>
+
+      <Card className="border-border/70 bg-card/95 lg:col-span-2">
+        <CardHeader>
+          <div className="flex items-center gap-3">
+            <div className="rounded-full bg-background p-2">
+              <ShieldAlert className="size-4 text-primary" />
+            </div>
+            <div>
+              <CardTitle className="text-xl">프로젝트 성격</CardTitle>
+              <CardDescription>
+                이 프로젝트는 수익 창출을 목적으로 하지 않으며, WebRTC 넷플레이와 에뮬레이터 연동 구조를 보여주기 위한 포트폴리오용 기술 데모입니다.
+              </CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="grid gap-3 text-sm text-muted-foreground lg:grid-cols-3">
+          <div className="rounded-xl border border-border/70 bg-background/40 p-4">
+            <p className="font-medium text-foreground">포트폴리오 목적</p>
+            <p className="mt-2">
+              핵심 목적은 게임 서비스 운영이 아니라 WebRTC, 상태 동기화, iframe 기반 EmulatorJS 브리지 같은 구현 역량을 보여주는 것입니다.
+            </p>
+          </div>
+          <div className="rounded-xl border border-border/70 bg-background/40 p-4">
+            <p className="font-medium text-foreground">수익 목적 없음</p>
+            <p className="mt-2">
+              광고나 과금처럼 수익화 요소 없이, 포트폴리오와 기술 검증 중심의 데모 형태로 유지하는 방향을 전제로 합니다.
+            </p>
+          </div>
+          <div className="rounded-xl border border-border/70 bg-background/40 p-4">
+            <p className="font-medium text-foreground">콘텐츠 주의사항</p>
+            <p className="mt-2">
+              깃 저장소에는 상용 ROM과 BIOS를 직접 커밋하지 않는 전제입니다.
+            </p>
+          </div>
         </CardContent>
       </Card>
     </div>

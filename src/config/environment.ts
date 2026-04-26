@@ -46,7 +46,7 @@ const wsUrl = import.meta.env.VITE_WS_URL || defaultWsUrl;
 const emulatorJsDataUrl = normalizeEmulatorJsDataUrl(
   import.meta.env.VITE_EMULATORJS_DATA_URL || defaultEmulatorJsDataUrl,
 );
-const adProvider = normalizeAdProvider(import.meta.env.VITE_AD_PROVIDER);
+const adProvider: AdProvider = "none";
 
 export const appEnvironment = {
   siteName: "RTCADE",
@@ -56,7 +56,7 @@ export const appEnvironment = {
   emulatorJsDataUrl,
   emulatorJsLoaderUrl: new URL("loader.js", emulatorJsDataUrl).toString(),
   sideAds: {
-    enabled: normalizeBooleanEnv(import.meta.env.VITE_ENABLE_SIDE_ADS, false),
+    enabled: false,
     provider: adProvider,
     desktopMinWidth: normalizeNumberEnv(import.meta.env.VITE_AD_DESKTOP_MIN_WIDTH, 1536),
     rightRailMinWidth: normalizeNumberEnv(import.meta.env.VITE_AD_RIGHT_RAIL_MIN_WIDTH, 1280),

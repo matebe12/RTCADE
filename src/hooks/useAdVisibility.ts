@@ -4,7 +4,7 @@ import { appEnvironment } from "@/config/environment";
 import { useNetplayLobbyStore } from "@/stores/useNetplayLobbyStore";
 
 const CONTENT_AD_PATHS = new Set(["/", "/netplay", "/notices", "/settings"]);
-const HIDDEN_STEPS = new Set(["playing", "watching", "solo-playing", "session-summary"]);
+const HIDDEN_STEPS = new Set(["watching", "session-summary"]);
 
 export function useAdVisibility() {
   const location = useLocation();

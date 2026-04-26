@@ -38,6 +38,7 @@ interface NetplayChatPanelProps {
   remoteUser: ChatUser | null;
   inputRef: React.RefObject<HTMLInputElement | null>;
   className?: string;
+  contentClassName?: string;
 }
 
 const timeFormatter = new Intl.DateTimeFormat("ko-KR", {
@@ -59,6 +60,7 @@ export default function NetplayChatPanel({
   remoteUser,
   inputRef,
   className,
+  contentClassName,
 }: NetplayChatPanelProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
@@ -118,7 +120,7 @@ export default function NetplayChatPanel({
         </Button>
       </CardHeader>
 
-      <CardContent className="flex h-88 min-h-0 flex-1 flex-col gap-3 p-3">
+      <CardContent className={cn("flex h-88 min-h-0 flex-1 flex-col gap-3 p-3", contentClassName)}>
         <ScrollArea
           ref={scrollAreaRef}
           className="min-h-0 flex-1 rounded-md border border-border/60 bg-background/50"

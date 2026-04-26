@@ -172,11 +172,11 @@ function PopularGameSpotlightItem({
                   asChild
                   size="sm"
                   className="h-8 rounded-full px-3 text-[11px]"
-                  aria-label={`${displayName} 플레이`}
+                  aria-label={`${displayName} 공개방 만들기`}
                 >
-                  <NavLink to={playHref} title={`${displayName} 플레이`}>
+                  <NavLink to={playHref} title={`${displayName} 공개방 만들기`}>
                     <Gamepad2 className="size-4" />
-                    <span>플레이</span>
+                    <span>방 만들기</span>
                   </NavLink>
                 </Button>
               </div>
@@ -220,7 +220,7 @@ function PopularGameSpotlightItem({
               </div>
               <DialogTitle className="text-xl leading-tight text-foreground">{displayName}</DialogTitle>
               <DialogDescription>
-                스포트라이트 게임을 크게 보고 바로 공개방으로 시작할 수 있습니다.
+                버튼을 누르면 이 게임으로 공개방이 즉시 만들어집니다.
               </DialogDescription>
             </DialogHeader>
 
