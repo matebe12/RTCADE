@@ -1,10 +1,10 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Gamepad2, Star } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { parseRomName } from "@/lib/game-names";
-import { getGameThumbnailUrl } from "@/lib/game-thumbnails";
+import { getFallbackGameThumbnailUrl, getGameThumbnailUrl } from "@/lib/game-thumbnails";
 import { cn } from "@/lib/utils";
 
 interface GameCardProps {
@@ -34,9 +34,15 @@ export function GameCard({
 }: GameCardProps) {
   const resolvedDisplayName = displayName ?? parseRomName(filename, core);
   const thumbnailUrl = getGameThumbnailUrl(filename, core);
+  const fallbackThumbnailUrl = getFallbackGameThumbnailUrl(filename, core);
   const [imgError, setImgError] = useState(false);
+  const displayThumbnailUrl = imgError || !thumbnailUrl ? fallbackThumbnailUrl : thumbnailUrl;
 
   const handleImgError = useCallback(() => setImgError(true), []);
+
+  useEffect(() => {
+    setImgError(false);
+  }, [thumbnailUrl]);
 
   return (
     <div
@@ -55,12 +61,12 @@ export function GameCard({
         disabled={disabled}
         className="relative size-14 shrink-0 overflow-hidden rounded-md bg-muted"
       >
-        {thumbnailUrl && !imgError ? (
+        {displayThumbnailUrl ? (
           <img
-            src={thumbnailUrl}
+            src={displayThumbnailUrl}
             alt={resolvedDisplayName}
             loading="lazy"
-            onError={handleImgError}
+            onError={displayThumbnailUrl === thumbnailUrl ? handleImgError : undefined}
             className="size-full object-cover"
           />
         ) : (

@@ -663,6 +663,7 @@ const MAME_NAMES: Record<string, string> = {
   punisher: "퍼니셔",
   punkshot: "펑크 샷",
   pushman: "푸시맨",
+  puyopuy2: "뿌요뿌요 2",
   puzloop: "퍼즐루프",
   puzzledp: "퍼즐 더 팝",
   puzzli2: "퍼즐리 2",
@@ -1282,15 +1283,63 @@ const GAME_CATEGORIES: Record<string, GameCategory> = {
   kinst2: "fighting",
 };
 
+const ARCADE_CORES = new Set(["mame2003", "mame2003_plus", "arcade", "fbneo"]);
+const ROM_FILENAME_EXTENSION_PATTERN = /\.\w+$/;
+const CLONE_SUFFIX_PATTERN = /(?:[_-]?[a-z])$/;
+const MAX_CLONE_SUFFIX_FALLBACK_STEPS = 2;
+
+function stripRomExtension(filename: string) {
+  return filename.replace(ROM_FILENAME_EXTENSION_PATTERN, "");
+}
+
+function hasLookupEntry<T>(lookup: Record<string, T>, key: string) {
+  return Object.prototype.hasOwnProperty.call(lookup, key);
+}
+
+function resolveArcadeLookupKey<T>(lookup: Record<string, T>, filename: string) {
+  const base = stripRomExtension(filename).toLowerCase();
+
+  if (hasLookupEntry(lookup, base)) {
+    return base;
+  }
+
+  let candidate = base;
+
+  for (let step = 0; step < MAX_CLONE_SUFFIX_FALLBACK_STEPS; step += 1) {
+    const nextCandidate = candidate.replace(CLONE_SUFFIX_PATTERN, "");
+
+    if (nextCandidate === candidate || nextCandidate.length < 3) {
+      break;
+    }
+
+    candidate = nextCandidate;
+
+    if (hasLookupEntry(lookup, candidate)) {
+      return candidate;
+    }
+  }
+
+  return null;
+}
+
+export function isArcadeCore(core: string) {
+  return ARCADE_CORES.has(core);
+}
+
+export function resolveArcadeLookupValue<T>(filename: string, lookup: Record<string, T>): T | null {
+  const key = resolveArcadeLookupKey(lookup, filename);
+  return key ? lookup[key] : null;
+}
+
 /**
  * ROM shortcode의 카테고리를 반환. 매핑에 없으면 "etc".
  */
 export function getRomCategory(filename: string, core: string): GameCategory {
-  if (core !== "mame2003" && core !== "mame2003_plus" && core !== "arcade" && core !== "fbneo") {
+  if (!isArcadeCore(core)) {
     return "etc";
   }
-  const base = filename.replace(/\.\w+$/, "").toLowerCase();
-  return GAME_CATEGORIES[base] ?? "etc";
+
+  return resolveArcadeLookupValue(filename, GAME_CATEGORIES) ?? "etc";
 }
 
 /**
@@ -1299,11 +1348,11 @@ export function getRomCategory(filename: string, core: string): GameCategory {
  */
 export function parseRomName(filename: string, core: string): string {
   // Strip extension
-  const base = filename.replace(/\.\w+$/, "");
+  const base = stripRomExtension(filename);
 
   // For MAME/arcade cores, try the lookup table first
-  if (core === "mame2003" || core === "mame2003_plus" || core === "arcade" || core === "fbneo") {
-    const known = MAME_NAMES[base.toLowerCase()];
+  if (isArcadeCore(core)) {
+    const known = resolveArcadeLookupValue(filename, MAME_NAMES);
     if (known) return known;
   }
 

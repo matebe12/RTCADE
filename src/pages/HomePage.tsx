@@ -8,7 +8,7 @@ import {
   Trophy,
   Users,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { NavLink } from "react-router-dom";
 
 import { SYSTEM_OPTIONS } from "@/components/EmulatorPlayer";
@@ -18,7 +18,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { getGameThumbnailUrl } from "@/lib/game-thumbnails";
+import { getFallbackGameThumbnailUrl, getGameThumbnailUrl } from "@/lib/game-thumbnails";
 import type { PopularGameSummary } from "@/lib/operations-api";
 import { usePageSeo } from "@/lib/seo";
 import {
@@ -87,17 +87,22 @@ function getPopularGameFilename(romPath?: string) {
 function PopularGameThumbnail({ game }: { game: PopularGameSummary }) {
   const [imgError, setImgError] = useState(false);
   const filename = getPopularGameFilename(game.romPath);
-  const thumbnailUrl =
-    filename && game.core && !imgError ? getGameThumbnailUrl(filename, game.core) : null;
+  const thumbnailUrl = filename && game.core ? getGameThumbnailUrl(filename, game.core) : null;
+  const fallbackThumbnailUrl = filename && game.core ? getFallbackGameThumbnailUrl(filename, game.core) : null;
+  const displayThumbnailUrl = imgError || !thumbnailUrl ? fallbackThumbnailUrl : thumbnailUrl;
+
+  useEffect(() => {
+    setImgError(false);
+  }, [thumbnailUrl]);
 
   return (
     <div className="relative size-16 shrink-0 overflow-hidden rounded-2xl border border-primary/15 bg-background/70 shadow-sm shadow-primary/10">
-      {thumbnailUrl ? (
+      {displayThumbnailUrl ? (
         <img
-          src={thumbnailUrl}
+          src={displayThumbnailUrl}
           alt={game.gameName}
           loading="lazy"
-          onError={() => setImgError(true)}
+          onError={displayThumbnailUrl === thumbnailUrl ? () => setImgError(true) : undefined}
           className="size-full object-cover"
         />
       ) : (

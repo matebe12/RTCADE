@@ -1,3 +1,5 @@
+import { isArcadeCore, parseRomName, resolveArcadeLookupValue } from "@/lib/game-names";
+
 /**
  * MAME ROM shortcode → 영어 MAME 데이터베이스 이름 매핑.
  * libretro-thumbnails CDN에서 스크린샷을 가져오기 위한 이름.
@@ -288,6 +290,7 @@ const MAME_THUMBNAIL_NAMES: Record<string, string> = {
   pulstar: "Pulstar",
   punchout: "Punch-Out!! (Japan)",
   punisher: "The Punisher (World 930422)",
+  puyopuy2: "Puyo Puyo 2 (Japan)",
 
   // ── Q ──
   qbert: "Q-bert",
@@ -418,17 +421,101 @@ const MAME_THUMBNAIL_NAMES: Record<string, string> = {
 };
 
 const THUMBNAIL_CDN_BASE = "https://thumbnails.libretro.com/MAME/Named_Snaps/";
+const ROM_FILENAME_EXTENSION_PATTERN = /\.\w+$/;
+
+function getThumbnailBadgeLabel(core: string) {
+  switch (core) {
+    case "mame2003":
+    case "mame2003_plus":
+      return "MAME";
+    case "fbneo":
+      return "FB";
+    default:
+      return core.toUpperCase();
+  }
+}
+
+function getThumbnailMonogram(title: string) {
+  const compactTitle = title.replace(/\s+/g, "").trim();
+
+  if (!compactTitle) {
+    return "RT";
+  }
+
+  const words = title.trim().split(/\s+/).filter(Boolean);
+
+  if (words.length >= 2) {
+    return (words[0][0] + words[1][0]).slice(0, 2).toUpperCase();
+  }
+
+  return compactTitle.slice(0, 2).toUpperCase();
+}
+
+function truncateThumbnailLabel(value: string, maxLength: number) {
+  return value.length > maxLength ? `${value.slice(0, maxLength - 1)}…` : value;
+}
+
+function escapeSvgText(value: string) {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/\"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function stripRomExtension(filename: string) {
+  return filename.replace(ROM_FILENAME_EXTENSION_PATTERN, "");
+}
+
+export function getFallbackGameThumbnailUrl(filename: string, core: string) {
+  const title = parseRomName(filename, core);
+  const monogram = getThumbnailMonogram(title);
+  const badgeLabel = getThumbnailBadgeLabel(core);
+  const footerLabel = truncateThumbnailLabel(stripRomExtension(filename).toUpperCase(), 12);
+
+  const svg = `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 240" role="img" aria-label="${escapeSvgText(title)}">
+      <defs>
+        <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1">
+          <stop offset="0%" stop-color="#08111f" />
+          <stop offset="60%" stop-color="#13253f" />
+          <stop offset="100%" stop-color="#2d1a0c" />
+        </linearGradient>
+        <radialGradient id="glowA" cx="0.18" cy="0.2" r="0.9">
+          <stop offset="0%" stop-color="#36cfff" stop-opacity="0.68" />
+          <stop offset="100%" stop-color="#36cfff" stop-opacity="0" />
+        </radialGradient>
+        <radialGradient id="glowB" cx="0.85" cy="0.82" r="0.75">
+          <stop offset="0%" stop-color="#ff9d42" stop-opacity="0.6" />
+          <stop offset="100%" stop-color="#ff9d42" stop-opacity="0" />
+        </radialGradient>
+      </defs>
+      <rect width="320" height="240" rx="28" fill="url(#bg)" />
+      <rect width="320" height="240" rx="28" fill="url(#glowA)" />
+      <rect width="320" height="240" rx="28" fill="url(#glowB)" />
+      <rect x="16" y="16" width="288" height="208" rx="22" fill="none" stroke="rgba(255,255,255,0.16)" />
+      <rect x="28" y="26" width="72" height="28" rx="14" fill="rgba(4,10,18,0.56)" stroke="rgba(255,255,255,0.18)" />
+      <text x="64" y="45" fill="#e8f4ff" font-family="Pretendard, Arial, sans-serif" font-size="16" font-weight="700" text-anchor="middle">${escapeSvgText(badgeLabel)}</text>
+      <text x="160" y="138" fill="#f8fafc" font-family="Pretendard, Arial, sans-serif" font-size="92" font-weight="800" letter-spacing="-4" text-anchor="middle">${escapeSvgText(monogram)}</text>
+      <text x="28" y="188" fill="#f8fafc" font-family="Pretendard, Arial, sans-serif" font-size="24" font-weight="700">${escapeSvgText(truncateThumbnailLabel(title, 16))}</text>
+      <text x="28" y="212" fill="rgba(232,244,255,0.72)" font-family="monospace" font-size="16">${escapeSvgText(footerLabel)}</text>
+    </svg>
+  `;
+
+  return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
+}
 
 /**
  * ROM shortcode에 해당하는 썸네일 이미지 URL을 반환.
  * 매핑에 없으면 null.
  */
 export function getGameThumbnailUrl(filename: string, core: string): string | null {
-  if (core !== "mame2003" && core !== "mame2003_plus" && core !== "arcade" && core !== "fbneo") {
+  if (!isArcadeCore(core)) {
     return null;
   }
-  const base = filename.replace(/\.\w+$/, "").toLowerCase();
-  const englishName = MAME_THUMBNAIL_NAMES[base];
+
+  const englishName = resolveArcadeLookupValue(filename, MAME_THUMBNAIL_NAMES);
   if (!englishName) return null;
 
   // URL-encode the name (spaces → %20, etc.)
