@@ -88,6 +88,12 @@ const DEFAULT_GAME_METRICS: GameMetrics = {
 };
 
 const POPULAR_GAMES_LIMIT = 5;
+const REPORTING_TIME_ZONE = "Asia/Seoul";
+const REPORTING_TODAY_SQL = `TIMEZONE('${REPORTING_TIME_ZONE}', NOW())::date`;
+
+function toReportingDateSql(value: string) {
+  return `TIMEZONE('${REPORTING_TIME_ZONE}', ${value})::date`;
+}
 
 const DEFAULT_NOTICES = [
   {
@@ -377,14 +383,14 @@ export function createOperationsDatabase(databaseUrl: string | null): Operations
     getGameMetrics: async () =>
       runSafely(async () => {
         const todayGamesResult = await pool!.query<{ count: string }>(
-          "SELECT COUNT(*)::text AS count FROM game_sessions WHERE started_at::date = CURRENT_DATE",
+          `SELECT COUNT(*)::text AS count FROM game_sessions WHERE ${toReportingDateSql("started_at")} = ${REPORTING_TODAY_SQL}`,
         );
         const totalGamesResult = await pool!.query<{ count: string }>(
           "SELECT COUNT(*)::text AS count FROM game_sessions",
         );
         const todayPopularGames = await listPopularGames(
           pool!,
-          "WHERE started_at::date = CURRENT_DATE",
+          `WHERE ${toReportingDateSql("started_at")} = ${REPORTING_TODAY_SQL}`,
         );
         const weeklyPopularGames = await listPopularGames(
           pool!,
@@ -415,7 +421,7 @@ export function createOperationsDatabase(databaseUrl: string | null): Operations
           "SELECT COUNT(*)::text AS count FROM visitors",
         );
         const todayVisitorsResult = await pool!.query<{ count: string }>(
-          "SELECT COUNT(*)::text AS count FROM daily_visitors WHERE visit_date = CURRENT_DATE",
+          `SELECT COUNT(*)::text AS count FROM daily_visitors WHERE visit_date = ${REPORTING_TODAY_SQL}`,
         );
 
         return {
@@ -497,7 +503,7 @@ export function createOperationsDatabase(databaseUrl: string | null): Operations
         await pool!.query(
           `
             INSERT INTO daily_visitors (visit_date, visitor_id)
-            VALUES (CURRENT_DATE, $1)
+            VALUES (${REPORTING_TODAY_SQL}, $1)
             ON CONFLICT (visit_date, visitor_id)
             DO NOTHING
           `,
