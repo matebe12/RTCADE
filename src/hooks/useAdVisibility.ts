@@ -16,7 +16,7 @@ export function useAdVisibility() {
   const showRails = enabled && allowedPath && !hiddenByStep;
 
   return {
-    showLeftRail: showRails,
+    showLeftRail: false,
     showRightRail: showRails,
   } as const;
 }
