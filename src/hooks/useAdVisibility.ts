@@ -3,7 +3,7 @@ import { useLocation } from "react-router-dom";
 import { appEnvironment } from "@/config/environment";
 import { useNetplayLobbyStore } from "@/stores/useNetplayLobbyStore";
 
-const CONTENT_AD_PATHS = new Set(["/", "/notices", "/settings"]);
+const CONTENT_AD_PATHS = new Set(["/", "/netplay", "/notices", "/settings"]);
 const HIDDEN_STEPS = new Set(["playing", "watching", "solo-playing", "session-summary"]);
 
 export function useAdVisibility() {
