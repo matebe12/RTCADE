@@ -135,9 +135,10 @@ const STATE_BUFFER_THRESHOLD = 512 * 1024;
 const DEFAULT_REMOTE_HELD_MASK = 0;
 const REPAIR_SYNC_INTERVAL_MS = 120;
 const REPAIR_SYNC_ZERO_FLUSH_COUNT = 3;
-const VIDEO_STREAM_MAX_BITRATE = 8_000_000;
-const VIDEO_STREAM_MAX_FRAMERATE = 60;
-const VIDEO_STREAM_SCALE_DOWN = 1.0;
+const VIDEO_STREAM_MAX_BITRATE = 4_500_000;
+const VIDEO_STREAM_MAX_FRAMERATE = 45;
+const VIDEO_STREAM_SCALE_DOWN = 1.25;
+const VIDEO_STREAM_PLAYOUT_DELAY_SEC = 0.05;
 const GAMEPLAY_DISCONNECT_GRACE_MS = 4_000;
 
 const RTC_CONFIG: RTCConfiguration = {
@@ -649,6 +650,9 @@ export class NetplayPeer {
 
     pc.ontrack = (e) => {
       console.log("[PEER] ontrack fired, streams:", e.streams.length);
+      if (e.track.kind === "video") {
+        this.applyLowLatencyReceiverSettings(e.receiver);
+      }
       const stream = e.streams && e.streams.length > 0 ? e.streams[0] : new MediaStream([e.track]);
 
       if (this._connectionMode === "spectator" && e.track.kind === "video") {
@@ -1429,6 +1433,24 @@ export class NetplayPeer {
     }
   }
 
+  private applyLowLatencyReceiverSettings(receiver: RTCRtpReceiver | null | undefined) {
+    if (!receiver) {
+      return;
+    }
+
+    try {
+      const receiverWithDelayHint = receiver as RTCRtpReceiver & {
+        playoutDelayHint?: number;
+      };
+
+      if ("playoutDelayHint" in receiverWithDelayHint) {
+        receiverWithDelayHint.playoutDelayHint = VIDEO_STREAM_PLAYOUT_DELAY_SEC;
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+
   private replaceStreamTracks(
     pc: RTCPeerConnection | null,
     senders: RTCRtpSender[],
@@ -1441,18 +1463,18 @@ export class NetplayPeer {
     this.removeStreamTracks(pc, senders);
 
     for (const track of stream.getVideoTracks()) {
-      track.contentHint = "detail";
+      track.contentHint = "motion";
       const sender = pc.addTrack(track, stream);
       senders.push(sender);
 
       try {
         const params = sender.getParameters();
-        if (params.encodings && params.encodings.length > 0) {
-          params.encodings[0].maxBitrate = VIDEO_STREAM_MAX_BITRATE;
-          params.encodings[0].maxFramerate = VIDEO_STREAM_MAX_FRAMERATE;
-          params.encodings[0].scaleResolutionDownBy = VIDEO_STREAM_SCALE_DOWN;
-        }
-        params.degradationPreference = "maintain-resolution";
+        const encodings = params.encodings && params.encodings.length > 0 ? params.encodings : [{}];
+        params.encodings = encodings;
+        params.encodings[0].maxBitrate = VIDEO_STREAM_MAX_BITRATE;
+        params.encodings[0].maxFramerate = VIDEO_STREAM_MAX_FRAMERATE;
+        params.encodings[0].scaleResolutionDownBy = VIDEO_STREAM_SCALE_DOWN;
+        params.degradationPreference = "maintain-framerate";
         void sender.setParameters(params).catch(() => undefined);
       } catch {
         /* ignore */

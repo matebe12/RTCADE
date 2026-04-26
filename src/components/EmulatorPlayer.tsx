@@ -79,6 +79,7 @@ const EJS_HIDE_BUTTONS_CSS = [
 
 // Temporary safety switch while diagnosing host startup aborts.
 const HOST_AUDIO_CAPTURE_ENABLED = false;
+const HOST_STREAM_CAPTURE_FPS = 45;
 
 /**
  * Install an AudioContext monkey-patch BEFORE EmulatorJS loads.
@@ -803,7 +804,7 @@ const EmulatorPlayer = forwardRef<HTMLDivElement, EmulatorPlayerProps>(function 
       }
 
       try {
-        const videoStream = canvas.captureStream(60);
+        const videoStream = canvas.captureStream(HOST_STREAM_CAPTURE_FPS);
 
         for (const track of videoStream.getVideoTracks()) {
           track.contentHint = "detail";
