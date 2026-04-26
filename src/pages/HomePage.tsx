@@ -8,8 +8,8 @@ import {
   Trophy,
   Users,
 } from "lucide-react";
-import { useEffect, useState } from "react";
-import { NavLink } from "react-router-dom";
+import { useCallback, useEffect, useState } from "react";
+import { NavLink, useNavigate } from "react-router-dom";
 
 import { SYSTEM_OPTIONS } from "@/components/EmulatorPlayer";
 import { useOperationsNotices } from "@/hooks/useOperationsNotices";
@@ -36,6 +36,7 @@ import {
   getTotalPlayedCount,
   getUserProfile,
 } from "@/lib/user-profile";
+import { useNetplayLobbyStore } from "@/stores/useNetplayLobbyStore";
 
 interface HomePageProps {
   hasProfile: boolean;
@@ -110,6 +111,8 @@ function PopularGameSpotlightItem({
   game: PopularGameSummary;
   index: number;
 }) {
+  const navigate = useNavigate();
+  const resetLobby = useNetplayLobbyStore((store) => store.resetLobby);
   const [imgError, setImgError] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
   const filename = getPopularGameFilename(game.romPath);
@@ -120,6 +123,17 @@ function PopularGameSpotlightItem({
     filename && game.core ? getFallbackGameThumbnailUrl(filename, game.core) : null;
   const displayThumbnailUrl = imgError || !thumbnailUrl ? fallbackThumbnailUrl : thumbnailUrl;
   const playHref = buildPopularGameEntryHref("create-room", game);
+
+  const handleQuickCreateRoom = useCallback(() => {
+    resetLobby();
+    navigate(playHref);
+  }, [navigate, playHref, resetLobby]);
+
+  const handlePreviewQuickCreateRoom = useCallback(() => {
+    setPreviewOpen(false);
+    resetLobby();
+    navigate(playHref);
+  }, [navigate, playHref, resetLobby]);
 
   useEffect(() => {
     setImgError(false);
@@ -169,15 +183,14 @@ function PopularGameSpotlightItem({
 
               <div className="flex shrink-0 items-center gap-2">
                 <Button
-                  asChild
                   size="sm"
                   className="h-8 rounded-full px-3 text-[11px]"
                   aria-label={`${displayName} 공개방 만들기`}
+                  title={`${displayName} 공개방 만들기`}
+                  onClick={handleQuickCreateRoom}
                 >
-                  <NavLink to={playHref} title={`${displayName} 공개방 만들기`}>
-                    <Gamepad2 className="size-4" />
-                    <span>방 만들기</span>
-                  </NavLink>
+                  <Gamepad2 className="size-4" />
+                  <span>방 만들기</span>
                 </Button>
               </div>
             </div>
@@ -228,11 +241,13 @@ function PopularGameSpotlightItem({
               <Button type="button" variant="outline" onClick={() => setPreviewOpen(false)}>
                 닫기
               </Button>
-              <Button asChild type="button">
-                <NavLink to={playHref} title={`${displayName} 공개방 만들기`}>
-                  <Gamepad2 className="size-4" />
-                  <span>공개방 만들기</span>
-                </NavLink>
+              <Button
+                type="button"
+                title={`${displayName} 공개방 만들기`}
+                onClick={handlePreviewQuickCreateRoom}
+              >
+                <Gamepad2 className="size-4" />
+                <span>공개방 만들기</span>
               </Button>
             </DialogFooter>
           </div>
