@@ -436,7 +436,7 @@ const MAME_NAMES: Record<string, string> = {
   kof95: "KOF '95",
   kof96: "KOF '96",
   kof97: "KOF '97",
-  kof98: "KOF '98",
+  kof98: "킹오파98",
   kof99: "KOF '99",
   kof2000: "KOF 2000",
   kof2001: "KOF 2001",
@@ -752,7 +752,7 @@ const MAME_NAMES: Record<string, string> = {
   // ── S ──
   s1945: "스트라이커즈 1945",
   s1945ii: "스트라이커즈 1945 II",
-  s1945iii: "스트라이커즈 1945 III",
+  s1945iii: "스트라이커즈 1945 3",
   sailormn: "세일러문",
   salamand: "사라만다",
   salmndr2: "사라만다 2",
@@ -808,6 +808,7 @@ const MAME_NAMES: Record<string, string> = {
   slyspy: "시크릿 에이전트",
   smash: "스매시 TV",
   smashtv: "스매시 TV",
+  snowbro2: "스노우 브라더스 2",
   snowbros: "스노우 브라더스",
   snowbros2: "스노우 브라더스 2",
   socbrawl: "사커 브롤",
@@ -914,8 +915,8 @@ const MAME_NAMES: Record<string, string> = {
   tkdensho: "투신전",
   tkmmpzdm: "토코메키 메모리얼",
   tmek: "T-MEK",
-  tmnt: "닌자거북이",
-  tmnt2: "닌자거북이 2",
+  tmnt: "닌자 거북이",
+  tmnt2: "닌자 거북이 2",
   tndrcade: "썬더 케이드",
   tnexspce: "더 넥스트 스페이스",
   tnk3: "TNK III",
@@ -1306,6 +1307,13 @@ function resolveArcadeLookupKey<T>(lookup: Record<string, T>, filename: string) 
   let candidate = base;
 
   for (let step = 0; step < MAX_CLONE_SUFFIX_FALLBACK_STEPS; step += 1) {
+    const trailingCharacter = candidate.at(-1);
+    const previousCharacter = candidate.at(-2);
+
+    if (trailingCharacter && previousCharacter === trailingCharacter) {
+      break;
+    }
+
     const nextCandidate = candidate.replace(CLONE_SUFFIX_PATTERN, "");
 
     if (nextCandidate === candidate || nextCandidate.length < 3) {
