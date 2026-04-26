@@ -32,12 +32,17 @@ export interface PlaySessionStore {
 
 const ACTIVE_SESSION_TTL_MS = 30_000;
 
+interface CreatePlaySessionStoreOptions {
+  onSessionEnded?: (session: ActivePlaySession, reason: "expired" | "explicit") => void;
+}
+
 function isNonEmptyString(value: unknown): value is string {
   return typeof value === "string" && value.trim().length > 0;
 }
 
-export function createPlaySessionStore(): PlaySessionStore {
+export function createPlaySessionStore(options: CreatePlaySessionStoreOptions = {}): PlaySessionStore {
   const sessions = new Map<string, ActivePlaySession>();
+  const notifySessionEnded = options.onSessionEnded;
 
   const pruneExpiredSessions = () => {
     const now = Date.now();
@@ -45,6 +50,7 @@ export function createPlaySessionStore(): PlaySessionStore {
     for (const [sessionId, session] of sessions.entries()) {
       if (now - session.lastSeenAt > ACTIVE_SESSION_TTL_MS) {
         sessions.delete(sessionId);
+        notifySessionEnded?.(session, "expired");
       }
     }
   };
@@ -55,7 +61,12 @@ export function createPlaySessionStore(): PlaySessionStore {
         return;
       }
 
-      sessions.delete(sessionId.trim());
+      const normalizedSessionId = sessionId.trim();
+      const endedSession = sessions.get(normalizedSessionId);
+      sessions.delete(normalizedSessionId);
+      if (endedSession) {
+        notifySessionEnded?.(endedSession, "explicit");
+      }
     },
     getActivitySnapshot: () => {
       pruneExpiredSessions();

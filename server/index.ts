@@ -18,8 +18,13 @@ import { createVisitorTrackingMiddleware } from "./visitorTracking";
 async function bootstrap() {
   const config = getServerConfig();
   const roomStore = createRoomStore();
-  const playSessionStore = createPlaySessionStore();
   const operationsDatabase = createOperationsDatabase(config.databaseUrl);
+  const playSessionStore = createPlaySessionStore({
+    onSessionEnded: (session, reason) => {
+      const endedAt = reason === "expired" ? new Date(session.lastSeenAt).toISOString() : undefined;
+      void operationsDatabase.completeGameSession(session.sessionId, endedAt);
+    },
+  });
   const app = express();
   const server = createServer(app);
   const wss = new WebSocketServer({ server });

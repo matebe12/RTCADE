@@ -59,7 +59,7 @@ export interface RecordGameSessionInput {
 }
 
 export interface OperationsDatabase {
-  completeGameSession: (sessionId: string) => Promise<void>;
+  completeGameSession: (sessionId: string, endedAt?: string) => Promise<void>;
   createNotice: (input: CreateNoticeInput) => Promise<NoticeRecord | null>;
   getGameMetrics: () => Promise<GameMetrics>;
   isEnabled: boolean;
@@ -328,23 +328,25 @@ export function createOperationsDatabase(databaseUrl: string | null): Operations
   }
 
   return {
-    completeGameSession: async (sessionId) => {
+    completeGameSession: async (sessionId, endedAt) => {
       await runSafely(async () => {
         await pool!.query(
           `
             UPDATE game_sessions
             SET
-              ended_at = COALESCE(ended_at, NOW()),
+              ended_at = COALESCE(ended_at, $2::timestamptz, NOW()),
               duration_ms = GREATEST(
                 duration_ms,
                 GREATEST(
                   0,
-                  FLOOR(EXTRACT(EPOCH FROM (COALESCE(ended_at, NOW()) - started_at)) * 1000)::bigint
+                  FLOOR(
+                    EXTRACT(EPOCH FROM (COALESCE(ended_at, $2::timestamptz, NOW()) - started_at)) * 1000
+                  )::bigint
                 )
               )
             WHERE session_id = $1
           `,
-          [sessionId],
+          [sessionId, endedAt ?? null],
         );
       }, undefined);
     },
@@ -483,7 +485,7 @@ export function createOperationsDatabase(databaseUrl: string | null): Operations
           `
             INSERT INTO game_sessions (session_id, game_name, rom_path, core)
             VALUES ($1, $2, $3, $4)
-            ON CONFLICT (session_id) DO NOTHING
+            ON CONFLICT DO NOTHING
           `,
           [input.sessionId, input.gameName, input.romPath, input.core],
         );

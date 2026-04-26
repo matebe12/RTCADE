@@ -338,8 +338,8 @@ export async function upsertActivePlaySession(input: ActivePlaySessionInput) {
 }
 
 export async function endActivePlaySession(sessionId: string) {
-  await request(`/api/active-play-sessions/${encodeURIComponent(sessionId)}`, {
-    method: "DELETE",
+  await request(`/api/active-play-sessions/${encodeURIComponent(sessionId)}/end`, {
+    method: "POST",
     keepalive: true,
   });
 
