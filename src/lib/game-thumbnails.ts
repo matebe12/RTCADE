@@ -152,10 +152,12 @@ const MAME_THUMBNAIL_NAMES: Record<string, string> = {
   garou: "Garou - Mark of the Wolves (set 1)",
   gauntlet: "Gauntlet (rev 14)",
   gberet: "Green Beret",
+  galaxyfg: "Galaxy Fight - Universal Warriors",
   ghouls: "Ghouls'n Ghosts (World)",
   gng: "Ghosts'n Goblins (World)",
   goldnaxe: "Golden Axe (set 6, US) (8751 317-123A)",
   gokuparo: "Gokujou Parodius - Kako no Eikuu wo Motomete (ver JAD)",
+  gowcaizr: "Voltage Fighter - Gowcaizer _ Choujin Gakuen Gowcaizer",
   gradius: "Gradius (Japan, ROM version)",
   gradius2: "Gradius II - GOFER no Yabou (World, set 1)",
   gradius3: "Gradius III (World, program code R)",
@@ -207,6 +209,7 @@ const MAME_THUMBNAIL_NAMES: Record<string, string> = {
   kof2001: "The King of Fighters 2001 (set 1)",
   kof2002: "The King of Fighters 2002",
   kof2003: "The King of Fighters 2003 (World _ US, MVS)",
+  kizuna: "Kizuna Encounter - Super Tag Battle _ Fu'un Super Tag Battle",
   kotm: "King of the Monsters (set 1)",
   kotm2: "King of the Monsters 2 - The Next Thing",
   kungfum: "Kung-Fu Master",
@@ -273,6 +276,7 @@ const MAME_THUMBNAIL_NAMES: Record<string, string> = {
   pang: "Pang (World)",
   pang3: "Pang! 3 (Euro 950601)",
   paperboy: "Paperboy (rev 3)",
+  panicbom: "Panic Bomber",
   parodius: "Parodius DA! (World)",
   pbobbl2n: "Puzzle Bobble 2 _ Bust-A-Move Again (Neo-Geo)",
   pengo: "Pengo (set 1 rev c)",
@@ -353,6 +357,7 @@ const MAME_THUMBNAIL_NAMES: Record<string, string> = {
   ssriders: "Sunset Riders (4 Players ver EAC)",
   strider: "Strider (World)",
   strider2: "Strider 2 (World 991213)",
+  strhoop: "Street Hoop _ Street Slam _ Dunk Dream",
   superman: "Superman (World 2 Players)",
   suprmrio: "Vs. Super Mario Bros.",
   svc: "SNK vs. Capcom - SVC Chaos (MVS)",
@@ -420,6 +425,8 @@ const MAME_THUMBNAIL_NAMES: Record<string, string> = {
 const THUMBNAIL_CDN_BASE = "https://thumbnails.libretro.com/MAME/Named_Snaps/";
 const ROM_FILENAME_EXTENSION_PATTERN = /\.\w+$/;
 const VERIFIED_THUMBNAIL_URLS: Record<string, string> = {
+  dmnfrnt:
+    "https://thumbnails.libretro.com/FBNeo%20-%20Arcade%20Games/Named_Snaps/Demon%20Front%20(V105).png",
   fatfursp:
     "https://thumbnails.libretro.com/SNK%20-%20Neo%20Geo/Named_Snaps/Fatal%20Fury%20Special%20_%20Garou%20Densetsu%20Special%20(set%201)(NGM-058)(NGH-058).png",
   kof98:

@@ -1,0 +1,28 @@
+{
+  "defaults": {
+    "bios": null
+  },
+  "roms": {
+    "dmnfrnt.zip": {
+      "bios": null
+    },
+    "galaxyfg.zip": {
+      "bios": "neogeo.zip"
+    },
+    "gowcaizr.zip": {
+      "bios": "neogeo.zip"
+    },
+    "kizuna.zip": {
+      "bios": "neogeo.zip"
+    },
+    "panicbom.zip": {
+      "bios": "neogeo.zip"
+    },
+    "strhoop.zip": {
+      "bios": "neogeo.zip"
+    },
+    "turfmast.zip": {
+      "bios": "neogeo.zip"
+    }
+  }
+}

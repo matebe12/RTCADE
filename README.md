@@ -107,7 +107,24 @@ server/roms/mame2003/neogeo.zip     # BIOS (자동 감지)
 server/roms/nes/contra.zip          # Contra
 ```
 
-BIOS 파일(`neogeo.zip`, `pgm.zip` 등)은 자동으로 인식되어 같은 폴더의 ROM에 자동 연결됩니다.
+BIOS 파일(`neogeo.zip`, `pgm.zip` 등)은 기본적으로 자동 인식되어 같은 폴더의 ROM에 자동 연결됩니다.
+
+FBNeo처럼 BIOS 요구가 섞인 코어는 코어 폴더에 `.rtcade-roms.json`을 두면 ROM별 BIOS를 지정할 수 있습니다.
+
+```json
+{
+   "defaults": {
+      "bios": null
+   },
+   "roms": {
+      "kizuna.zip": { "bios": "neogeo.zip" },
+      "panicbom.zip": { "bios": "neogeo.zip" },
+      "turfmast.zip": { "bios": "neogeo.zip" }
+   }
+}
+```
+
+이 파일이 있으면 폴더 단위 BIOS 자동 연결보다 이 카탈로그가 우선합니다.
 
 ### 백엔드 환경변수
 
