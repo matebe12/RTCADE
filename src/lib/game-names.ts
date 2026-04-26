@@ -436,7 +436,7 @@ const MAME_NAMES: Record<string, string> = {
   kof95: "KOF '95",
   kof96: "KOF '96",
   kof97: "KOF '97",
-  kof98: "킹오파98",
+  kof98: "KOF '98",
   kof99: "KOF '99",
   kof2000: "KOF 2000",
   kof2001: "KOF 2001",

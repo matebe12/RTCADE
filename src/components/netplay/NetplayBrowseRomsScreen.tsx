@@ -217,6 +217,7 @@ export default function NetplayBrowseRomsScreen({
                       core={rom.core}
                       systemLabel={sys?.label || rom.core}
                       displayName={rom.displayName}
+                      previewActionLabel="방 만들기"
                       favorite={favoriteGames.includes(rom.path)}
                       onToggleFavorite={() => onToggleFavoriteGame(rom.path)}
                       onClick={() => onCreateRoom(rom)}
@@ -240,6 +241,7 @@ export default function NetplayBrowseRomsScreen({
                       filename={rom.filename}
                       core={rom.core}
                       systemLabel={sys?.label || rom.core}
+                      previewActionLabel="방 만들기"
                       favorite={true}
                       onToggleFavorite={() => onToggleFavoriteGame(rom.path)}
                       onClick={() => onCreateRoom(rom)}
@@ -280,6 +282,7 @@ export default function NetplayBrowseRomsScreen({
                           filename={rom.filename}
                           core={rom.core}
                           systemLabel={sys?.label || rom.core}
+                          previewActionLabel="방 만들기"
                           favorite={favoriteGames.includes(rom.path)}
                           onToggleFavorite={() => onToggleFavoriteGame(rom.path)}
                           onClick={() => onCreateRoom(rom)}
@@ -302,6 +305,7 @@ export default function NetplayBrowseRomsScreen({
                     filename={rom.filename}
                     core={rom.core}
                     systemLabel={sys?.label || rom.core}
+                    previewActionLabel="방 만들기"
                     favorite={favoriteGames.includes(rom.path)}
                     onToggleFavorite={() => onToggleFavoriteGame(rom.path)}
                     onClick={() => onCreateRoom(rom)}
