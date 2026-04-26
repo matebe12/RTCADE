@@ -7,7 +7,19 @@ export interface PopularGameSummary {
   gameName: string;
   playCount: number;
   romPath?: string;
+  totalPlayTimeMs: number;
 }
+
+interface IceServerResponse {
+  iceServers?: unknown;
+}
+
+const FALLBACK_ICE_SERVERS: RTCIceServer[] = [
+  { urls: ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"] },
+];
+
+let cachedRtcConfiguration: RTCConfiguration | null = null;
+let rtcConfigurationPromise: Promise<RTCConfiguration> | null = null;
 
 export interface OperationsStats {
   activeRooms: number;
@@ -33,6 +45,7 @@ export interface RecordGameSessionInput {
   core: string;
   gameName: string;
   romPath: string;
+  sessionId: string;
 }
 
 export interface ActivePlaySessionInput {
@@ -72,6 +85,7 @@ function toPopularGameSummary(value: unknown): PopularGameSummary | null {
     gameName?: unknown;
     playCount?: unknown;
     romPath?: unknown;
+    totalPlayTimeMs?: unknown;
   };
 
   if (typeof candidate.gameName !== "string" || candidate.gameName.trim().length === 0) {
@@ -89,6 +103,54 @@ function toPopularGameSummary(value: unknown): PopularGameSummary | null {
       typeof candidate.romPath === "string" && candidate.romPath.trim().length > 0
         ? candidate.romPath
         : undefined,
+    totalPlayTimeMs: toNumber(candidate.totalPlayTimeMs),
+  };
+}
+
+function toIceServer(value: unknown): RTCIceServer | null {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+
+  const candidate = value as {
+    credential?: unknown;
+    urls?: unknown;
+    username?: unknown;
+  };
+
+  const urls = Array.isArray(candidate.urls)
+    ? candidate.urls.filter((entry): entry is string => typeof entry === "string" && entry.trim().length > 0)
+    : typeof candidate.urls === "string" && candidate.urls.trim().length > 0
+      ? [candidate.urls]
+      : [];
+
+  if (urls.length === 0) {
+    return null;
+  }
+
+  return {
+    urls,
+    username:
+      typeof candidate.username === "string" && candidate.username.trim().length > 0
+        ? candidate.username
+        : undefined,
+    credential:
+      typeof candidate.credential === "string" && candidate.credential.trim().length > 0
+        ? candidate.credential
+        : undefined,
+  };
+}
+
+function normalizeRtcConfiguration(value: unknown): RTCConfiguration {
+  const candidate = value && typeof value === "object" ? (value as IceServerResponse) : {};
+  const iceServers = Array.isArray(candidate.iceServers)
+    ? candidate.iceServers
+        .map((entry) => toIceServer(entry))
+        .filter((entry): entry is RTCIceServer => entry !== null)
+    : [];
+
+  return {
+    iceServers: iceServers.length > 0 ? iceServers : FALLBACK_ICE_SERVERS,
   };
 }
 
@@ -199,8 +261,50 @@ export function endActivePlaySessionWithBeacon(sessionId: string) {
   return navigator.sendBeacon(targetUrl);
 }
 
+export function completeGameSessionWithBeacon(sessionId: string) {
+  if (
+    typeof window === "undefined" ||
+    typeof navigator === "undefined" ||
+    typeof navigator.sendBeacon !== "function"
+  ) {
+    return false;
+  }
+
+  const trimmedSessionId = sessionId.trim();
+
+  if (trimmedSessionId.length === 0) {
+    return false;
+  }
+
+  const targetUrl = buildBackendUrl(`/api/game-sessions/${encodeURIComponent(trimmedSessionId)}/end`);
+
+  return navigator.sendBeacon(targetUrl);
+}
+
 export function fetchOperationsStats() {
   return fetchJson<unknown>("/api/stats").then(normalizeOperationsStats);
+}
+
+export function fetchNetplayRtcConfiguration(forceRefresh = false) {
+  if (!forceRefresh && cachedRtcConfiguration) {
+    return Promise.resolve(cachedRtcConfiguration);
+  }
+
+  if (!forceRefresh && rtcConfigurationPromise) {
+    return rtcConfigurationPromise;
+  }
+
+  rtcConfigurationPromise = fetchJson<unknown>("/api/ice-servers")
+    .then((response) => {
+      cachedRtcConfiguration = normalizeRtcConfiguration(response);
+      return cachedRtcConfiguration;
+    })
+    .catch(() => ({ iceServers: FALLBACK_ICE_SERVERS }))
+    .finally(() => {
+      rtcConfigurationPromise = null;
+    });
+
+  return rtcConfigurationPromise;
 }
 
 export async function recordGameSession(input: RecordGameSessionInput) {
@@ -210,6 +314,14 @@ export async function recordGameSession(input: RecordGameSessionInput) {
       "Content-Type": "application/json",
     },
     body: JSON.stringify(input),
+  });
+
+  notifyOperationsStatsRefresh();
+}
+
+export async function completeGameSession(sessionId: string) {
+  await request(`/api/game-sessions/${encodeURIComponent(sessionId)}/end`, {
+    method: "POST",
   });
 
   notifyOperationsStatsRefresh();

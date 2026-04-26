@@ -16,8 +16,14 @@ import {
 } from "@/stores/useNetplayLobbyStore";
 import { toast } from "sonner";
 import type { NetplaySessionRole } from "../../shared/emulator-protocol";
+import { MAX_SPECTATORS_PER_ROOM } from "../../shared/emulator-protocol";
 
 type SetLobbyState = (next: LobbyState | ((previous: LobbyState) => LobbyState)) => void;
+
+type StartedNetplaySession = ActiveSession & {
+  mode: "netplay";
+  role: NetplaySessionRole;
+};
 
 interface UseNetplayPeerFactoryOptions {
   peerRef: MutableRefObject<NetplayPeer | null>;
@@ -76,10 +82,15 @@ export function useNetplayPeerFactory({
   handleVideoStream,
   handleHeartbeat,
 }: UseNetplayPeerFactoryOptions) {
-  const createPeer = useCallback((): NetplayPeer => {
+  const createPeer = useCallback((rtcConfiguration?: RTCConfiguration): NetplayPeer => {
     const peer = new NetplayPeer({
       onConnected: () => setStatus(NETPLAY_COPY.peerConnected),
       onDisconnected: () => {
+        console.warn("[LOBBY] peer disconnected callback", {
+          activeRole: activeSessionRef.current?.role ?? null,
+          lobbyRole: roleRef.current,
+        });
+
         if (activeSessionRef.current?.role === "spectator") {
           toast.error(NETPLAY_COPY.peerLeft);
           resetToMenu();
@@ -114,6 +125,7 @@ export function useNetplayPeerFactory({
       onVideoStream: (stream) => handleVideoStream?.(stream),
       onHeartbeat: (ts) => handleHeartbeat?.(ts),
       onRoomCreated: () => {
+        roleRef.current = "host";
         setState((previous) => {
           if (previous.step === "browse" || previous.step === "menu") {
             return previous;
@@ -126,75 +138,117 @@ export function useNetplayPeerFactory({
           setOpponentProfile({ nickname: info.guestNickname, avatar: info.guestAvatar || "🎮" });
         }
         setStatus(NETPLAY_COPY.peerJoined);
-        setState((previous) => {
-          if (previous.step === "waiting") {
-            roleRef.current = "host";
-            activeSessionRef.current = {
-              mode: "netplay",
-              romPath: previous.romPath,
-              core: previous.core,
-              role: "host",
-              biosPath: previous.biosPath,
-              isPublic: previous.isPublic,
-            };
-            sessionStartedAtRef.current = null;
-            return {
-              step: "playing",
-              romPath: previous.romPath,
-              core: previous.core,
-              role: "host",
-              biosPath: previous.biosPath,
-            };
-          }
-          return previous;
-        });
       },
       onRoomJoined: (info) => {
         if (info.hostNickname) {
           setOpponentProfile({ nickname: info.hostNickname, avatar: info.hostAvatar || "🎮" });
         }
-        if (info.role === "spectator") {
-          setStatus(NETPLAY_COPY.spectatorJoined);
-          setGameStarted(true);
-          roleRef.current = "spectator";
-          activeSessionRef.current = {
-            mode: "netplay",
-            romPath: info.romFilename,
-            core: info.core as SystemCore,
-            role: "spectator",
-            biosPath: info.bios,
+        roleRef.current = info.role;
+        setGameStarted(false);
+        activeSessionRef.current = null;
+        sessionStartedAtRef.current = null;
+        setState({
+          step: "waiting",
+          code: info.code,
+          participantId: info.participantId,
+          role: info.role,
+          romFilename: info.romFilename,
+          romPath: info.romFilename,
+          core: info.core as SystemCore,
+          biosPath: info.bios,
+          participants: [],
+          canStart: false,
+          isReady: false,
+          spectatorSlotsRemaining: MAX_SPECTATORS_PER_ROOM,
+        });
+        setStatus(
+          info.role === "spectator" ? NETPLAY_COPY.spectatorLobbyJoined : NETPLAY_COPY.roomLobbyJoined,
+        );
+      },
+      onRoomLobbyUpdated: (info) => {
+        setState((previous) => {
+          if (previous.step !== "waiting" || previous.code !== info.code) {
+            return previous;
+          }
+
+          const selfParticipant = info.participants.find(
+            (participant) => participant.id === previous.participantId,
+          );
+
+          return {
+            ...previous,
+            participants: info.participants,
+            canStart: info.canStart,
+            isReady: previous.role === "host" ? true : (selfParticipant?.ready ?? previous.isReady),
+            spectatorSlotsRemaining: info.spectatorSlotsRemaining,
           };
-          sessionStartedAtRef.current = null;
-          setState({
-            step: "watching",
-            romPath: info.romFilename,
-            core: info.core as SystemCore,
-            role: "spectator",
-            biosPath: info.bios,
-          });
+        });
+
+        if (roleRef.current === "host") {
+          setStatus(info.canStart ? NETPLAY_COPY.roomReadyToStart : NETPLAY_COPY.waitingForRoomReady);
+        }
+      },
+      onSessionStarted: (info) => {
+        if (info.hostNickname && info.role !== "host") {
+          setOpponentProfile({ nickname: info.hostNickname, avatar: info.hostAvatar || "🎮" });
+        }
+
+        setStatus(NETPLAY_COPY.roomStartRequested);
+
+        const nextSessionBox: { current: StartedNetplaySession | null } = { current: null };
+
+        setState((previous) => {
+          if (previous.step !== "waiting" || previous.code !== info.code) {
+            return previous;
+          }
+
+          nextSessionBox.current = {
+            mode: "netplay",
+            romPath: previous.romPath,
+            core: previous.core,
+            role: info.role,
+            biosPath: previous.biosPath,
+            isPublic: previous.isPublic,
+          };
+
+          if (info.role === "spectator") {
+            return {
+              step: "watching",
+              romPath: previous.romPath,
+              core: previous.core,
+              role: "spectator",
+              biosPath: previous.biosPath,
+            };
+          }
+
+          return {
+            step: "playing",
+            romPath: previous.romPath,
+            core: previous.core,
+            role: info.role === "host" ? "host" : "guest",
+            biosPath: previous.biosPath,
+          };
+        });
+
+        const nextSession = nextSessionBox.current;
+
+        if (!nextSession) {
           return;
         }
 
-        setStatus(NETPLAY_COPY.roomJoined);
-        setGameStarted(false);
-        roleRef.current = "guest";
-        activeSessionRef.current = {
-          mode: "netplay",
-          romPath: info.romFilename,
-          core: info.core as SystemCore,
-          role: "guest",
-          biosPath: info.bios,
-        };
+        roleRef.current = nextSession.role;
         sessionStartedAtRef.current = null;
-        setState({
-          step: "playing",
-          romPath: info.romFilename,
-          core: info.core as SystemCore,
-          role: "guest",
-          biosPath: info.bios,
-        });
+
+        if (nextSession.role === "spectator") {
+          setGameStarted(true);
+          activeSessionRef.current = nextSession;
+          return;
+        }
+
+        setGameStarted(false);
+        activeSessionRef.current = nextSession;
       },
-    });
+    }, rtcConfiguration);
     peerRef.current = peer;
     return peer;
   }, [

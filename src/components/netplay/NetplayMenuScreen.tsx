@@ -14,7 +14,7 @@ interface NetplayMenuScreenProps {
   error: string;
   onOpenBrowse: () => void;
   onOpenPublicRooms: () => void;
-  onOpenWatchingRooms: () => void;
+  onOpenSpectateInput: () => void;
   onOpenJoinInput: () => void;
   onJoinPublicRoom: (roomCode: string) => void;
 }
@@ -50,7 +50,7 @@ export default function NetplayMenuScreen({
   error,
   onOpenBrowse,
   onOpenPublicRooms,
-  onOpenWatchingRooms,
+  onOpenSpectateInput,
   onOpenJoinInput,
   onJoinPublicRoom,
 }: NetplayMenuScreenProps) {
@@ -94,9 +94,9 @@ export default function NetplayMenuScreen({
             variant="outline"
             className={cn("w-full", !hasSecondarySections && "min-h-13")}
             data-tutorial="netplay-open-watch-rooms"
-            onClick={onOpenWatchingRooms}
+            onClick={onOpenSpectateInput}
           >
-            관전하기
+            관전자 입장
           </Button>
         </div>
 

@@ -5,7 +5,6 @@ import NetplaySessionSummary from "./NetplaySessionSummary";
 import NetplayBrowseRomsScreen from "@/components/netplay/NetplayBrowseRomsScreen";
 import NetplayJoinRoomScreen from "@/components/netplay/NetplayJoinRoomScreen";
 import NetplayMenuScreen from "@/components/netplay/NetplayMenuScreen";
-import NetplayModeTabs from "@/components/netplay/NetplayModeTabs";
 import NetplayPlayingScreen from "@/components/netplay/NetplayPlayingScreen";
 import NetplayPublicRoomsScreen from "@/components/netplay/NetplayPublicRoomsScreen";
 import NetplaySpectateCodeScreen from "@/components/netplay/NetplaySpectateCodeScreen";
@@ -108,6 +107,8 @@ export default function NetplayLobby() {
     handleJoinPublicRoom,
     handleJoinRoom,
     handleLocalInput,
+    handleSetRoomReady,
+    handleStartRoomSession,
     handleSpectatePublicRoom,
     handleSpectateRoom,
     handleResyncFailed,
@@ -312,6 +313,9 @@ export default function NetplayLobby() {
     [setFavoriteGames],
   );
 
+  const canStartSoloFromLobby =
+    state.step === "waiting" && state.role === "host" && state.participants.length === 1;
+
   const handleModeChange = useCallback(
     (nextMode: typeof mode) => {
       if (mode === nextMode) return;
@@ -340,6 +344,28 @@ export default function NetplayLobby() {
     [fetchRoms, mode, setError, setMode, setSearchQuery, setState, setStatus, state.step],
   );
 
+  const handleWaitingRoomStart = useCallback(() => {
+    if (state.step !== "waiting" || state.role !== "host") {
+      return;
+    }
+
+    if (!canStartSoloFromLobby) {
+      handleStartRoomSession();
+      return;
+    }
+
+    const soloRom: RomInfo = {
+      filename: state.romFilename,
+      path: state.romPath,
+      core: state.core,
+      bios: state.biosPath,
+    };
+
+    resetToMenu();
+    setMode("solo");
+    startSoloGame(soloRom);
+  }, [canStartSoloFromLobby, handleStartRoomSession, resetToMenu, setMode, startSoloGame, state]);
+
   const myProfile = getUserProfile();
 
   const handleGoHome = useCallback(() => {
@@ -364,7 +390,7 @@ export default function NetplayLobby() {
         error={error}
         onOpenBrowse={fetchRoms}
         onOpenPublicRooms={() => void fetchPublicRooms(true)}
-        onOpenWatchingRooms={() => void fetchPlayingRooms(true)}
+        onOpenSpectateInput={() => setState({ step: "spectate-input" })}
         onOpenJoinInput={() => setState({ step: "join-input" })}
         onJoinPublicRoom={(roomCode) => void handleJoinPublicRoom(roomCode)}
       />
@@ -437,11 +463,19 @@ export default function NetplayLobby() {
     content = (
       <NetplayWaitingScreen
         roomCode={state.code}
+        role={state.role}
         romFilename={state.romFilename}
         core={state.core}
         isPublic={state.isPublic}
+        participants={state.participants}
+        canStart={state.canStart}
+        canStartSolo={canStartSoloFromLobby}
+        isReady={state.isReady}
+        spectatorSlotsRemaining={state.spectatorSlotsRemaining}
         status={status}
         onBack={handleBack}
+        onReadyChange={handleSetRoomReady}
+        onStart={handleWaitingRoomStart}
       />
     );
   }
@@ -569,15 +603,8 @@ export default function NetplayLobby() {
     return null;
   }
 
-  const disableModeSwitch =
-    state.step === "playing" ||
-    state.step === "watching" ||
-    state.step === "waiting" ||
-    state.step === "solo-playing";
-
   return (
     <div className="flex h-full flex-col gap-4">
-      <NetplayModeTabs mode={mode} disabled={disableModeSwitch} onModeChange={handleModeChange} />
       {content}
     </div>
   );

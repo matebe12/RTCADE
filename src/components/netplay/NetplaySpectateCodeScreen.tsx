@@ -39,10 +39,10 @@ export default function NetplaySpectateCodeScreen({
         <CardTitle className="text-sm">코드로 관전</CardTitle>
       </CardHeader>
       <CardContent className="flex flex-col items-center gap-4">
-        <p className="text-xs text-muted-foreground">플레이 중인 6자리 방 코드를 입력하세요</p>
+        <p className="text-xs text-muted-foreground">게임 시작 전 6자리 방 코드를 입력하세요</p>
         <CodeInput value={joinCode} onChange={onJoinCodeChange} onSubmit={onSpectateRoom} />
         <Button className="w-full" onClick={onSpectateRoom} disabled={joinCode.length !== 6}>
-          관전 시작
+          관전자 입장
         </Button>
         {status && <p className="text-xs text-muted-foreground">{status}</p>}
         {error && <p className="text-xs text-destructive-foreground">{error}</p>}

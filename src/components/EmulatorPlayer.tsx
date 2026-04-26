@@ -77,6 +77,9 @@ const EJS_HIDE_BUTTONS_CSS = [
   .map((btn) => `[data-btn="${btn}"]{display:none!important}`)
   .join("");
 
+// Temporary safety switch while diagnosing host startup aborts.
+const HOST_AUDIO_CAPTURE_ENABLED = false;
+
 /**
  * Install an AudioContext monkey-patch BEFORE EmulatorJS loads.
  * This captures the AudioContext it creates and taps into the audio output
@@ -354,7 +357,9 @@ const EmulatorPlayer = forwardRef<HTMLDivElement, EmulatorPlayerProps>(function 
   const styleRef = useRef<HTMLStyleElement | null>(null);
   const streamReadyFiredRef = useRef(false);
   const gameRunningRef = useRef(false);
+  const readyHandshakeCompleteRef = useRef(false);
   const isNetplay = role === "host" || role === "guest";
+  const shouldCaptureAudio = role === "host" && HOST_AUDIO_CAPTURE_ENABLED;
   const localPlayer = role === "guest" ? 1 : 0;
 
   // Stable refs for callback props so the main effect doesn't depend on them
@@ -437,7 +442,9 @@ const EmulatorPlayer = forwardRef<HTMLDivElement, EmulatorPlayerProps>(function 
     let gameUrlObjectUrl: string | null = null;
 
     // Install audio capture before EJS loads
-    installAudioCapture();
+    if (shouldCaptureAudio) {
+      installAudioCapture();
+    }
 
     // Create the game mount point
     const gameDiv = document.createElement("div");
@@ -496,46 +503,40 @@ const EmulatorPlayer = forwardRef<HTMLDivElement, EmulatorPlayerProps>(function 
     // For netplay: intercept game start to pause and verify gameManager
     if (isNetplay) {
       gameRunningRef.current = false;
+      readyHandshakeCompleteRef.current = false;
       win.EJS_onGameStart = () => {
         if (aborted) return;
+        if (readyHandshakeCompleteRef.current) return;
+
         const ejs = win.EJS_emulator as
-          | { pause: () => void; play: () => void; gameManager?: { getState: () => unknown } }
+          | { gameManager?: unknown }
           | undefined;
         if (!ejs) return;
 
-        console.log("[EMULATOR] EJS_onGameStart fired (netplay), pausing...");
-        ejs.pause();
+        console.log("[EMULATOR] EJS_onGameStart fired (netplay), waiting for host ready gate...");
 
         let attempt = 0;
         function tryReady() {
           if (aborted) return;
+          if (readyHandshakeCompleteRef.current) return;
+
           attempt++;
           console.log("[EMULATOR] Ready attempt", attempt);
           const ejsInner = win.EJS_emulator as
-            | { pause: () => void; play: () => void; gameManager?: { getState: () => Uint8Array } }
+            | { gameManager?: unknown }
             | undefined;
           if (ejsInner?.gameManager) {
-            try {
-              const testState = ejsInner.gameManager.getState();
-              if (testState && testState.byteLength > 0) {
-                console.log("[EMULATOR] getState() works, state size:", testState.byteLength);
-                ejsInner.pause();
-                onEmulatorReadyRef.current?.();
-                return;
-              }
-            } catch (e) {
-              console.warn("[EMULATOR] getState() failed:", e);
-            }
+            console.log("[EMULATOR] gameManager detected, netplay host ready");
+            readyHandshakeCompleteRef.current = true;
+            onEmulatorReadyRef.current?.();
+            return;
           }
+
           if (attempt < 10) {
-            ejsInner?.play();
-            setTimeout(() => {
-              ejsInner?.pause();
-              setTimeout(tryReady, 200);
-            }, 200);
+            setTimeout(tryReady, 200);
           } else {
             console.warn("[EMULATOR] Max attempts reached, sending ready anyway");
-            ejsInner?.pause();
+            readyHandshakeCompleteRef.current = true;
             onEmulatorReadyRef.current?.();
           }
         }
@@ -610,6 +611,12 @@ const EmulatorPlayer = forwardRef<HTMLDivElement, EmulatorPlayerProps>(function 
     }
 
     function cleanup() {
+      console.warn("[EMULATOR] cleanup invoked", {
+        role,
+        romPath,
+        aborted,
+      });
+
       aborted = true;
 
       if (initTimerId !== null) {
@@ -632,7 +639,9 @@ const EmulatorPlayer = forwardRef<HTMLDivElement, EmulatorPlayerProps>(function 
 
       // Clean up EJS globals (preserves EJS_STORAGE for next mount)
       cleanupEJSGlobals();
-      removeAudioCapture();
+      if (shouldCaptureAudio) {
+        removeAudioCapture();
+      }
 
       if (gameUrlObjectUrl) {
         URL.revokeObjectURL(gameUrlObjectUrl);
@@ -648,10 +657,11 @@ const EmulatorPlayer = forwardRef<HTMLDivElement, EmulatorPlayerProps>(function 
       // Reset game-running flag
       (window as unknown as Record<string, unknown>).__rtcade_game_running = false;
       gameRunningRef.current = false;
+      readyHandshakeCompleteRef.current = false;
     }
 
     return () => cleanup();
-  }, [romSource, core, role, romPath, biosPath, isNetplay, localPlayer]);
+  }, [romSource, core, role, romPath, biosPath, isNetplay, localPlayer, shouldCaptureAudio]);
 
   // Keyboard event listeners on the container
   useEffect(() => {
@@ -777,15 +787,16 @@ const EmulatorPlayer = forwardRef<HTMLDivElement, EmulatorPlayerProps>(function 
       }
 
       // Check if the audio splitter has been created (game must be playing)
-      const audioSplitter = (window as unknown as Record<string, unknown>)
-        .__rtcade_audio_splitter as
-        | {
-            stream?: MediaStream;
-          }
-        | undefined;
-      const hasAudio = !!audioSplitter?.stream;
+      const audioSplitter = shouldCaptureAudio
+        ? ((window as unknown as Record<string, unknown>).__rtcade_audio_splitter as
+            | {
+                stream?: MediaStream;
+              }
+            | undefined)
+        : undefined;
+      const hasAudio = shouldCaptureAudio && !!audioSplitter?.stream;
 
-      if (!hasAudio) {
+      if (shouldCaptureAudio && !hasAudio) {
         audioWaitCount++;
         if (audioWaitCount < MAX_AUDIO_WAIT) return; // keep waiting
         console.warn("[EMULATOR] Audio not available after 15s, proceeding with video only");
@@ -794,13 +805,18 @@ const EmulatorPlayer = forwardRef<HTMLDivElement, EmulatorPlayerProps>(function 
       try {
         const videoStream = canvas.captureStream(60);
 
+        for (const track of videoStream.getVideoTracks()) {
+          track.contentHint = "detail";
+        }
+
         if (hasAudio && audioSplitter?.stream) {
           for (const track of audioSplitter.stream.getAudioTracks()) {
+            track.contentHint = "music";
             videoStream.addTrack(track);
           }
           console.log("[EMULATOR] Combined A/V stream ready");
         } else {
-          console.log("[EMULATOR] Video-only stream ready (no audio capture)");
+          console.log("[EMULATOR] Video-only stream ready (audio capture disabled)");
         }
 
         streamReadyFiredRef.current = true;
@@ -812,7 +828,7 @@ const EmulatorPlayer = forwardRef<HTMLDivElement, EmulatorPlayerProps>(function 
     }, 500);
 
     return () => clearInterval(interval);
-  }, [role, onCanvasStreamReady]);
+  }, [role, onCanvasStreamReady, shouldCaptureAudio]);
 
   return (
     <div

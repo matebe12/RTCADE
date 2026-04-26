@@ -249,6 +249,7 @@ export default function NetplayPlayingScreen({
             <GuestVideoDisplay
               ref={emulatorRef}
               videoStream={videoStream}
+              captureInput={gameStarted}
               onLocalInput={onLocalInput}
               onChatShortcut={onChatShortcut}
               disconnectSeverity={disconnectSeverity}

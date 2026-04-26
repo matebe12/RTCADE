@@ -107,6 +107,7 @@ export function useNetplaySession({
   const guestResyncPendingRef = useRef(false);
   const opponentProfileRef = useRef<OpponentProfile | null>(null);
   const activeSessionRef = useRef<ActiveSession | null>(null);
+  const recordedSessionIdRef = useRef<string | null>(null);
   const sessionStartedAtRef = useRef<number | null>(null);
   const videoStreamRef = useRef<MediaStream | null>(null);
   const setVideoStreamCallbackRef = useRef<((stream: MediaStream | null) => void) | null>(null);
@@ -381,6 +382,7 @@ export function useNetplaySession({
     useNetplaySessionHistory({
       activeSessionRef,
       opponentProfileRef,
+      recordedSessionIdRef,
       sessionStartedAtRef,
       setRecentGames,
       setRecentOpponents,
@@ -434,6 +436,7 @@ export function useNetplaySession({
     roleRef,
     activeSessionRef,
     opponentProfileRef,
+    recordedSessionIdRef,
     sessionStartedAtRef,
     resetSyncRuntime,
     resetChatRuntime: resetChatControls,
@@ -447,6 +450,8 @@ export function useNetplaySession({
     handleCreateRoom,
     handleJoinPublicRoom,
     handleJoinRoom,
+    handleSetRoomReady,
+    handleStartRoomSession,
     handleSpectatePublicRoom,
     handleSpectateRoom,
     handleSummaryRematch,
@@ -509,6 +514,8 @@ export function useNetplaySession({
     handleJoinPublicRoom,
     handleJoinRoom,
     handleLocalInput,
+    handleSetRoomReady,
+    handleStartRoomSession,
     handleSpectatePublicRoom,
     handleSpectateRoom,
     handleResyncFailed,

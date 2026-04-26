@@ -2,11 +2,13 @@ import { useCallback } from "react";
 
 import type { SystemCore } from "@/components/EmulatorPlayer";
 import { appEnvironment } from "@/config/environment";
+import { fetchNetplayRtcConfiguration } from "@/lib/operations-api";
 import { getUserProfile } from "@/lib/user-profile";
 import { NETPLAY_COPY } from "@/netplay/netplayCopy";
 import type { NetplayPeer } from "@/netplay/peer";
 import { type LobbyState, type RomInfo, type RoomVisibility } from "@/stores/useNetplayLobbyStore";
 import { toast } from "sonner";
+import { MAX_SPECTATORS_PER_ROOM } from "../../shared/emulator-protocol";
 
 const SERVER_URL = appEnvironment.wsUrl;
 
@@ -24,7 +26,7 @@ interface UseNetplayRoomEntryOptions {
   setStatus: (status: string) => void;
   setError: (error: string) => void;
   resetSessionRuntime: () => void;
-  createPeer: () => NetplayPeer;
+  createPeer: (rtcConfiguration?: RTCConfiguration) => NetplayPeer;
 }
 
 export function useNetplayRoomEntry({
@@ -37,6 +39,11 @@ export function useNetplayRoomEntry({
   resetSessionRuntime,
   createPeer,
 }: UseNetplayRoomEntryOptions) {
+  const createConfiguredPeer = useCallback(async () => {
+    const rtcConfiguration = await fetchNetplayRtcConfiguration();
+    return createPeer(rtcConfiguration);
+  }, [createPeer]);
+
   const startHostingRoom = useCallback(
     async ({
       romFilename,
@@ -54,7 +61,7 @@ export function useNetplayRoomEntry({
       resetSessionRuntime();
       setError("");
       setStatus(NETPLAY_COPY.roomCreating);
-      const peer = createPeer();
+      const peer = await createConfiguredPeer();
       try {
         await peer.connect(SERVER_URL);
       } catch {
@@ -71,11 +78,17 @@ export function useNetplayRoomEntry({
         setState({
           step: "waiting",
           code,
+          participantId: "host",
+          role: "host",
           romFilename,
           romPath,
           core,
           biosPath,
           isPublic,
+          participants: [],
+          canStart: false,
+          isReady: true,
+          spectatorSlotsRemaining: MAX_SPECTATORS_PER_ROOM,
         });
         setStatus(NETPLAY_COPY.waitingForOpponent);
       };
@@ -89,7 +102,7 @@ export function useNetplayRoomEntry({
         isPublic,
       );
     },
-    [createPeer, resetSessionRuntime, setError, setState, setStatus],
+    [createConfiguredPeer, resetSessionRuntime, setError, setState, setStatus],
   );
 
   const handleCreateRoom = useCallback(
@@ -115,7 +128,7 @@ export function useNetplayRoomEntry({
       resetSessionRuntime();
       setError("");
       setStatus(NETPLAY_COPY.joiningRoom);
-      const peer = createPeer();
+      const peer = await createConfiguredPeer();
       try {
         await peer.connect(SERVER_URL);
       } catch {
@@ -126,7 +139,7 @@ export function useNetplayRoomEntry({
       }
       peer.joinRoom(roomCode, getUserProfile()?.nickname, getUserProfile()?.avatar);
     },
-    [createPeer, resetSessionRuntime, setError, setStatus],
+    [createConfiguredPeer, resetSessionRuntime, setError, setStatus],
   );
 
   const spectateRoomWithCode = useCallback(
@@ -139,7 +152,7 @@ export function useNetplayRoomEntry({
       resetSessionRuntime();
       setError("");
       setStatus(NETPLAY_COPY.spectatingRoom);
-      const peer = createPeer();
+      const peer = await createConfiguredPeer();
       try {
         await peer.connect(SERVER_URL);
       } catch {
@@ -150,7 +163,7 @@ export function useNetplayRoomEntry({
       }
       peer.spectateRoom(roomCode, getUserProfile()?.nickname, getUserProfile()?.avatar);
     },
-    [createPeer, resetSessionRuntime, setError, setStatus],
+    [createConfiguredPeer, resetSessionRuntime, setError, setStatus],
   );
 
   const handleJoinRoom = useCallback(async () => {

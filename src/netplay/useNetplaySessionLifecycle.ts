@@ -1,6 +1,7 @@
 import { useCallback, useEffect, type MutableRefObject } from "react";
 
 import type { SessionEndReason } from "@/components/NetplaySessionSummary";
+import { completeGameSession, completeGameSessionWithBeacon } from "@/lib/operations-api";
 import type { NetplayPeer } from "@/netplay/peer";
 import {
   type ActiveSession,
@@ -19,6 +20,7 @@ interface UseNetplaySessionLifecycleOptions {
   roleRef: MutableRefObject<NetplaySessionRole | null>;
   activeSessionRef: MutableRefObject<ActiveSession | null>;
   opponentProfileRef: MutableRefObject<OpponentProfile | null>;
+  recordedSessionIdRef: MutableRefObject<string | null>;
   sessionStartedAtRef: MutableRefObject<number | null>;
   resetSyncRuntime: () => void;
   resetChatRuntime: () => void;
@@ -35,6 +37,7 @@ export function useNetplaySessionLifecycle({
   roleRef,
   activeSessionRef,
   opponentProfileRef,
+  recordedSessionIdRef,
   sessionStartedAtRef,
   resetSyncRuntime,
   resetChatRuntime,
@@ -43,26 +46,53 @@ export function useNetplaySessionLifecycle({
   recordRecentOpponent,
   fetchRoms,
 }: UseNetplaySessionLifecycleOptions) {
+  const finalizeRecordedSession = useCallback(
+    (useBeacon = false) => {
+      const sessionId = recordedSessionIdRef.current;
+      recordedSessionIdRef.current = null;
+
+      if (!sessionId) {
+        return;
+      }
+
+      if (useBeacon) {
+        const beaconSent = completeGameSessionWithBeacon(sessionId);
+        if (!beaconSent) {
+          void completeGameSession(sessionId).catch(() => undefined);
+        }
+        return;
+      }
+
+      void completeGameSession(sessionId).catch(() => undefined);
+    },
+    [recordedSessionIdRef],
+  );
+
   useEffect(() => {
     return () => {
+      finalizeRecordedSession(true);
       peerRef.current?.close();
     };
-  }, [peerRef]);
+  }, [finalizeRecordedSession, peerRef]);
 
   const resetSessionRuntime = useCallback(() => {
+    finalizeRecordedSession();
     peerRef.current?.close();
     peerRef.current = null;
     roleRef.current = null;
     activeSessionRef.current = null;
     opponentProfileRef.current = null;
+    recordedSessionIdRef.current = null;
     sessionStartedAtRef.current = null;
     resetSyncRuntime();
     resetSessionUiState();
     resetChatRuntime();
   }, [
     activeSessionRef,
+    finalizeRecordedSession,
     opponentProfileRef,
     peerRef,
+    recordedSessionIdRef,
     resetChatRuntime,
     resetSessionUiState,
     resetSyncRuntime,

@@ -20,9 +20,18 @@ function getRomFilename(romPath: string) {
   return romPath.split("/").pop() ?? romPath;
 }
 
+function createSessionId() {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+
+  return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
 interface UseNetplaySessionHistoryOptions {
   activeSessionRef: MutableRefObject<ActiveSession | null>;
   opponentProfileRef: MutableRefObject<OpponentProfile | null>;
+  recordedSessionIdRef: MutableRefObject<string | null>;
   sessionStartedAtRef: MutableRefObject<number | null>;
   setRecentGames: (recentGames: RecentGame[]) => void;
   setRecentOpponents: (recentOpponents: RecentOpponent[]) => void;
@@ -31,6 +40,7 @@ interface UseNetplaySessionHistoryOptions {
 export function useNetplaySessionHistory({
   activeSessionRef,
   opponentProfileRef,
+  recordedSessionIdRef,
   sessionStartedAtRef,
   setRecentGames,
   setRecentOpponents,
@@ -91,14 +101,18 @@ export function useNetplaySessionHistory({
       incrementTotalPlayedCount();
 
       if (activeSession.mode === "solo" || activeSession.role === "host") {
+        const sessionId = recordedSessionIdRef.current ?? createSessionId();
+        recordedSessionIdRef.current = sessionId;
+
         void recordGameSession({
           core: activeSession.core,
           gameName,
           romPath: activeSession.romPath,
+          sessionId,
         }).catch(() => undefined);
       }
     }
-  }, [activeSessionRef, recordRecentGame, sessionStartedAtRef]);
+  }, [activeSessionRef, recordRecentGame, recordedSessionIdRef, sessionStartedAtRef]);
 
   const buildSessionSummary = useCallback(
     (endReason: SessionEndReason): SessionSummaryState | null => {

@@ -41,6 +41,15 @@ export interface PlayingRoomInfo extends PublicRoomInfo {
   spectatorCount: number;
 }
 
+export interface RoomLobbyParticipantInfo {
+  id: string;
+  role: "host" | "guest" | "spectator";
+  nickname?: string;
+  avatar?: string;
+  ready: boolean;
+  joinedAt: number;
+}
+
 export type LobbyMode = "netplay" | "solo";
 
 export type RoomVisibility = "private" | "public";
@@ -87,11 +96,17 @@ export type LobbyState =
   | {
       step: "waiting";
       code: string;
+      participantId: string;
+      role: "host" | "guest" | "spectator";
       romFilename: string;
       romPath: string;
       core: SystemCore;
       biosPath?: string;
       isPublic?: boolean;
+      participants: RoomLobbyParticipantInfo[];
+      canStart: boolean;
+      isReady: boolean;
+      spectatorSlotsRemaining: number;
     }
   | { step: "join-input" }
   | { step: "spectate-input" }

@@ -6,18 +6,46 @@ import { MAX_SPECTATORS_PER_ROOM } from "../shared/emulator-protocol";
 
 export type RoomState = "waiting" | "playing";
 
+export interface RoomLobbyParticipantSummary {
+  id: string;
+  role: "host" | "guest" | "spectator";
+  nickname?: string;
+  avatar?: string;
+  ready: boolean;
+  joinedAt: number;
+}
+
+export interface RoomLobbySnapshot {
+  code: string;
+  roomState: RoomState;
+  participants: RoomLobbyParticipantSummary[];
+  canStart: boolean;
+  hasGuest: boolean;
+  spectatorSlotsRemaining: number;
+  roleLocked: boolean;
+}
+
+export interface RoomGuest {
+  socket: WebSocket;
+  nickname?: string;
+  avatar?: string;
+  ready: boolean;
+  joinedAt: number;
+}
+
 export interface RoomSpectator {
   id: string;
   socket: WebSocket;
   nickname?: string;
   avatar?: string;
+  ready: boolean;
   joinedAt: number;
 }
 
 export interface Room {
   code: string;
   host: WebSocket;
-  guest: WebSocket | null;
+  guest: RoomGuest | null;
   romFilename: string;
   core: string;
   bios?: string;
@@ -64,12 +92,17 @@ interface CreateRoomOptions {
 }
 
 export interface RoomStore {
-  attachGuest: (room: Room, guest: WebSocket) => boolean;
+  attachGuest: (
+    room: Room,
+    guest: WebSocket,
+    options?: { nickname?: string; avatar?: string },
+  ) => boolean;
   attachSpectator: (
     room: Room,
     spectator: WebSocket,
     options?: { nickname?: string; avatar?: string },
   ) => RoomSpectator | null;
+  canStartSession: (room: Room) => boolean;
   createRoom: (options: CreateRoomOptions) => Room;
   deleteRoom: (code: string) => void;
   detachGuest: (room: Room) => void;
@@ -78,10 +111,12 @@ export interface RoomStore {
   findRoom: (code: string) => Room | null;
   findSpectatorSocket: (room: Room, spectatorId: string) => WebSocket | null;
   getActivitySnapshot: () => RoomActivitySnapshot;
+  getLobbySnapshot: (room: Room) => RoomLobbySnapshot;
   getSpectatorCount: (room: Room) => number;
   listPlayingPublicRooms: () => PlayingRoomSummary[];
   listPublicRooms: () => PublicRoomSummary[];
   markPlaying: (room: Room) => boolean;
+  setParticipantReady: (room: Room, socket: WebSocket, ready: boolean) => boolean;
 }
 
 function generateCode(rooms: Map<string, Room>): string {
@@ -100,20 +135,69 @@ function clearSpectators(room: Room) {
   return spectators;
 }
 
+function canStartRoomSession(room: Room) {
+  return room.guest !== null && room.guest.ready && Array.from(room.spectators.values()).every((spectator) => spectator.ready);
+}
+
+function buildLobbyParticipants(room: Room): RoomLobbyParticipantSummary[] {
+  const participants: RoomLobbyParticipantSummary[] = [
+    {
+      id: "host",
+      role: "host",
+      nickname: room.hostNickname,
+      avatar: room.hostAvatar,
+      ready: true,
+      joinedAt: room.createdAt,
+    },
+  ];
+
+  if (room.guest) {
+    participants.push({
+      id: "guest",
+      role: "guest",
+      nickname: room.guest.nickname,
+      avatar: room.guest.avatar,
+      ready: room.guest.ready,
+      joinedAt: room.guest.joinedAt,
+    });
+  }
+
+  participants.push(
+    ...Array.from(room.spectators.values())
+      .sort((left, right) => left.joinedAt - right.joinedAt)
+      .map((spectator) => ({
+        id: spectator.id,
+        role: "spectator" as const,
+        nickname: spectator.nickname,
+        avatar: spectator.avatar,
+        ready: spectator.ready,
+        joinedAt: spectator.joinedAt,
+      })),
+  );
+
+  return participants;
+}
+
 export function createRoomStore(): RoomStore {
   const rooms = new Map<string, Room>();
 
   return {
-    attachGuest: (room, guest) => {
+    attachGuest: (room, guest, options) => {
       if (room.guest) {
         return false;
       }
 
-      room.guest = guest;
+      room.guest = {
+        socket: guest,
+        nickname: options?.nickname,
+        avatar: options?.avatar,
+        ready: false,
+        joinedAt: Date.now(),
+      };
       return true;
     },
     attachSpectator: (room, spectator, options) => {
-      if (room.state !== "playing") {
+      if (room.state !== "waiting") {
         return null;
       }
 
@@ -132,12 +216,14 @@ export function createRoomStore(): RoomStore {
         socket: spectator,
         nickname: options?.nickname,
         avatar: options?.avatar,
+        ready: false,
         joinedAt: Date.now(),
       };
 
       room.spectators.set(roomSpectator.id, roomSpectator);
       return roomSpectator;
     },
+    canStartSession: (room) => canStartRoomSession(room),
     createRoom: ({ host, romFilename, core, bios, isPublic, hostNickname, hostAvatar }) => {
       const room: Room = {
         code: generateCode(rooms),
@@ -163,9 +249,6 @@ export function createRoomStore(): RoomStore {
     },
     detachGuest: (room) => {
       room.guest = null;
-      room.state = "waiting";
-      room.startedAt = null;
-      room.spectators.clear();
     },
     detachSpectator: (room, spectatorId) => room.spectators.delete(spectatorId),
     endPlayingSession: (room) => {
@@ -202,6 +285,15 @@ export function createRoomStore(): RoomStore {
         waitingRooms,
       };
     },
+    getLobbySnapshot: (room) => ({
+      code: room.code,
+      roomState: room.state,
+      participants: buildLobbyParticipants(room),
+      canStart: canStartRoomSession(room),
+      hasGuest: room.guest !== null,
+      spectatorSlotsRemaining: Math.max(0, MAX_SPECTATORS_PER_ROOM - room.spectators.size),
+      roleLocked: room.state === "playing",
+    }),
     getSpectatorCount: (room) => room.spectators.size,
     listPlayingPublicRooms: () =>
       Array.from(rooms.values())
@@ -235,13 +327,28 @@ export function createRoomStore(): RoomStore {
           hostAvatar: room.hostAvatar,
         })),
     markPlaying: (room) => {
-      if (!room.guest) {
+      if (!canStartRoomSession(room)) {
         return false;
       }
 
       room.state = "playing";
       room.startedAt = room.startedAt ?? Date.now();
       return true;
+    },
+    setParticipantReady: (room, socket, ready) => {
+      if (room.guest?.socket === socket) {
+        room.guest.ready = ready;
+        return true;
+      }
+
+      for (const spectator of room.spectators.values()) {
+        if (spectator.socket === socket) {
+          spectator.ready = ready;
+          return true;
+        }
+      }
+
+      return false;
     },
   };
 }

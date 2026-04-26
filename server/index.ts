@@ -5,6 +5,7 @@ import { WebSocketServer } from "ws";
 import { createCorsMiddleware, getServerConfig } from "./config";
 import { createOperationsDatabase } from "./operationsDatabase";
 import { registerEmulatorRoute } from "./emulator";
+import { registerIceServerRoutes } from "./iceServerApi";
 import { registerNoticeRoutes } from "./noticeApi";
 import { createPlaySessionStore } from "./playSessionStore";
 import { registerPublicRoomRoutes } from "./publicRoomApi";
@@ -30,6 +31,7 @@ async function bootstrap() {
   app.use(createVisitorTrackingMiddleware(operationsDatabase));
   registerRomRoutes(app, config.romsDir);
   registerEmulatorRoute(app, config.emulatorJsDataUrl);
+  registerIceServerRoutes(app, config.iceServers);
   registerPublicRoomRoutes(app, roomStore);
   registerNoticeRoutes(app, operationsDatabase, config.noticeAdminToken);
   registerStatsRoutes(app, operationsDatabase, roomStore, playSessionStore);

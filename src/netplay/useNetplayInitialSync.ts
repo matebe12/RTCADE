@@ -44,25 +44,50 @@ export function useNetplayInitialSync({
   const localReadyRef = useRef(false);
   const remoteReadyRef = useRef(false);
   const pendingStateRef = useRef<ArrayBuffer | null>(null);
+  const startGameTimerRef = useRef<number | null>(null);
   const emulatorRuntime = useMemo(() => createEmulatorRuntimeBridge(emulatorRef), [emulatorRef]);
 
   const startGame = useCallback(
     (message: string, notifyPeer: boolean) => {
+      if (gameStartedRef.current) {
+        console.warn("[LOBBY] startGame ignored: session already started");
+        return;
+      }
+
+      gameStartedRef.current = true;
       updateSync(message);
       markSessionStarted();
       setGameStarted(true);
-      gameStartedRef.current = true;
-      emulatorRuntime.sync.startGame();
-      // Mark game running so EmulatorPlayer's keyboard handler processes input
-      (window as unknown as Record<string, unknown>).__rtcade_game_running = true;
-      if (notifyPeer) {
-        peerRef.current?.sendStartSignal();
-      }
-      // HOST: start video capture for streaming after game starts
-      if (roleRef.current === "host") {
-        onHostGameStarted?.();
-        onStartVideoCapture?.();
-      }
+
+      startGameTimerRef.current = window.setTimeout(() => {
+        startGameTimerRef.current = null;
+
+        try {
+          const currentRole = roleRef.current;
+
+          if (currentRole === "host") {
+            console.log("[LOBBY] HOST start gate opened without replaying emulator");
+          } else {
+            emulatorRuntime.sync.startGame();
+          }
+
+          // Mark game running so EmulatorPlayer's keyboard handler processes input
+          (window as unknown as Record<string, unknown>).__rtcade_game_running = true;
+          if (notifyPeer) {
+            peerRef.current?.sendStartSignal();
+          }
+          // HOST: start video capture for streaming after game starts
+          if (currentRole === "host") {
+            onHostGameStarted?.();
+            onStartVideoCapture?.();
+          }
+        } catch (error) {
+          console.error("[LOBBY] startGame failed:", error);
+          gameStartedRef.current = false;
+          setGameStarted(false);
+          updateSync(NETPLAY_COPY.syncFallbackStart);
+        }
+      }, 0);
     },
     [
       emulatorRuntime,
@@ -104,6 +129,11 @@ export function useNetplayInitialSync({
   }, [dcState, gameStarted, peerRef, roleRef, updateSync]);
 
   const resetInitialSyncRuntime = useCallback(() => {
+    if (startGameTimerRef.current !== null) {
+      window.clearTimeout(startGameTimerRef.current);
+      startGameTimerRef.current = null;
+    }
+
     localReadyRef.current = false;
     remoteReadyRef.current = false;
     pendingStateRef.current = null;

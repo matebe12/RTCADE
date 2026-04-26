@@ -1,4 +1,9 @@
-import { SignalingClient, type SignalingMessage } from "./signaling";
+import {
+  SignalingClient,
+  type RoomLobbySnapshotMessage,
+  type RoomSessionStartedMessage,
+  type SignalingMessage,
+} from "./signaling";
 import { deflate, inflate } from "pako";
 
 export type InputMessage = {
@@ -45,6 +50,7 @@ export type PeerEventHandler = {
   onRoomCreated?: (code: string) => void;
   onRoomJoined?: (info: {
     code: string;
+    participantId: string;
     role: "guest" | "spectator";
     romFilename: string;
     core: string;
@@ -69,6 +75,8 @@ export type PeerEventHandler = {
   onChatTyping?: (isTyping: boolean) => void;
   onVideoStream?: (stream: MediaStream) => void;
   onHeartbeat?: (ts: number) => void;
+  onRoomLobbyUpdated?: (info: Omit<RoomLobbySnapshotMessage, "type">) => void;
+  onSessionStarted?: (info: Omit<RoomSessionStartedMessage, "type">) => void;
 };
 
 type GameplayTransportState = "closed" | "connecting" | "open" | "closing";
@@ -89,6 +97,13 @@ type SpectatorPeerState = {
   pc: RTCPeerConnection;
   senders: RTCRtpSender[];
   negotiating: boolean;
+  negotiationQueued: boolean;
+};
+
+type PendingSpectatorInfo = {
+  spectatorId: string;
+  spectatorNickname?: string;
+  spectatorAvatar?: string;
 };
 
 type PendingBinaryStream = {
@@ -120,6 +135,10 @@ const STATE_BUFFER_THRESHOLD = 512 * 1024;
 const DEFAULT_REMOTE_HELD_MASK = 0;
 const REPAIR_SYNC_INTERVAL_MS = 120;
 const REPAIR_SYNC_ZERO_FLUSH_COUNT = 3;
+const VIDEO_STREAM_MAX_BITRATE = 8_000_000;
+const VIDEO_STREAM_MAX_FRAMERATE = 60;
+const VIDEO_STREAM_SCALE_DOWN = 1.0;
+const GAMEPLAY_DISCONNECT_GRACE_MS = 4_000;
 
 const RTC_CONFIG: RTCConfiguration = {
   iceServers: [{ urls: "stun:stun.l.google.com:19302" }, { urls: "stun:stun1.l.google.com:19302" }],
@@ -150,10 +169,17 @@ export class NetplayPeer {
   private _guestProfile: Profile | null = null;
   private _localProfile: Profile = {};
   private _spectatorPeers = new Map<string, SpectatorPeerState>();
+  private _pendingSpectatorInfos = new Map<string, PendingSpectatorInfo>();
+  private _spectatorVideoReady = false;
+  private _sessionStarted = false;
   private _stream: MediaStream | null = null;
+  private _rtcConfig: RTCConfiguration;
+  private _disconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  private _disconnectReason: string | null = null;
 
-  constructor(handler: PeerEventHandler) {
+  constructor(handler: PeerEventHandler, rtcConfig: RTCConfiguration = RTC_CONFIG) {
     this.handler = handler;
+    this._rtcConfig = rtcConfig;
     this.signaling = new SignalingClient(this.onSignaling);
   }
 
@@ -171,6 +197,8 @@ export class NetplayPeer {
   ) {
     this._connectionMode = "host";
     this._guestProfile = null;
+    this._sessionStarted = false;
+    this._pendingSpectatorInfos.clear();
     this._localProfile = { nickname, avatar };
     this.signaling.send({
       type: "create-room",
@@ -185,14 +213,24 @@ export class NetplayPeer {
 
   joinRoom(code: string, nickname?: string, avatar?: string) {
     this._connectionMode = "guest";
+    this._sessionStarted = false;
     this._localProfile = { nickname, avatar };
     this.signaling.send({ type: "join-room", code, nickname, avatar });
   }
 
   spectateRoom(code: string, nickname?: string, avatar?: string) {
     this._connectionMode = "spectator";
+    this._sessionStarted = false;
     this._localProfile = { nickname, avatar };
     this.signaling.send({ type: "spectate-room", code, nickname, avatar });
+  }
+
+  setRoomReady(ready: boolean) {
+    if (this._connectionMode !== "guest" && this._connectionMode !== "spectator") {
+      return;
+    }
+
+    this.signaling.send({ type: "set-room-ready", ready });
   }
 
   markSessionStarted() {
@@ -340,13 +378,25 @@ export class NetplayPeer {
     this._stream = stream;
 
     if (!this.pc) {
-      console.warn("[PEER] startVideoStreaming: no peer connection");
+      if (this._connectionMode === "host" && this._sessionStarted) {
+        console.log("[PEER] startVideoStreaming: stream ready before main peer offer; starting host connection");
+        void this.startAsHost();
+      } else {
+        console.warn("[PEER] startVideoStreaming: no peer connection");
+      }
     } else {
       this.replaceStreamTracks(this.pc, this._videoSenders, stream);
     }
 
+    if (this._connectionMode === "host" && this._sessionStarted) {
+      for (const spectator of this._pendingSpectatorInfos.values()) {
+        this.createSpectatorConnection(spectator);
+      }
+    }
+
     for (const spectator of this._spectatorPeers.values()) {
       this.replaceStreamTracks(spectator.pc, spectator.senders, stream);
+      void this.requestSpectatorNegotiation(spectator);
     }
 
     console.log(
@@ -404,6 +454,7 @@ export class NetplayPeer {
 
   close() {
     this._closing = true;
+    this.clearPendingDisconnect();
     this.stopRepairSyncLoop();
     this.stopVideoStreaming();
     this.inputDc?.close();
@@ -426,8 +477,43 @@ export class NetplayPeer {
     this.pc = null;
     this._gameplayConnected = false;
     this._gameplayTransportState = "closed";
+    this._sessionStarted = false;
+    this._pendingSpectatorInfos.clear();
+    this._spectatorVideoReady = false;
     this._spectatorPeers.clear();
     this._stream = null;
+  }
+
+  private clearPendingDisconnect() {
+    if (this._disconnectTimer) {
+      clearTimeout(this._disconnectTimer);
+      this._disconnectTimer = null;
+    }
+    this._disconnectReason = null;
+  }
+
+  private scheduleDisconnect(reason: string) {
+    if (this._closing || this._disconnectTimer) {
+      return;
+    }
+
+    this._disconnectReason = reason;
+    console.warn(
+      `[PEER] scheduling disconnect in ${GAMEPLAY_DISCONNECT_GRACE_MS}ms (${reason})`,
+    );
+
+    this._disconnectTimer = setTimeout(() => {
+      this._disconnectTimer = null;
+      const pendingReason = this._disconnectReason;
+      this._disconnectReason = null;
+
+      if (this._closing) {
+        return;
+      }
+
+      console.warn(`[PEER] disconnect grace expired (${pendingReason ?? "unknown"})`);
+      this.handler.onDisconnected();
+    }, GAMEPLAY_DISCONNECT_GRACE_MS);
   }
 
   // --- Private ---
@@ -442,25 +528,72 @@ export class NetplayPeer {
         this.handler.onRoomJoined?.(msg);
         break;
 
+      case "room-lobby-updated":
+        this.handler.onRoomLobbyUpdated?.({
+          code: msg.code,
+          roomState: msg.roomState,
+          participants: msg.participants,
+          canStart: msg.canStart,
+          hasGuest: msg.hasGuest,
+          spectatorSlotsRemaining: msg.spectatorSlotsRemaining,
+          roleLocked: msg.roleLocked,
+        });
+        break;
+
       case "guest-joined":
         this._guestProfile = {
           nickname: msg.guestNickname,
           avatar: msg.guestAvatar,
         };
         this.handler.onGuestJoined?.(msg as { guestNickname?: string; guestAvatar?: string });
-        this.startAsHost();
         break;
 
       case "spectator-joined":
         if (this._connectionMode === "host") {
-          this.createSpectatorConnection(msg);
+          const pendingInfo: PendingSpectatorInfo = {
+            spectatorId: msg.spectatorId,
+            spectatorNickname: msg.spectatorNickname,
+            spectatorAvatar: msg.spectatorAvatar,
+          };
+
+          this._pendingSpectatorInfos.set(msg.spectatorId, pendingInfo);
+
+          if (this._sessionStarted) {
+            this.createSpectatorConnection(pendingInfo);
+          }
         }
         break;
 
       case "spectator-disconnected":
         if (this._connectionMode === "host") {
+          this._pendingSpectatorInfos.delete(msg.spectatorId);
           this.cleanupSpectatorPeer(msg.spectatorId);
         }
+        break;
+
+      case "room-session-started":
+        this._sessionStarted = true;
+
+        if (this._connectionMode === "host") {
+          if (this._stream) {
+            void this.startAsHost();
+            for (const spectator of this._pendingSpectatorInfos.values()) {
+              this.createSpectatorConnection(spectator);
+            }
+          } else {
+            console.log("[PEER] room-session-started: waiting for host stream before creating main offer");
+          }
+        }
+
+        this.handler.onSessionStarted?.({
+          code: msg.code,
+          role: msg.role,
+          romFilename: msg.romFilename,
+          core: msg.core,
+          bios: msg.bios,
+          hostNickname: msg.hostNickname,
+          hostAvatar: msg.hostAvatar,
+        });
         break;
 
       case "offer":
@@ -504,37 +637,48 @@ export class NetplayPeer {
     }
   };
 
-  private setupPeerConnection() {
-    this.pc = new RTCPeerConnection(RTC_CONFIG);
+  private setupPeerConnection(): RTCPeerConnection {
+    const pc = new RTCPeerConnection(this._rtcConfig);
+    this.pc = pc;
 
-    if (this._connectionMode !== "spectator") {
-      this.applyPreferredVideoCodecs(this.pc);
-    }
-
-    this.pc.onicecandidate = (e) => {
+    pc.onicecandidate = (e) => {
       if (e.candidate) {
         this.signaling.send({ type: "ice-candidate", candidate: e.candidate.toJSON() });
       }
     };
 
-    this.pc.ontrack = (e) => {
+    pc.ontrack = (e) => {
       console.log("[PEER] ontrack fired, streams:", e.streams.length);
-      if (e.streams && e.streams.length > 0) {
-        this.handler.onVideoStream?.(e.streams[0]);
-      } else if (e.track) {
-        // Fallback: create a new MediaStream from the track
-        const stream = new MediaStream([e.track]);
-        this.handler.onVideoStream?.(stream);
+      const stream = e.streams && e.streams.length > 0 ? e.streams[0] : new MediaStream([e.track]);
+
+      if (this._connectionMode === "spectator" && e.track.kind === "video") {
+        this._spectatorVideoReady = true;
+        e.track.addEventListener("ended", () => {
+          this._spectatorVideoReady = false;
+          this.emitGameplayTransportState();
+        });
+        this.emitGameplayTransportState();
       }
+
+      this.handler.onVideoStream?.(stream);
     };
 
-    this.pc.onnegotiationneeded = async () => {
+    pc.onnegotiationneeded = async () => {
+      if (this.pc !== pc || this._closing) {
+        return;
+      }
+
       if (this._negotiating) return;
       this._negotiating = true;
       try {
-        const offer = await this.pc!.createOffer();
-        await this.pc!.setLocalDescription(offer);
-        this.signaling.send({ type: "offer", sdp: this.pc!.localDescription! });
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
+
+        if (this.pc !== pc || this._closing || !pc.localDescription) {
+          return;
+        }
+
+        this.signaling.send({ type: "offer", sdp: pc.localDescription });
       } catch (err) {
         console.warn("[PEER] onnegotiationneeded renegotiation failed:", err);
       } finally {
@@ -542,14 +686,27 @@ export class NetplayPeer {
       }
     };
 
-    this.pc.onconnectionstatechange = () => {
-      if (this.pc?.connectionState === "disconnected" || this.pc?.connectionState === "failed") {
+    pc.onconnectionstatechange = () => {
+      if (this.pc !== pc) {
+        return;
+      }
+
+      console.log("[PEER] main pc connection state:", pc.connectionState);
+
+      if (pc.connectionState === "connected") {
+        this.clearPendingDisconnect();
+        return;
+      }
+
+      if (pc.connectionState === "disconnected" || pc.connectionState === "failed") {
         if (!this._closing && this._gameplayConnected) {
           this._gameplayConnected = false;
-          this.handler.onDisconnected();
+          this.scheduleDisconnect(`pc:${pc.connectionState}`);
         }
       }
     };
+
+    return pc;
   }
 
   private emitGameplayTransportState() {
@@ -557,11 +714,11 @@ export class NetplayPeer {
       const controlState = this.controlDc?.readyState ?? "closed";
       let nextState: GameplayTransportState = "closed";
 
-      if (controlState === "open") {
+      if (controlState === "open" && this._spectatorVideoReady) {
         nextState = "open";
       } else if (controlState === "closing") {
         nextState = "closing";
-      } else if (controlState === "connecting") {
+      } else if (controlState === "connecting" || controlState === "open") {
         nextState = "connecting";
       }
 
@@ -571,6 +728,7 @@ export class NetplayPeer {
       }
 
       if (!this._gameplayConnected && nextState === "open") {
+        this.clearPendingDisconnect();
         this._gameplayConnected = true;
         this.handler.onConnected();
         return;
@@ -578,7 +736,7 @@ export class NetplayPeer {
 
       if (this._gameplayConnected && nextState !== "open" && !this._closing) {
         this._gameplayConnected = false;
-        this.handler.onDisconnected();
+        this.scheduleDisconnect(`spectator-transport:${nextState}`);
         return;
       }
 
@@ -607,11 +765,13 @@ export class NetplayPeer {
     }
 
     if (nextState !== this._gameplayTransportState) {
+      console.log("[PEER] gameplay transport state:", nextState);
       this._gameplayTransportState = nextState;
       this.handler.onDataChannelState?.(nextState);
     }
 
     if (!this._gameplayConnected && nextState === "open") {
+      this.clearPendingDisconnect();
       this._gameplayConnected = true;
       this.handler.onConnected();
       return;
@@ -619,7 +779,7 @@ export class NetplayPeer {
 
     if (this._gameplayConnected && nextState !== "open" && !this._closing) {
       this._gameplayConnected = false;
-      this.handler.onDisconnected();
+      this.scheduleDisconnect(`transport:${nextState}`);
       return;
     }
 
@@ -934,33 +1094,66 @@ export class NetplayPeer {
   }
 
   private async startAsHost() {
-    this.setupPeerConnection();
-    const inputDc = this.pc!.createDataChannel(INPUT_CHANNEL_LABEL, {
-      ordered: false,
-      maxRetransmits: 0,
-    });
-    const controlDc = this.pc!.createDataChannel(CONTROL_CHANNEL_LABEL);
-    const stateDc = this.pc!.createDataChannel(STATE_CHANNEL_LABEL);
-    const repairDc = this.pc!.createDataChannel(REPAIR_CHANNEL_LABEL, {
-      ordered: false,
-      maxRetransmits: 0,
-    });
-    const chatDc = this.pc!.createDataChannel(CHAT_CHANNEL_LABEL);
-    this.setupInputDataChannel(inputDc);
-    this.setupControlDataChannel(controlDc);
-    this.setupStateDataChannel(stateDc);
-    this.setupRepairDataChannel(repairDc);
-    this.setupChatDataChannel(chatDc);
+    if (this.pc || this._closing) {
+      return;
+    }
 
-    const offer = await this.pc!.createOffer();
-    await this.pc!.setLocalDescription(offer);
-    this.signaling.send({ type: "offer", sdp: this.pc!.localDescription! });
+    const pc = this.setupPeerConnection();
+
+    if (this._closing) {
+      return;
+    }
+
+    this._negotiating = true;
+
+    try {
+      const inputDc = pc.createDataChannel(INPUT_CHANNEL_LABEL, {
+        ordered: false,
+        maxRetransmits: 0,
+      });
+      const controlDc = pc.createDataChannel(CONTROL_CHANNEL_LABEL);
+      const stateDc = pc.createDataChannel(STATE_CHANNEL_LABEL);
+      const repairDc = pc.createDataChannel(REPAIR_CHANNEL_LABEL, {
+        ordered: false,
+        maxRetransmits: 0,
+      });
+      const chatDc = pc.createDataChannel(CHAT_CHANNEL_LABEL);
+      this.setupInputDataChannel(inputDc);
+      this.setupControlDataChannel(controlDc);
+      this.setupStateDataChannel(stateDc);
+      this.setupRepairDataChannel(repairDc);
+      this.setupChatDataChannel(chatDc);
+
+      if (this._stream) {
+        this.replaceStreamTracks(pc, this._videoSenders, this._stream);
+      }
+
+      if (this.pc !== pc || this._closing) {
+        return;
+      }
+
+      const activePc: RTCPeerConnection = pc;
+      const offer = await activePc.createOffer();
+      await activePc.setLocalDescription(offer);
+
+      if (this.pc !== activePc || this._closing || !activePc.localDescription) {
+        return;
+      }
+
+      this.signaling.send({ type: "offer", sdp: activePc.localDescription });
+    } finally {
+      this._negotiating = false;
+    }
   }
 
   private async handleOffer(sdp: RTCSessionDescriptionInit) {
-    this.setupPeerConnection();
+    if (this._connectionMode === "spectator") {
+      this._spectatorVideoReady = false;
+    }
 
-    this.pc!.ondatachannel = (e) => {
+    const pc = this.setupPeerConnection();
+
+    pc.ondatachannel = (e) => {
       if (e.channel.label === CHAT_CHANNEL_LABEL) {
         this.setupChatDataChannel(e.channel);
         return;
@@ -995,10 +1188,10 @@ export class NetplayPeer {
       }
     };
 
-    await this.pc!.setRemoteDescription(sdp);
-    const answer = await this.pc!.createAnswer();
-    await this.pc!.setLocalDescription(answer);
-    this.signaling.send({ type: "answer", sdp: this.pc!.localDescription! });
+    await pc.setRemoteDescription(sdp);
+    const answer = await pc.createAnswer();
+    await pc.setLocalDescription(answer);
+    this.signaling.send({ type: "answer", sdp: pc.localDescription! });
   }
 
   private async handleRenegotiationOffer(sdp: RTCSessionDescriptionInit) {
@@ -1064,7 +1257,7 @@ export class NetplayPeer {
       return;
     }
 
-    const pc = new RTCPeerConnection(RTC_CONFIG);
+    const pc = new RTCPeerConnection(this._rtcConfig);
     const spectator: SpectatorPeerState = {
       id: info.spectatorId,
       nickname: info.spectatorNickname,
@@ -1074,6 +1267,7 @@ export class NetplayPeer {
       controlDc: null,
       senders: [],
       negotiating: false,
+      negotiationQueued: false,
     };
 
     this._spectatorPeers.set(spectator.id, spectator);
@@ -1097,24 +1291,7 @@ export class NetplayPeer {
     };
 
     pc.onnegotiationneeded = async () => {
-      if (spectator.negotiating) {
-        return;
-      }
-
-      spectator.negotiating = true;
-      try {
-        const offer = await pc.createOffer();
-        await pc.setLocalDescription(offer);
-        this.signaling.send({
-          type: "offer",
-          sdp: pc.localDescription!,
-          spectatorId: spectator.id,
-        });
-      } catch (error) {
-        console.warn("[PEER] spectator renegotiation failed:", error);
-      } finally {
-        spectator.negotiating = false;
-      }
+      await this.requestSpectatorNegotiation(spectator);
     };
 
     const controlDc = pc.createDataChannel(CONTROL_CHANNEL_LABEL);
@@ -1158,6 +1335,8 @@ export class NetplayPeer {
     if (this._stream) {
       this.replaceStreamTracks(pc, spectator.senders, this._stream);
     }
+
+    void this.requestSpectatorNegotiation(spectator);
   }
 
   private cleanupSpectatorPeer(spectatorId: string) {
@@ -1179,7 +1358,52 @@ export class NetplayPeer {
       return;
     }
 
-    void spectator.pc.setRemoteDescription(sdp).catch(() => undefined);
+    void spectator.pc
+      .setRemoteDescription(sdp)
+      .then(() => {
+        if (spectator.negotiationQueued && spectator.pc.signalingState === "stable") {
+          spectator.negotiationQueued = false;
+          return this.requestSpectatorNegotiation(spectator);
+        }
+
+        return undefined;
+      })
+      .catch(() => undefined);
+  }
+
+  private async requestSpectatorNegotiation(spectator: SpectatorPeerState) {
+    if (spectator.pc.connectionState === "closed") {
+      spectator.negotiationQueued = false;
+      return;
+    }
+
+    if (spectator.negotiating || spectator.pc.signalingState !== "stable") {
+      spectator.negotiationQueued = true;
+      return;
+    }
+
+    spectator.negotiating = true;
+
+    try {
+      const offer = await spectator.pc.createOffer();
+      await spectator.pc.setLocalDescription(offer);
+      this.signaling.send({
+        type: "offer",
+        sdp: spectator.pc.localDescription!,
+        spectatorId: spectator.id,
+      });
+    } catch (error) {
+      console.warn("[PEER] spectator renegotiation failed:", error);
+    } finally {
+      spectator.negotiating = false;
+
+      if (spectator.negotiationQueued) {
+        spectator.negotiationQueued = false;
+        queueMicrotask(() => {
+          void this.requestSpectatorNegotiation(spectator);
+        });
+      }
+    }
   }
 
   private handleSpectatorIceCandidate(spectatorId: string, candidate: RTCIceCandidateInit) {
@@ -1217,15 +1441,16 @@ export class NetplayPeer {
     this.removeStreamTracks(pc, senders);
 
     for (const track of stream.getVideoTracks()) {
+      track.contentHint = "detail";
       const sender = pc.addTrack(track, stream);
       senders.push(sender);
 
       try {
         const params = sender.getParameters();
         if (params.encodings && params.encodings.length > 0) {
-          params.encodings[0].maxBitrate = 5_000_000;
-          params.encodings[0].maxFramerate = 60;
-          params.encodings[0].scaleResolutionDownBy = 1.0;
+          params.encodings[0].maxBitrate = VIDEO_STREAM_MAX_BITRATE;
+          params.encodings[0].maxFramerate = VIDEO_STREAM_MAX_FRAMERATE;
+          params.encodings[0].scaleResolutionDownBy = VIDEO_STREAM_SCALE_DOWN;
         }
         params.degradationPreference = "maintain-resolution";
         void sender.setParameters(params).catch(() => undefined);
@@ -1239,6 +1464,7 @@ export class NetplayPeer {
         continue;
       }
 
+      track.contentHint = "music";
       senders.push(pc.addTrack(track, stream));
     }
   }

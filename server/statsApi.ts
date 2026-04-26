@@ -28,9 +28,14 @@ export function registerStatsRoutes(
   playSessionStore: PlaySessionStore,
 ) {
   app.post("/api/game-sessions", async (req, res) => {
-    const { core, gameName, romPath } = req.body ?? {};
+    const { core, gameName, romPath, sessionId } = req.body ?? {};
 
-    if (!isNonEmptyString(core) || !isNonEmptyString(gameName) || !isNonEmptyString(romPath)) {
+    if (
+      !isNonEmptyString(core) ||
+      !isNonEmptyString(gameName) ||
+      !isNonEmptyString(romPath) ||
+      !isNonEmptyString(sessionId)
+    ) {
       res.status(400).json({ ok: false });
       return;
     }
@@ -39,8 +44,21 @@ export function registerStatsRoutes(
       core: core.trim(),
       gameName: gameName.trim(),
       romPath: romPath.trim(),
+      sessionId: sessionId.trim(),
     });
 
+    res.status(202).json({ ok: true });
+  });
+
+  app.post("/api/game-sessions/:sessionId/end", async (req, res) => {
+    const sessionId = req.params.sessionId ?? "";
+
+    if (!isNonEmptyString(sessionId)) {
+      res.status(400).json({ ok: false });
+      return;
+    }
+
+    await operationsDatabase.completeGameSession(sessionId.trim());
     res.status(202).json({ ok: true });
   });
 

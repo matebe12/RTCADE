@@ -37,6 +37,7 @@ export interface PopularGameRecord {
   gameName: string;
   playCount: number;
   romPath: string;
+  totalPlayTimeMs: number;
 }
 
 export interface GameMetrics {
@@ -54,9 +55,11 @@ export interface RecordGameSessionInput {
   core: string;
   gameName: string;
   romPath: string;
+  sessionId: string;
 }
 
 export interface OperationsDatabase {
+  completeGameSession: (sessionId: string) => Promise<void>;
   createNotice: (input: CreateNoticeInput) => Promise<NoticeRecord | null>;
   getGameMetrics: () => Promise<GameMetrics>;
   isEnabled: boolean;
@@ -152,11 +155,29 @@ const CREATE_NOTICES_TABLE_SQL = `
 const CREATE_GAME_SESSIONS_TABLE_SQL = `
   CREATE TABLE IF NOT EXISTS game_sessions (
     id BIGSERIAL PRIMARY KEY,
+    session_id TEXT,
     game_name TEXT NOT NULL,
     rom_path TEXT NOT NULL,
     core TEXT NOT NULL,
-    started_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    started_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    ended_at TIMESTAMPTZ,
+    duration_ms BIGINT NOT NULL DEFAULT 0
   )
+`;
+
+const ALTER_GAME_SESSIONS_ADD_SESSION_ID_SQL = `
+  ALTER TABLE game_sessions
+  ADD COLUMN IF NOT EXISTS session_id TEXT
+`;
+
+const ALTER_GAME_SESSIONS_ADD_ENDED_AT_SQL = `
+  ALTER TABLE game_sessions
+  ADD COLUMN IF NOT EXISTS ended_at TIMESTAMPTZ
+`;
+
+const ALTER_GAME_SESSIONS_ADD_DURATION_MS_SQL = `
+  ALTER TABLE game_sessions
+  ADD COLUMN IF NOT EXISTS duration_ms BIGINT NOT NULL DEFAULT 0
 `;
 
 const CREATE_NOTICE_INDEX_SQL = `
@@ -172,6 +193,12 @@ const CREATE_GAME_SESSIONS_STARTED_AT_INDEX_SQL = `
 const CREATE_GAME_SESSIONS_GAME_NAME_INDEX_SQL = `
   CREATE INDEX IF NOT EXISTS game_sessions_game_name_started_at_idx
   ON game_sessions (game_name, started_at DESC)
+`;
+
+const CREATE_GAME_SESSIONS_SESSION_ID_INDEX_SQL = `
+  CREATE UNIQUE INDEX IF NOT EXISTS game_sessions_session_id_idx
+  ON game_sessions (session_id)
+  WHERE session_id IS NOT NULL
 `;
 
 function mapNoticeRow(row: {
@@ -206,6 +233,7 @@ function mapPopularGameRows(
     game_name: string;
     play_count: string;
     rom_path: string;
+    total_play_time_ms: string;
   }>,
 ): PopularGameRecord[] {
   return rows.map((row) => ({
@@ -213,6 +241,7 @@ function mapPopularGameRows(
     gameName: row.game_name,
     playCount: Number(row.play_count || "0"),
     romPath: row.rom_path,
+    totalPlayTimeMs: Number(row.total_play_time_ms || "0"),
   }));
 }
 
@@ -222,13 +251,27 @@ async function listPopularGames(pool: Pool, whereClause: string) {
     game_name: string;
     play_count: string;
     rom_path: string;
+    total_play_time_ms: string;
   }>(
     `
-      SELECT game_name, rom_path, core, COUNT(*)::text AS play_count
+      SELECT
+        game_name,
+        rom_path,
+        core,
+        COUNT(*)::text AS play_count,
+        COALESCE(
+          SUM(
+            CASE
+              WHEN ended_at IS NOT NULL THEN GREATEST(duration_ms, 0)
+              ELSE GREATEST(0, FLOOR(EXTRACT(EPOCH FROM (NOW() - started_at)) * 1000)::bigint)
+            END
+          ),
+          0
+        )::text AS total_play_time_ms
       FROM game_sessions
       ${whereClause}
       GROUP BY game_name, rom_path, core
-      ORDER BY COUNT(*) DESC, MAX(started_at) DESC
+      ORDER BY COUNT(*) DESC, COALESCE(SUM(duration_ms), 0) DESC, MAX(started_at) DESC
       LIMIT ${POPULAR_GAMES_LIMIT}
     `,
   );
@@ -279,6 +322,26 @@ export function createOperationsDatabase(databaseUrl: string | null): Operations
   }
 
   return {
+    completeGameSession: async (sessionId) => {
+      await runSafely(async () => {
+        await pool!.query(
+          `
+            UPDATE game_sessions
+            SET
+              ended_at = COALESCE(ended_at, NOW()),
+              duration_ms = GREATEST(
+                duration_ms,
+                GREATEST(
+                  0,
+                  FLOOR(EXTRACT(EPOCH FROM (COALESCE(ended_at, NOW()) - started_at)) * 1000)::bigint
+                )
+              )
+            WHERE session_id = $1
+          `,
+          [sessionId],
+        );
+      }, undefined);
+    },
     createNotice: async (input) =>
       runSafely(async () => {
         if (input.isPinned) {
@@ -370,9 +433,13 @@ export function createOperationsDatabase(databaseUrl: string | null): Operations
         await pool.query(CREATE_DAILY_VISITORS_TABLE_SQL);
         await pool.query(CREATE_NOTICES_TABLE_SQL);
         await pool.query(CREATE_GAME_SESSIONS_TABLE_SQL);
+        await pool.query(ALTER_GAME_SESSIONS_ADD_SESSION_ID_SQL);
+        await pool.query(ALTER_GAME_SESSIONS_ADD_ENDED_AT_SQL);
+        await pool.query(ALTER_GAME_SESSIONS_ADD_DURATION_MS_SQL);
         await pool.query(CREATE_NOTICE_INDEX_SQL);
         await pool.query(CREATE_GAME_SESSIONS_STARTED_AT_INDEX_SQL);
         await pool.query(CREATE_GAME_SESSIONS_GAME_NAME_INDEX_SQL);
+        await pool.query(CREATE_GAME_SESSIONS_SESSION_ID_INDEX_SQL);
         await seedDefaultNotices(pool);
       } catch (error) {
         console.error("[DB] Initialization failed, disabling DB-backed features:", error);
@@ -408,10 +475,11 @@ export function createOperationsDatabase(databaseUrl: string | null): Operations
       await runSafely(async () => {
         await pool!.query(
           `
-            INSERT INTO game_sessions (game_name, rom_path, core)
-            VALUES ($1, $2, $3)
+            INSERT INTO game_sessions (session_id, game_name, rom_path, core)
+            VALUES ($1, $2, $3, $4)
+            ON CONFLICT (session_id) DO NOTHING
           `,
-          [input.gameName, input.romPath, input.core],
+          [input.sessionId, input.gameName, input.romPath, input.core],
         );
       }, undefined);
     },

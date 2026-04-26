@@ -8,7 +8,16 @@ export interface ServerConfig {
   databaseUrl: string | null;
   noticeAdminToken: string | null;
   emulatorJsDataUrl: string;
+  iceServers: IceServerDefinition[];
 }
+
+export interface IceServerDefinition {
+  urls: string[];
+  username?: string;
+  credential?: string;
+}
+
+const DEFAULT_STUN_SERVER_URLS = ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"];
 
 function normalizeEmulatorJsDataUrl(url: string) {
   return url.endsWith("/") ? url : `${url}/`;
@@ -47,6 +56,40 @@ function buildDatabaseUrlFromEnv() {
   return url.toString();
 }
 
+function normalizeOptionalEnv(value: string | undefined) {
+  const trimmed = value?.trim();
+  return trimmed && trimmed.length > 0 ? trimmed : undefined;
+}
+
+function parseUrlList(value: string | undefined) {
+  return (value ?? "")
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter((entry) => entry.length > 0);
+}
+
+function getIceServersFromEnv(): IceServerDefinition[] {
+  const stunUrls = parseUrlList(process.env.STUN_SERVER_URLS);
+  const turnUrls = parseUrlList(process.env.TURN_SERVER_URLS);
+  const turnUsername = normalizeOptionalEnv(process.env.TURN_USERNAME);
+  const turnCredential = normalizeOptionalEnv(process.env.TURN_CREDENTIAL);
+  const iceServers: IceServerDefinition[] = [
+    {
+      urls: stunUrls.length > 0 ? stunUrls : DEFAULT_STUN_SERVER_URLS,
+    },
+  ];
+
+  if (turnUrls.length > 0) {
+    iceServers.push({
+      urls: turnUrls,
+      username: turnUsername,
+      credential: turnCredential,
+    });
+  }
+
+  return iceServers;
+}
+
 export function getServerConfig(): ServerConfig {
   return {
     port: Number.parseInt(process.env.PORT || "3001", 10),
@@ -57,6 +100,7 @@ export function getServerConfig(): ServerConfig {
     emulatorJsDataUrl: normalizeEmulatorJsDataUrl(
       process.env.EMULATORJS_DATA_URL || "https://cdn.emulatorjs.org/stable/data/",
     ),
+    iceServers: getIceServersFromEnv(),
   };
 }
 

@@ -10,6 +10,8 @@ WebRTC DataChannel을 통해 서버 중계 없이 1:1 P2P로 직접 연결하여
 ## 주요 기능
 
 - **P2P 넷플레이** — 6자리 방 코드로 상대방과 연결, WebRTC DataChannel로 입력 공유
+- **대기실 기반 시작** — 참가자/관전자가 먼저 입장하고 준비 완료 후 방장이 게임 시작
+- **사전 관전자 입장** — 게임 시작 전 관전자 최대 5명까지 입장, 시작 후 역할 고정
 - **24개 시스템 지원** — NES, SNES, N64, GBA, PSX, MAME 2003+, FBNeo 등
 - **자동 상태 동기화** — 초기 세이브 스테이트 싱크 + 주기적 리싱크로 드리프트 보정
 - **유저 프로필** — 닉네임 + 이모지 아바타 (localStorage 저장)
@@ -82,6 +84,7 @@ npm run dev:all
 
 - GET /api/stats — 총 방문자, 오늘 방문자, 현재 열린 방/대기 방/접속 플레이어 수
 - GET /api/notices — 게시된 공지 목록
+- GET /api/ice-servers — 브라우저가 사용할 STUN/TURN 설정
 
 관리자 토큰을 설정하면 공지 작성·수정 API도 함께 사용할 수 있습니다.
 
@@ -115,11 +118,17 @@ ROMS_PATH=/app/server/roms
 DATABASE_URL=postgresql://postgres:password@postgres.railway.internal:5432/railway
 DATABASE_PUBLIC_URL=postgresql://postgres:password@public-host:port/railway?sslmode=require
 NOTICE_ADMIN_TOKEN=replace-with-a-strong-random-token
+STUN_SERVER_URLS=stun:stun.l.google.com:19302,stun:stun1.l.google.com:19302
+TURN_SERVER_URLS=turn:turn.example.com:3478?transport=udp,turn:turn.example.com:3478?transport=tcp
+TURN_USERNAME=turn-user
+TURN_CREDENTIAL=turn-password
 ```
 
 Railway에 배포된 백엔드는 내부 URL인 DATABASE_URL을 쓰는 편이 안전합니다. 로컬에서 직접 DB 연결을 시험할 때만 DATABASE_PUBLIC_URL을 쓰면 됩니다.
 
 DATABASE_URL과 DATABASE_PUBLIC_URL이 모두 없으면 서버는 공지/방문자 통계를 비활성화한 채 계속 기동합니다.
+
+다른 네트워크 사이의 guest/spectator 연결 안정성을 높이려면 TURN_SERVER_URLS, TURN_USERNAME, TURN_CREDENTIAL을 함께 설정하는 편이 좋습니다.
 
 관리자 공지 API는 Authorization 헤더에 Bearer 토큰을 넣어 호출합니다.
 
@@ -143,7 +152,9 @@ curl -X POST "$API_URL/api/admin/notices" \
 
 ```
 HOST: 넷플레이 → 방 만들기 → 게임 선택 → 6자리 코드 공유
-GUEST: 넷플레이 → 방 참가 → 코드 입력
+GUEST: 넷플레이 → 방 참가 → 코드 입력 → 준비 완료
+SPECTATOR: 넷플레이 → 관전자 입장 → 코드 입력 → 준비 완료
+HOST: 모두 준비 완료 확인 → 게임 시작
 ```
 
 ### 초기 동기화

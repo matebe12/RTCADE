@@ -72,6 +72,23 @@ function getPopularGameCoreLabel(core?: string) {
   return SYSTEM_OPTIONS.find((system) => system.value === core)?.label ?? core;
 }
 
+function formatPlayTime(totalPlayTimeMs: number) {
+  const totalSeconds = Math.max(0, Math.floor(totalPlayTimeMs / 1000));
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+
+  if (hours > 0) {
+    return minutes > 0 ? `${hours}시간 ${minutes}분` : `${hours}시간`;
+  }
+
+  if (minutes > 0) {
+    return seconds > 0 ? `${minutes}분 ${seconds}초` : `${minutes}분`;
+  }
+
+  return `${Math.max(1, seconds)}초`;
+}
+
 function PopularGamesCard({ emptyCopy, games, periodKey, title }: PopularGamesCardProps) {
   return (
     <div className="flex h-full flex-col rounded-[24px] border border-primary/20 bg-background/80 p-4 shadow-sm shadow-primary/5">
@@ -146,7 +163,7 @@ function PopularGamesCard({ emptyCopy, games, periodKey, title }: PopularGamesCa
                       {game.gameName}
                     </div>
                     <div className="mt-1 text-[11px] text-muted-foreground">
-                      {numberFormatter.format(game.playCount)}회 플레이
+                      {numberFormatter.format(game.playCount)}회 플레이 · {formatPlayTime(game.totalPlayTimeMs)}
                     </div>
                   </div>
                 </div>

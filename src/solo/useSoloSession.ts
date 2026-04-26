@@ -3,6 +3,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { SystemCore } from "@/components/EmulatorPlayer";
 import { parseRomName } from "@/lib/game-names";
 import {
+  completeGameSession,
+  completeGameSessionWithBeacon,
   endActivePlaySession,
   endActivePlaySessionWithBeacon,
   notifyOperationsStatsRefresh,
@@ -73,6 +75,7 @@ export function useSoloSession({
       return;
     }
 
+    void completeGameSession(activeSessionId).catch(() => undefined);
     void endActivePlaySession(activeSessionId).catch(() => undefined);
   }, []);
 
@@ -84,7 +87,12 @@ export function useSoloSession({
       return;
     }
 
+    const gameSessionBeaconSent = completeGameSessionWithBeacon(activeSessionId);
     const beaconSent = endActivePlaySessionWithBeacon(activeSessionId);
+
+    if (!gameSessionBeaconSent) {
+      void completeGameSession(activeSessionId).catch(() => undefined);
+    }
 
     if (!beaconSent) {
       void endActivePlaySession(activeSessionId).catch(() => undefined);
@@ -136,6 +144,7 @@ export function useSoloSession({
           core: rom.core,
           gameName,
           romPath: rom.path,
+          sessionId: nextSessionId,
         }).catch(() => undefined);
 
         void upsertActivePlaySession({

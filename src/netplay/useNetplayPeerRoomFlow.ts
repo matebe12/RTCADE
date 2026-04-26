@@ -1,6 +1,7 @@
 import type { MutableRefObject } from "react";
 
 import type { SessionEndReason } from "@/components/NetplaySessionSummary";
+import { NETPLAY_COPY } from "@/netplay/netplayCopy";
 import {
   type ChatMessage as PeerChatMessage,
   type InputMessage,
@@ -135,6 +136,22 @@ export function useNetplayPeerRoomFlow({
     handleCreateRoom,
     handleJoinPublicRoom,
     handleJoinRoom,
+    handleSetRoomReady: (ready: boolean) => {
+      if (state.step !== "waiting" || state.role === "host") {
+        return;
+      }
+
+      setStatus(ready ? NETPLAY_COPY.roomReadyEnabled : NETPLAY_COPY.roomReadyDisabled);
+      peerRef.current?.setRoomReady(ready);
+    },
+    handleStartRoomSession: () => {
+      if (state.step !== "waiting" || state.role !== "host") {
+        return;
+      }
+
+      setStatus(NETPLAY_COPY.roomStartRequested);
+      peerRef.current?.markSessionStarted();
+    },
     handleSpectatePublicRoom,
     handleSpectateRoom,
     handleSummaryRematch,

@@ -23,6 +23,23 @@ function parseMessage(raw: RawData): Record<string, unknown> | null {
   }
 }
 
+function broadcastRoomLobby(room: Room, roomStore: RoomStore) {
+  const message = {
+    type: "room-lobby-updated",
+    ...roomStore.getLobbySnapshot(room),
+  };
+
+  send(room.host, message);
+
+  if (room.guest) {
+    send(room.guest.socket, message);
+  }
+
+  for (const spectator of room.spectators.values()) {
+    send(spectator.socket, message);
+  }
+}
+
 export function attachSignalingServer(wss: WebSocketServer, roomStore: RoomStore) {
   wss.on("connection", (ws) => {
     let myRoom: Room | null = null;
@@ -65,6 +82,7 @@ export function attachSignalingServer(wss: WebSocketServer, roomStore: RoomStore
           myRoom = room;
           role = "host";
           send(ws, { type: "room-created", code: room.code });
+          broadcastRoomLobby(room, roomStore);
           break;
         }
 
@@ -81,7 +99,12 @@ export function attachSignalingServer(wss: WebSocketServer, roomStore: RoomStore
             return;
           }
 
-          if (!roomStore.attachGuest(room, ws)) {
+          if (
+            !roomStore.attachGuest(room, ws, {
+              nickname: message.nickname ? String(message.nickname) : undefined,
+              avatar: message.avatar ? String(message.avatar) : undefined,
+            })
+          ) {
             send(ws, { type: "error", message: "방이 이미 가득 찼습니다." });
             return;
           }
@@ -92,6 +115,7 @@ export function attachSignalingServer(wss: WebSocketServer, roomStore: RoomStore
           send(ws, {
             type: "room-joined",
             code: room.code,
+            participantId: "guest",
             role: "guest",
             romFilename: room.romFilename,
             core: room.core,
@@ -105,6 +129,7 @@ export function attachSignalingServer(wss: WebSocketServer, roomStore: RoomStore
             guestNickname: message.nickname ? String(message.nickname) : undefined,
             guestAvatar: message.avatar ? String(message.avatar) : undefined,
           });
+          broadcastRoomLobby(room, roomStore);
           break;
         }
 
@@ -125,8 +150,8 @@ export function attachSignalingServer(wss: WebSocketServer, roomStore: RoomStore
             send(ws, {
               type: "error",
               message:
-                room.state !== "playing"
-                  ? "아직 관전할 수 있는 플레이 중 방이 아닙니다."
+                room.state !== "waiting"
+                  ? "게임 시작 후에는 관전자 입장이 닫힙니다."
                   : "관전자 정원이 가득 찼습니다.",
             });
             return;
@@ -139,6 +164,7 @@ export function attachSignalingServer(wss: WebSocketServer, roomStore: RoomStore
           send(ws, {
             type: "room-joined",
             code: room.code,
+            participantId: attachedSpectator.id,
             role: "spectator",
             romFilename: room.romFilename,
             core: room.core,
@@ -154,12 +180,71 @@ export function attachSignalingServer(wss: WebSocketServer, roomStore: RoomStore
             spectatorAvatar: attachedSpectator.avatar,
             spectatorCount: roomStore.getSpectatorCount(room),
           });
+          broadcastRoomLobby(room, roomStore);
+          break;
+        }
+
+        case "set-room-ready": {
+          if (!myRoom || myRoom.state !== "waiting") {
+            return;
+          }
+
+          if (role !== "guest" && role !== "spectator") {
+            return;
+          }
+
+          roomStore.setParticipantReady(myRoom, ws, !!message.ready);
+          broadcastRoomLobby(myRoom, roomStore);
           break;
         }
 
         case "session-started": {
           if (role === "host" && myRoom) {
-            roomStore.markPlaying(myRoom);
+            if (!roomStore.markPlaying(myRoom)) {
+              send(ws, {
+                type: "error",
+                message: "게스트가 들어오고, 모든 관전자가 준비 완료되어야 시작할 수 있습니다.",
+              });
+              broadcastRoomLobby(myRoom, roomStore);
+              return;
+            }
+
+            send(myRoom.host, {
+              type: "room-session-started",
+              code: myRoom.code,
+              role: "host",
+              romFilename: myRoom.romFilename,
+              core: myRoom.core,
+              bios: myRoom.bios,
+              hostNickname: myRoom.hostNickname,
+              hostAvatar: myRoom.hostAvatar,
+            });
+
+            if (myRoom.guest) {
+              send(myRoom.guest.socket, {
+                type: "room-session-started",
+                code: myRoom.code,
+                role: "guest",
+                romFilename: myRoom.romFilename,
+                core: myRoom.core,
+                bios: myRoom.bios,
+                hostNickname: myRoom.hostNickname,
+                hostAvatar: myRoom.hostAvatar,
+              });
+            }
+
+            for (const spectator of myRoom.spectators.values()) {
+              send(spectator.socket, {
+                type: "room-session-started",
+                code: myRoom.code,
+                role: "spectator",
+                romFilename: myRoom.romFilename,
+                core: myRoom.core,
+                bios: myRoom.bios,
+                hostNickname: myRoom.hostNickname,
+                hostAvatar: myRoom.hostAvatar,
+              });
+            }
           }
           break;
         }
@@ -178,7 +263,7 @@ export function attachSignalingServer(wss: WebSocketServer, roomStore: RoomStore
               typeof message.spectatorId === "string" ? String(message.spectatorId) : null;
             target = targetSpectatorId
               ? roomStore.findSpectatorSocket(myRoom, targetSpectatorId)
-              : myRoom.guest;
+              : myRoom.guest?.socket ?? null;
           } else if (role === "guest") {
             target = myRoom.host;
           } else if (role === "spectator") {
@@ -207,7 +292,7 @@ export function attachSignalingServer(wss: WebSocketServer, roomStore: RoomStore
 
       if (role === "host") {
         if (myRoom.guest) {
-          send(myRoom.guest, { type: "peer-disconnected" });
+          send(myRoom.guest.socket, { type: "peer-disconnected" });
         }
         for (const hostedSpectator of myRoom.spectators.values()) {
           send(hostedSpectator.socket, { type: "peer-disconnected" });
@@ -217,21 +302,29 @@ export function attachSignalingServer(wss: WebSocketServer, roomStore: RoomStore
       }
 
       if (role === "guest") {
-        for (const hostedSpectator of roomStore.endPlayingSession(myRoom)) {
-          send(hostedSpectator.socket, { type: "peer-disconnected" });
+        if (myRoom.state === "playing") {
+          for (const hostedSpectator of roomStore.endPlayingSession(myRoom)) {
+            send(hostedSpectator.socket, { type: "peer-disconnected" });
+          }
+          send(myRoom.host, { type: "peer-disconnected" });
+        } else {
+          roomStore.detachGuest(myRoom);
+          broadcastRoomLobby(myRoom, roomStore);
         }
-        send(myRoom.host, { type: "peer-disconnected" });
-        roomStore.detachGuest(myRoom);
         return;
       }
 
       if (role === "spectator" && spectatorId) {
         roomStore.detachSpectator(myRoom, spectatorId);
-        send(myRoom.host, {
-          type: "spectator-disconnected",
-          spectatorId,
-          spectatorCount: roomStore.getSpectatorCount(myRoom),
-        });
+        if (myRoom.state === "playing") {
+          send(myRoom.host, {
+            type: "spectator-disconnected",
+            spectatorId,
+            spectatorCount: roomStore.getSpectatorCount(myRoom),
+          });
+        } else {
+          broadcastRoomLobby(myRoom, roomStore);
+        }
       }
     });
   });

@@ -1,3 +1,34 @@
+export interface RoomLobbyParticipant {
+  id: string;
+  role: "host" | "guest" | "spectator";
+  nickname?: string;
+  avatar?: string;
+  ready: boolean;
+  joinedAt: number;
+}
+
+export interface RoomLobbySnapshotMessage {
+  type: "room-lobby-updated";
+  code: string;
+  roomState: "waiting" | "playing";
+  participants: RoomLobbyParticipant[];
+  canStart: boolean;
+  hasGuest: boolean;
+  spectatorSlotsRemaining: number;
+  roleLocked: boolean;
+}
+
+export interface RoomSessionStartedMessage {
+  type: "room-session-started";
+  code: string;
+  role: "host" | "guest" | "spectator";
+  romFilename: string;
+  core: string;
+  bios?: string;
+  hostNickname?: string;
+  hostAvatar?: string;
+}
+
 export type SignalingMessage =
   | {
       type: "create-room";
@@ -10,11 +41,13 @@ export type SignalingMessage =
     }
   | { type: "join-room"; code: string; nickname?: string; avatar?: string }
   | { type: "spectate-room"; code: string; nickname?: string; avatar?: string }
+  | { type: "set-room-ready"; ready: boolean }
   | { type: "session-started" }
   | { type: "room-created"; code: string }
   | {
       type: "room-joined";
       code: string;
+      participantId: string;
       role: "guest" | "spectator";
       romFilename: string;
       core: string;
@@ -35,6 +68,8 @@ export type SignalingMessage =
       spectatorId: string;
       spectatorCount: number;
     }
+  | RoomLobbySnapshotMessage
+  | RoomSessionStartedMessage
   | { type: "peer-disconnected" }
   | { type: "error"; message: string }
   | { type: "offer"; sdp: RTCSessionDescriptionInit; spectatorId?: string }

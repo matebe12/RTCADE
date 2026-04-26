@@ -54,6 +54,9 @@ const GuestVideoDisplay = forwardRef<HTMLDivElement, GuestVideoDisplayProps>(
     const containerRef = useRef<HTMLDivElement>(null);
     const videoRef = useRef<HTMLVideoElement>(null);
     const [isMuted, setIsMuted] = useState(true); // Start muted for autoplay policy
+    const [playbackState, setPlaybackState] = useState<
+      "waiting-stream" | "waiting-playback" | "playing" | "stalled"
+    >("waiting-stream");
 
     useImperativeHandle(ref, () => containerRef.current!, []);
 
@@ -72,19 +75,48 @@ const GuestVideoDisplay = forwardRef<HTMLDivElement, GuestVideoDisplayProps>(
     // Attach MediaStream to video element
     useEffect(() => {
       const video = videoRef.current;
-      if (!video || !videoStream) return undefined;
+      if (!video) return undefined;
+
+      if (!videoStream) {
+        video.srcObject = null;
+        setPlaybackState("waiting-stream");
+        return undefined;
+      }
 
       video.srcObject = videoStream;
       video.muted = isMuted;
+      setPlaybackState("waiting-playback");
       // Minimise playback buffer for low-latency WebRTC stream
       if ("latencyHint" in video) {
         (video as unknown as Record<string, unknown>).latencyHint = 0;
       }
+      const handleCanPlay = () => {
+        setPlaybackState((current) => (current === "playing" ? current : "waiting-playback"));
+      };
+      const handlePlaying = () => {
+        setPlaybackState("playing");
+      };
+      const handleStalled = () => {
+        setPlaybackState((current) => (current === "waiting-stream" ? current : "stalled"));
+      };
+
+      video.addEventListener("canplay", handleCanPlay);
+      video.addEventListener("loadeddata", handleCanPlay);
+      video.addEventListener("playing", handlePlaying);
+      video.addEventListener("stalled", handleStalled);
+      video.addEventListener("waiting", handleStalled);
+      video.addEventListener("emptied", handleStalled);
       video.play().catch(() => {
         /* autoplay policy — user interaction unblocks later */
       });
 
       return () => {
+        video.removeEventListener("canplay", handleCanPlay);
+        video.removeEventListener("loadeddata", handleCanPlay);
+        video.removeEventListener("playing", handlePlaying);
+        video.removeEventListener("stalled", handleStalled);
+        video.removeEventListener("waiting", handleStalled);
+        video.removeEventListener("emptied", handleStalled);
         video.srcObject = null;
       };
       // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -141,6 +173,15 @@ const GuestVideoDisplay = forwardRef<HTMLDivElement, GuestVideoDisplayProps>(
 
     const showDisconnectOverlay =
       disconnectSeverity === "warning" || disconnectSeverity === "danger";
+    const showPlaybackOverlay = !videoStream || playbackState !== "playing";
+
+    let playbackMessage = "호스트 화면 수신 대기 중…";
+
+    if (videoStream && playbackState === "waiting-playback") {
+      playbackMessage = "첫 화면을 불러오는 중…";
+    } else if (videoStream && playbackState === "stalled") {
+      playbackMessage = "화면 재생을 복구하는 중…";
+    }
 
     return (
       <div
@@ -149,26 +190,26 @@ const GuestVideoDisplay = forwardRef<HTMLDivElement, GuestVideoDisplayProps>(
         className="relative w-full aspect-[4/3] bg-neutral-900 rounded-lg overflow-hidden outline-none focus:ring-2 focus:ring-primary/60"
         onContextMenu={(e) => e.preventDefault()}
       >
-        {videoStream ? (
-          <>
-            <video ref={videoRef} autoPlay playsInline className="h-full w-full object-contain" />
-            {/* Mute/Unmute button overlay */}
-            <div className="absolute bottom-3 right-3 z-10">
-              <Button
-                variant="secondary"
-                size="sm"
-                className="h-8 w-8 rounded-full p-0 opacity-60 hover:opacity-100 transition-opacity"
-                onClick={toggleMute}
-                title={isMuted ? "소리 켜기" : "소리 끄기"}
-              >
-                {isMuted ? <VolumeX className="size-4" /> : <Volume2 className="size-4" />}
-              </Button>
-            </div>
-          </>
-        ) : (
-          <div className="flex h-full w-full flex-col items-center justify-center gap-3 text-muted-foreground">
+        <video ref={videoRef} autoPlay playsInline className="h-full w-full object-contain" />
+
+        {showPlaybackOverlay && (
+          <div className="absolute inset-0 z-10 flex h-full w-full flex-col items-center justify-center gap-3 bg-black/60 text-muted-foreground backdrop-blur-[1px]">
             <Loader2 className="size-8 animate-spin" />
-            <span className="text-sm">호스트 화면 수신 대기 중…</span>
+            <span className="text-sm">{playbackMessage}</span>
+          </div>
+        )}
+
+        {videoStream && (
+          <div className="absolute bottom-3 right-3 z-10">
+            <Button
+              variant="secondary"
+              size="sm"
+              className="h-8 w-8 rounded-full p-0 opacity-60 hover:opacity-100 transition-opacity"
+              onClick={toggleMute}
+              title={isMuted ? "소리 켜기" : "소리 끄기"}
+            >
+              {isMuted ? <VolumeX className="size-4" /> : <Volume2 className="size-4" />}
+            </Button>
           </div>
         )}
 
