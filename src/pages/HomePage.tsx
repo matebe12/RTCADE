@@ -19,6 +19,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { getGameThumbnailUrl } from "@/lib/game-thumbnails";
 import type { PopularGameSummary } from "@/lib/operations-api";
 import { usePageSeo } from "@/lib/seo";
 import {
@@ -72,6 +73,40 @@ function getPopularGameCoreLabel(core?: string) {
   return SYSTEM_OPTIONS.find((system) => system.value === core)?.label ?? core;
 }
 
+function getPopularGameFilename(romPath?: string) {
+  if (!romPath) {
+    return null;
+  }
+
+  return romPath.split("/").pop() ?? romPath;
+}
+
+function PopularGameThumbnail({ game }: { game: PopularGameSummary }) {
+  const [imgError, setImgError] = useState(false);
+  const filename = getPopularGameFilename(game.romPath);
+  const thumbnailUrl =
+    filename && game.core && !imgError ? getGameThumbnailUrl(filename, game.core) : null;
+
+  return (
+    <div className="relative size-16 shrink-0 overflow-hidden rounded-2xl border border-primary/15 bg-background/70 shadow-sm shadow-primary/10">
+      {thumbnailUrl ? (
+        <img
+          src={thumbnailUrl}
+          alt={game.gameName}
+          loading="lazy"
+          onError={() => setImgError(true)}
+          className="size-full object-cover"
+        />
+      ) : (
+        <div className="flex size-full items-center justify-center bg-gradient-to-br from-primary/15 via-background/40 to-background/80 text-primary/70">
+          <Gamepad2 className="size-6" />
+        </div>
+      )}
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-black/45 to-transparent" />
+    </div>
+  );
+}
+
 function formatPlayTime(totalPlayTimeMs: number) {
   const totalSeconds = Math.max(0, Math.floor(totalPlayTimeMs / 1000));
   const hours = Math.floor(totalSeconds / 3600);
@@ -114,7 +149,8 @@ function PopularGamesCard({ emptyCopy, games, periodKey, title }: PopularGamesCa
                 key={`${periodKey}-${game.gameName}-${game.romPath ?? index}-${game.core ?? "unknown"}`}
                 className="rounded-2xl border border-border/70 bg-background/55 px-3 py-3"
               >
-                <div className="flex flex-col gap-3">
+                <div className="flex items-start gap-3">
+                  <PopularGameThumbnail game={game} />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex min-w-0 flex-wrap items-center gap-2">
