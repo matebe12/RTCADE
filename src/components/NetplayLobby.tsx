@@ -226,8 +226,13 @@ export default function NetplayLobby() {
 
       const romPath = searchParams.get("romPath");
       const core = searchParams.get("core");
+      const requestedVisibility = searchParams.get("visibility");
+      const roomVisibilityFromEntry = requestedVisibility === "public" ? "public" : "private";
 
       if (!romPath || !core) {
+        if (entry === "create-room") {
+          setRoomVisibility(roomVisibilityFromEntry);
+        }
         openEntryFallback(entry);
         navigate(location.pathname, { replace: true });
         return;
@@ -267,6 +272,7 @@ export default function NetplayLobby() {
         }
 
         setMode("netplay");
+        setRoomVisibility(roomVisibilityFromEntry);
         await handleCreateRoom(matchedRom);
         if (cancelled) {
           return;

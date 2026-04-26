@@ -53,6 +53,10 @@ interface PopularGamesCardProps {
 function buildPopularGameEntryHref(entry: "create-room" | "solo", game: PopularGameSummary) {
   const searchParams = new URLSearchParams({ entry });
 
+  if (entry === "create-room") {
+    searchParams.set("visibility", "public");
+  }
+
   if (game.romPath) {
     searchParams.set("romPath", game.romPath);
   }
@@ -168,14 +172,14 @@ function PopularGamesCard({ emptyCopy, games, periodKey, title }: PopularGamesCa
                           asChild
                           size="sm"
                           className="h-8 rounded-full px-3 text-[11px]"
-                          aria-label={`${game.gameName} 혼자하기`}
+                          aria-label={`${game.gameName} 플레이`}
                         >
                           <NavLink
                             to={buildPopularGameEntryHref("create-room", game)}
-                            title={`${game.gameName} 혼자하기`}
+                            title={`${game.gameName} 플레이`}
                           >
                             <Gamepad2 className="size-4" />
-                            <span>혼자하기</span>
+                            <span>플레이</span>
                           </NavLink>
                         </Button>
                       </div>

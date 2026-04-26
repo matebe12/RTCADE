@@ -2,6 +2,41 @@ const defaultApiUrl = `${window.location.protocol}//${window.location.hostname}:
 const defaultWsUrl = `${window.location.protocol === "https:" ? "wss:" : "ws:"}//${window.location.hostname}:3001`;
 const defaultEmulatorJsDataUrl = "https://cdn.emulatorjs.org/stable/data/";
 
+export type AdProvider = "none" | "placeholder" | "coupang" | "adsense";
+
+function normalizeBooleanEnv(value: string | undefined, fallback: boolean) {
+  if (!value) {
+    return fallback;
+  }
+
+  return value.trim().toLowerCase() === "true";
+}
+
+function normalizeNumberEnv(value: string | undefined, fallback: number) {
+  if (!value) {
+    return fallback;
+  }
+
+  const parsed = Number.parseInt(value, 10);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function normalizeOptionalEnv(value: string | undefined) {
+  const trimmed = value?.trim();
+  return trimmed && trimmed.length > 0 ? trimmed : undefined;
+}
+
+function normalizeAdProvider(value: string | undefined): AdProvider {
+  switch (value?.trim().toLowerCase()) {
+    case "placeholder":
+    case "coupang":
+    case "adsense":
+      return value.trim().toLowerCase() as AdProvider;
+    default:
+      return "none";
+  }
+}
+
 function normalizeEmulatorJsDataUrl(url: string) {
   return url.endsWith("/") ? url : `${url}/`;
 }
@@ -11,6 +46,7 @@ const wsUrl = import.meta.env.VITE_WS_URL || defaultWsUrl;
 const emulatorJsDataUrl = normalizeEmulatorJsDataUrl(
   import.meta.env.VITE_EMULATORJS_DATA_URL || defaultEmulatorJsDataUrl,
 );
+const adProvider = normalizeAdProvider(import.meta.env.VITE_AD_PROVIDER);
 
 export const appEnvironment = {
   siteName: "RTCADE",
@@ -19,4 +55,20 @@ export const appEnvironment = {
   wsUrl,
   emulatorJsDataUrl,
   emulatorJsLoaderUrl: new URL("loader.js", emulatorJsDataUrl).toString(),
+  sideAds: {
+    enabled: normalizeBooleanEnv(import.meta.env.VITE_ENABLE_SIDE_ADS, false),
+    provider: adProvider,
+    desktopMinWidth: normalizeNumberEnv(import.meta.env.VITE_AD_DESKTOP_MIN_WIDTH, 1536),
+    rightRailMinWidth: normalizeNumberEnv(import.meta.env.VITE_AD_RIGHT_RAIL_MIN_WIDTH, 1280),
+    disclosureText: import.meta.env.VITE_AD_DISCLOSURE_TEXT || "광고",
+    leftSlotId: import.meta.env.VITE_AD_LEFT_SLOT_ID || "left-rail",
+    rightSlotId: import.meta.env.VITE_AD_RIGHT_SLOT_ID || "right-rail",
+    coupangTrackingCode: normalizeOptionalEnv(import.meta.env.VITE_COUPANG_TRACKING_CODE),
+    coupangSubId: normalizeOptionalEnv(import.meta.env.VITE_COUPANG_SUB_ID),
+    coupangTemplate: import.meta.env.VITE_COUPANG_TEMPLATE || "carousel",
+    coupangRailWidth: normalizeNumberEnv(import.meta.env.VITE_COUPANG_RAIL_WIDTH, 180),
+    coupangRailHeight: normalizeNumberEnv(import.meta.env.VITE_COUPANG_RAIL_HEIGHT, 600),
+    adsenseClientId: normalizeOptionalEnv(import.meta.env.VITE_ADSENSE_CLIENT_ID),
+    adsenseTestMode: normalizeBooleanEnv(import.meta.env.VITE_ADSENSE_TEST_MODE, true),
+  },
 } as const;

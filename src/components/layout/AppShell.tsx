@@ -1,8 +1,10 @@
 import { ArrowRight, Bell, BookOpen, Globe, Home, Moon, Pin, Settings, Sun } from "lucide-react";
 import { NavLink, Outlet } from "react-router-dom";
 
+import { SideRailAd } from "@/components/ads/SideRailAd";
 import { appEnvironment } from "@/config/environment";
 import { useOperationsNotices } from "@/hooks/useOperationsNotices";
+import { useAdVisibility } from "@/hooks/useAdVisibility";
 import { UserBadge } from "@/components/UserBadge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -31,6 +33,7 @@ export default function AppShell({ profile, onOpenProfile }: AppShellProps) {
   const isDarkMode = resolvedTheme === "dark";
   const ThemeIcon = isDarkMode ? Sun : Moon;
   const themeToggleLabel = isDarkMode ? "라이트 모드로 전환" : "다크 모드로 전환";
+  const { showLeftRail, showRightRail } = useAdVisibility();
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -134,8 +137,16 @@ export default function AppShell({ profile, onOpenProfile }: AppShellProps) {
         </div>
       )}
 
-      <main className="mx-auto flex w-full max-w-6xl flex-1 px-4 py-8 lg:py-10">
-        <Outlet />
+      <main className="mx-auto flex w-full max-w-[104rem] gap-6 px-4 py-8 lg:py-10 xl:px-6">
+        <SideRailAd placement="left" visible={showLeftRail} />
+
+        <div className="min-w-0 flex-1">
+          <div className="mx-auto flex w-full max-w-6xl flex-1">
+            <Outlet />
+          </div>
+        </div>
+
+        <SideRailAd placement="right" visible={showRightRail} />
       </main>
     </div>
   );

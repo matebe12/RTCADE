@@ -341,6 +341,7 @@ const MAME_THUMBNAIL_NAMES: Record<string, string> = {
   slapfght: "Slap Fight (set 1)",
   slammast: "Saturday Night Slam Masters (World 930713)",
   snowbros: "Snow Bros. - Nick _ Tom (set 1)",
+  snowbros2: "Snow Bros. - Nick _ Tom (set 1)",
   socbrawl: "Soccer Brawl",
   solomon: "Solomon's Key (US)",
   sonicwi2: "Aero Fighters 2 _ Sonic Wings 2",
