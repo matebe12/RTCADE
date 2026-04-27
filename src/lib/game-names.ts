@@ -331,6 +331,7 @@ const MAME_NAMES: Record<string, string> = {
   glass: "글래스",
   glfgreat: "골프잉 그레이트",
   gng: "마계촌",
+  goalx3: "골! 골! 골!",
   goldnaxe: "골든 액스",
   goldnax2: "골든 액스: 죽음의 결투",
   goldnax3: "골든 액스 3",

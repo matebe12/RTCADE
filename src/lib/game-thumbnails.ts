@@ -155,6 +155,7 @@ const MAME_THUMBNAIL_NAMES: Record<string, string> = {
   galaxyfg: "Galaxy Fight - Universal Warriors",
   ghouls: "Ghouls'n Ghosts (World)",
   gng: "Ghosts'n Goblins (World)",
+  goalx3: "Goal! Goal! Goal!",
   goldnaxe: "Golden Axe (set 6, US) (8751 317-123A)",
   gokuparo: "Gokujou Parodius - Kako no Eikuu wo Motomete (ver JAD)",
   gowcaizr: "Voltage Fighter - Gowcaizer _ Choujin Gakuen Gowcaizer",

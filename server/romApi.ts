@@ -2,7 +2,7 @@ import express, { type Express } from "express";
 import fs from "fs";
 import path from "path";
 
-const BIOS_FILES = new Set(["neogeo.zip", "pgm.zip", "skns.zip", "decocass.zip", "neocdz.zip"]);
+const BIOS_FILES = new Set(["neogeo.zip", "pgm.zip", "skns.zip", "decocass.zip", "neocdz.zip", "stvbios.zip"]);
 const CORE_CATALOG_FILE_NAME = ".rtcade-roms.json";
 
 const VALID_CORES = new Set([
