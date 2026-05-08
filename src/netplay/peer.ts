@@ -137,8 +137,8 @@ const STATE_BUFFER_THRESHOLD = 512 * 1024;
 const DEFAULT_REMOTE_HELD_MASK = 0;
 const REPAIR_SYNC_INTERVAL_MS = 120;
 const REPAIR_SYNC_ZERO_FLUSH_COUNT = 3;
-const VIDEO_STREAM_MAX_BITRATE = 4_000_000;
-const VIDEO_STREAM_MAX_FRAMERATE = 45;
+const VIDEO_STREAM_MAX_BITRATE = 2_000_000;
+const VIDEO_STREAM_MAX_FRAMERATE = 40;
 const VIDEO_STREAM_SCALE_DOWN = 2.0;
 const VIDEO_STREAM_PLAYOUT_DELAY_SEC = 0.03;
 const GAMEPLAY_DISCONNECT_GRACE_MS = 4_000;
@@ -398,7 +398,9 @@ export class NetplayPeer {
 
     if (!this.pc) {
       if (this._connectionMode === "host" && this._sessionStarted) {
-        console.log("[PEER] startVideoStreaming: stream ready before main peer offer; starting host connection");
+        console.log(
+          "[PEER] startVideoStreaming: stream ready before main peer offer; starting host connection",
+        );
         void this.startAsHost();
       } else {
         console.warn("[PEER] startVideoStreaming: no peer connection");
@@ -517,9 +519,7 @@ export class NetplayPeer {
     }
 
     this._disconnectReason = reason;
-    console.warn(
-      `[PEER] scheduling disconnect in ${GAMEPLAY_DISCONNECT_GRACE_MS}ms (${reason})`,
-    );
+    console.warn(`[PEER] scheduling disconnect in ${GAMEPLAY_DISCONNECT_GRACE_MS}ms (${reason})`);
 
     this._disconnectTimer = setTimeout(() => {
       this._disconnectTimer = null;
@@ -605,7 +605,9 @@ export class NetplayPeer {
               this.createSpectatorConnection(spectator);
             }
           } else {
-            console.log("[PEER] room-session-started: waiting for host stream before creating main offer");
+            console.log(
+              "[PEER] room-session-started: waiting for host stream before creating main offer",
+            );
           }
         }
 
