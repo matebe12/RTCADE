@@ -79,7 +79,7 @@ const EJS_HIDE_BUTTONS_CSS = [
 
 // Temporary safety switch while diagnosing host startup aborts.
 const HOST_AUDIO_CAPTURE_ENABLED = false;
-const HOST_STREAM_CAPTURE_FPS = 45;
+const HOST_STREAM_CAPTURE_FPS = 60;
 
 /**
  * Install an AudioContext monkey-patch BEFORE EmulatorJS loads.
@@ -357,6 +357,7 @@ const EmulatorPlayer = forwardRef<HTMLDivElement, EmulatorPlayerProps>(function 
   const scriptRef = useRef<HTMLScriptElement | null>(null);
   const styleRef = useRef<HTMLStyleElement | null>(null);
   const streamReadyFiredRef = useRef(false);
+  const pressedButtonsRef = useRef(new Set<number>());
   const gameRunningRef = useRef(false);
   const readyHandshakeCompleteRef = useRef(false);
   const isNetplay = role === "host" || role === "guest";
@@ -509,9 +510,7 @@ const EmulatorPlayer = forwardRef<HTMLDivElement, EmulatorPlayerProps>(function 
         if (aborted) return;
         if (readyHandshakeCompleteRef.current) return;
 
-        const ejs = win.EJS_emulator as
-          | { gameManager?: unknown }
-          | undefined;
+        const ejs = win.EJS_emulator as { gameManager?: unknown } | undefined;
         if (!ejs) return;
 
         console.log("[EMULATOR] EJS_onGameStart fired (netplay), waiting for host ready gate...");
@@ -523,9 +522,7 @@ const EmulatorPlayer = forwardRef<HTMLDivElement, EmulatorPlayerProps>(function 
 
           attempt++;
           console.log("[EMULATOR] Ready attempt", attempt);
-          const ejsInner = win.EJS_emulator as
-            | { gameManager?: unknown }
-            | undefined;
+          const ejsInner = win.EJS_emulator as { gameManager?: unknown } | undefined;
           if (ejsInner?.gameManager) {
             console.log("[EMULATOR] gameManager detected, netplay host ready");
             readyHandshakeCompleteRef.current = true;
@@ -657,6 +654,7 @@ const EmulatorPlayer = forwardRef<HTMLDivElement, EmulatorPlayerProps>(function 
 
       // Reset game-running flag
       (window as unknown as Record<string, unknown>).__rtcade_game_running = false;
+      pressedButtonsRef.current.clear();
       gameRunningRef.current = false;
       readyHandshakeCompleteRef.current = false;
     }
@@ -675,6 +673,24 @@ const EmulatorPlayer = forwardRef<HTMLDivElement, EmulatorPlayerProps>(function 
     // handler (which does the actual simulateInput call).
     let windowKeyDown: ((e: KeyboardEvent) => void) | null = null;
     let windowKeyUp: ((e: KeyboardEvent) => void) | null = null;
+
+    const releasePressedButtons = () => {
+      if (pressedButtonsRef.current.size === 0) return;
+
+      const pressedButtons = Array.from(pressedButtonsRef.current);
+      pressedButtonsRef.current.clear();
+
+      const ejs = (window as unknown as Record<string, unknown>).EJS_emulator as
+        | { gameManager?: { simulateInput: (p: number, b: number, v: number) => void } }
+        | undefined;
+
+      for (const btn of pressedButtons) {
+        ejs?.gameManager?.simulateInput(localPlayer, btn, 0);
+        if (isNetplay) {
+          onLocalInput?.(btn, false);
+        }
+      }
+    };
 
     if (isNetplay) {
       windowKeyDown = (e: KeyboardEvent) => {
@@ -702,6 +718,9 @@ const EmulatorPlayer = forwardRef<HTMLDivElement, EmulatorPlayerProps>(function 
         e.preventDefault();
 
         if (!(window as unknown as Record<string, unknown>).__rtcade_game_running) return;
+        if (e.repeat || pressedButtonsRef.current.has(btn)) return;
+
+        pressedButtonsRef.current.add(btn);
         const ejs = (window as unknown as Record<string, unknown>).EJS_emulator as
           | { gameManager?: { simulateInput: (p: number, b: number, v: number) => void } }
           | undefined;
@@ -716,6 +735,9 @@ const EmulatorPlayer = forwardRef<HTMLDivElement, EmulatorPlayerProps>(function 
         e.preventDefault();
 
         if (!(window as unknown as Record<string, unknown>).__rtcade_game_running) return;
+        if (!pressedButtonsRef.current.has(btn)) return;
+
+        pressedButtonsRef.current.delete(btn);
         const ejs = (window as unknown as Record<string, unknown>).EJS_emulator as
           | { gameManager?: { simulateInput: (p: number, b: number, v: number) => void } }
           | undefined;
@@ -733,6 +755,9 @@ const EmulatorPlayer = forwardRef<HTMLDivElement, EmulatorPlayerProps>(function 
         if (btn === undefined) return;
         e.stopImmediatePropagation();
         e.preventDefault();
+        if (e.repeat || pressedButtonsRef.current.has(btn)) return;
+
+        pressedButtonsRef.current.add(btn);
         const ejs = (window as unknown as Record<string, unknown>).EJS_emulator as
           | { gameManager?: { simulateInput: (p: number, b: number, v: number) => void } }
           | undefined;
@@ -744,6 +769,9 @@ const EmulatorPlayer = forwardRef<HTMLDivElement, EmulatorPlayerProps>(function 
         if (btn === undefined) return;
         e.stopImmediatePropagation();
         e.preventDefault();
+        if (!pressedButtonsRef.current.has(btn)) return;
+
+        pressedButtonsRef.current.delete(btn);
         const ejs = (window as unknown as Record<string, unknown>).EJS_emulator as
           | { gameManager?: { simulateInput: (p: number, b: number, v: number) => void } }
           | undefined;
@@ -753,11 +781,15 @@ const EmulatorPlayer = forwardRef<HTMLDivElement, EmulatorPlayerProps>(function 
       window.addEventListener("keyup", windowKeyUp, true);
     }
 
+    window.addEventListener("blur", releasePressedButtons);
+
     return () => {
+      releasePressedButtons();
       container.removeEventListener("keydown", handleKeyDown, true);
       container.removeEventListener("keyup", handleKeyUp, true);
       if (windowKeyDown) window.removeEventListener("keydown", windowKeyDown, true);
       if (windowKeyUp) window.removeEventListener("keyup", windowKeyUp, true);
+      window.removeEventListener("blur", releasePressedButtons);
     };
   }, [handleKeyDown, handleKeyUp, isNetplay, localPlayer, onChatShortcut, onLocalInput]);
 

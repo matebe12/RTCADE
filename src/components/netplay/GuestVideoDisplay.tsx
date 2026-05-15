@@ -1,6 +1,7 @@
 import { useEffect, useRef, forwardRef, useImperativeHandle, useState, useCallback } from "react";
 
 import { Loader2, WifiOff, Volume2, VolumeX } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { DisconnectSeverity } from "../../../shared/emulator-protocol";
 
@@ -21,6 +22,11 @@ const KEY_TO_BUTTON: Record<string, number> = {
   Digit5: 2,
   KeyQ: 10,
   KeyE: 11,
+};
+
+type PlaybackStats = {
+  droppedFrames: number | null;
+  fps: number | null;
 };
 
 interface GuestVideoDisplayProps {
@@ -53,10 +59,15 @@ const GuestVideoDisplay = forwardRef<HTMLDivElement, GuestVideoDisplayProps>(
   ) {
     const containerRef = useRef<HTMLDivElement>(null);
     const videoRef = useRef<HTMLVideoElement>(null);
+    const pressedButtonsRef = useRef(new Set<number>());
     const [isMuted, setIsMuted] = useState(true); // Start muted for autoplay policy
     const [playbackState, setPlaybackState] = useState<
       "waiting-stream" | "waiting-playback" | "playing" | "stalled"
     >("waiting-stream");
+    const [playbackStats, setPlaybackStats] = useState<PlaybackStats>({
+      droppedFrames: null,
+      fps: null,
+    });
 
     useImperativeHandle(ref, () => containerRef.current!, []);
 
@@ -80,6 +91,7 @@ const GuestVideoDisplay = forwardRef<HTMLDivElement, GuestVideoDisplayProps>(
       if (!videoStream) {
         video.srcObject = null;
         setPlaybackState("waiting-stream");
+        setPlaybackStats({ droppedFrames: null, fps: null });
         return undefined;
       }
 
@@ -122,12 +134,104 @@ const GuestVideoDisplay = forwardRef<HTMLDivElement, GuestVideoDisplayProps>(
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [videoStream]); // intentionally not including isMuted to avoid re-attaching
 
+    useEffect(() => {
+      const video = videoRef.current;
+      if (!videoStream || !video) {
+        setPlaybackStats({ droppedFrames: null, fps: null });
+        return undefined;
+      }
+
+      let cancelled = false;
+      let lastFrames: number | null = null;
+      let lastSampleAt = performance.now();
+
+      const readVideoQuality = () => {
+        if ("getVideoPlaybackQuality" in video) {
+          return video.getVideoPlaybackQuality();
+        }
+
+        return null;
+      };
+
+      const publishStats = (frames: number | null, droppedFrames: number | null) => {
+        const now = performance.now();
+
+        if (frames === null) {
+          setPlaybackStats({ droppedFrames, fps: null });
+          return;
+        }
+
+        if (lastFrames === null) {
+          lastFrames = frames;
+          lastSampleAt = now;
+          setPlaybackStats({ droppedFrames, fps: null });
+          return;
+        }
+
+        const elapsedMs = now - lastSampleAt;
+
+        if (elapsedMs < 900) {
+          return;
+        }
+
+        const fps = Math.max(0, Math.round(((frames - lastFrames) * 1000) / elapsedMs));
+        lastFrames = frames;
+        lastSampleAt = now;
+        setPlaybackStats({ droppedFrames, fps });
+      };
+
+      if ("requestVideoFrameCallback" in video && "cancelVideoFrameCallback" in video) {
+        let frameCallbackId: number | null = null;
+
+        const handleFrame: VideoFrameRequestCallback = (_now, metadata) => {
+          if (cancelled) return;
+
+          const quality = readVideoQuality();
+          publishStats(
+            quality?.totalVideoFrames ?? metadata.presentedFrames,
+            quality?.droppedVideoFrames ?? null,
+          );
+          frameCallbackId = video.requestVideoFrameCallback(handleFrame);
+        };
+
+        frameCallbackId = video.requestVideoFrameCallback(handleFrame);
+
+        return () => {
+          cancelled = true;
+          if (frameCallbackId !== null) {
+            video.cancelVideoFrameCallback(frameCallbackId);
+          }
+        };
+      }
+
+      const interval = setInterval(() => {
+        const quality = readVideoQuality();
+        publishStats(quality?.totalVideoFrames ?? null, quality?.droppedVideoFrames ?? null);
+      }, 1000);
+
+      return () => {
+        cancelled = true;
+        clearInterval(interval);
+      };
+    }, [videoStream]);
+
     // Keyboard input capture
     useEffect(() => {
       if (!captureInput) return undefined;
 
       const container = containerRef.current;
       if (!container) return undefined;
+
+      const releasePressedButtons = () => {
+        if (pressedButtonsRef.current.size === 0) return;
+
+        const pressedButtons = Array.from(pressedButtonsRef.current);
+        pressedButtonsRef.current.clear();
+
+        for (const btn of pressedButtons) {
+          onLocalInput?.(btn, false);
+        }
+      };
 
       const handleKeyDown = (e: KeyboardEvent) => {
         // Chat shortcut (Enter)
@@ -149,6 +253,12 @@ const GuestVideoDisplay = forwardRef<HTMLDivElement, GuestVideoDisplayProps>(
         if (btn !== undefined) {
           e.stopImmediatePropagation();
           e.preventDefault();
+
+          if (e.repeat || pressedButtonsRef.current.has(btn)) {
+            return;
+          }
+
+          pressedButtonsRef.current.add(btn);
           onLocalInput?.(btn, true);
         }
       };
@@ -158,16 +268,25 @@ const GuestVideoDisplay = forwardRef<HTMLDivElement, GuestVideoDisplayProps>(
         if (btn !== undefined) {
           e.stopImmediatePropagation();
           e.preventDefault();
+
+          if (!pressedButtonsRef.current.has(btn)) {
+            return;
+          }
+
+          pressedButtonsRef.current.delete(btn);
           onLocalInput?.(btn, false);
         }
       };
 
       container.addEventListener("keydown", handleKeyDown, true);
       container.addEventListener("keyup", handleKeyUp, true);
+      window.addEventListener("blur", releasePressedButtons);
 
       return () => {
+        releasePressedButtons();
         container.removeEventListener("keydown", handleKeyDown, true);
         container.removeEventListener("keyup", handleKeyUp, true);
+        window.removeEventListener("blur", releasePressedButtons);
       };
     }, [captureInput, onLocalInput, onChatShortcut]);
 
@@ -187,7 +306,7 @@ const GuestVideoDisplay = forwardRef<HTMLDivElement, GuestVideoDisplayProps>(
       <div
         ref={containerRef}
         tabIndex={0}
-        className="relative w-full aspect-[4/3] bg-neutral-900 rounded-lg overflow-hidden outline-none focus:ring-2 focus:ring-primary/60"
+        className="relative aspect-4/3 w-full overflow-hidden rounded-lg bg-neutral-900 outline-none focus:ring-2 focus:ring-primary/60"
         onContextMenu={(e) => e.preventDefault()}
       >
         <video ref={videoRef} autoPlay playsInline className="h-full w-full object-contain" />
@@ -210,6 +329,18 @@ const GuestVideoDisplay = forwardRef<HTMLDivElement, GuestVideoDisplayProps>(
             >
               {isMuted ? <VolumeX className="size-4" /> : <Volume2 className="size-4" />}
             </Button>
+          </div>
+        )}
+
+        {videoStream && playbackState === "playing" && playbackStats.fps !== null && (
+          <div className="absolute bottom-3 left-3 z-10">
+            <Badge
+              variant="outline"
+              className="border-border/60 bg-black/60 text-[10px] text-white tabular-nums backdrop-blur-sm"
+              title={`재생 FPS ${playbackStats.fps}${playbackStats.droppedFrames === null ? "" : ` / 드롭 ${playbackStats.droppedFrames}`}`}
+            >
+              재생 {playbackStats.fps}fps
+            </Badge>
           </div>
         )}
 
