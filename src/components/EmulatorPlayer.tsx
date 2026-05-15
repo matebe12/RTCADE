@@ -1,4 +1,4 @@
-import { useEffect, useRef, forwardRef, useImperativeHandle, useCallback } from "react";
+import { useEffect, useRef, forwardRef, useImperativeHandle } from "react";
 
 import { appEnvironment } from "@/config/environment";
 import { createEmulatorRuntimeBridge } from "@/lib/emulator-runtime-bridge";
@@ -370,68 +370,6 @@ const EmulatorPlayer = forwardRef<HTMLDivElement, EmulatorPlayerProps>(function 
 
   useImperativeHandle(ref, () => containerRef.current!, []);
 
-  // Setup keyboard handler for netplay input capture
-  const handleKeyDown = useCallback(
-    (e: KeyboardEvent) => {
-      // Chat shortcut (Enter key)
-      if (
-        isNetplay &&
-        e.code === "Enter" &&
-        !e.repeat &&
-        !e.altKey &&
-        !e.ctrlKey &&
-        !e.metaKey &&
-        !e.shiftKey
-      ) {
-        e.stopPropagation();
-        e.preventDefault();
-        onChatShortcut?.();
-        return;
-      }
-
-      const btn = KEY_TO_BUTTON[e.code];
-      if (btn === undefined) return;
-
-      if (isNetplay) {
-        e.stopPropagation();
-        e.preventDefault();
-
-        // Check window-level flag set by sendStartGame / markGameRunning
-        if (!(window as unknown as Record<string, unknown>).__rtcade_game_running) return;
-
-        // Apply local input directly
-        const ejs = (window as unknown as Record<string, unknown>).EJS_emulator as
-          | { gameManager?: { simulateInput: (p: number, b: number, v: number) => void } }
-          | undefined;
-        ejs?.gameManager?.simulateInput(localPlayer, btn, 1);
-        onLocalInput?.(btn, true);
-      }
-      // Solo mode: let EmulatorJS handle it natively (don't intercept)
-    },
-    [isNetplay, localPlayer, onChatShortcut, onLocalInput],
-  );
-
-  const handleKeyUp = useCallback(
-    (e: KeyboardEvent) => {
-      const btn = KEY_TO_BUTTON[e.code];
-      if (btn === undefined) return;
-
-      if (isNetplay) {
-        e.stopPropagation();
-        e.preventDefault();
-
-        if (!(window as unknown as Record<string, unknown>).__rtcade_game_running) return;
-
-        const ejs = (window as unknown as Record<string, unknown>).EJS_emulator as
-          | { gameManager?: { simulateInput: (p: number, b: number, v: number) => void } }
-          | undefined;
-        ejs?.gameManager?.simulateInput(localPlayer, btn, 0);
-        onLocalInput?.(btn, false);
-      }
-    },
-    [isNetplay, localPlayer, onLocalInput],
-  );
-
   // Mount EmulatorJS directly in the container div
   useEffect(() => {
     const container = containerRef.current;
@@ -785,13 +723,11 @@ const EmulatorPlayer = forwardRef<HTMLDivElement, EmulatorPlayerProps>(function 
 
     return () => {
       releasePressedButtons();
-      container.removeEventListener("keydown", handleKeyDown, true);
-      container.removeEventListener("keyup", handleKeyUp, true);
       if (windowKeyDown) window.removeEventListener("keydown", windowKeyDown, true);
       if (windowKeyUp) window.removeEventListener("keyup", windowKeyUp, true);
       window.removeEventListener("blur", releasePressedButtons);
     };
-  }, [handleKeyDown, handleKeyUp, isNetplay, localPlayer, onChatShortcut, onLocalInput]);
+  }, [isNetplay, localPlayer, onChatShortcut, onLocalInput]);
 
   // HOST: capture canvas stream after emulator is ready
   // We wait for BOTH canvas AND audio to be available before firing.

@@ -63,6 +63,9 @@ export type NetplayNetworkStats = {
   videoFps: number | null;
   videoFramesDropped: number | null;
   inputRoundTripMs: number | null;
+  inputSeqGapCount: number;
+  staleInputDropCount: number;
+  staleRepairDropCount: number;
   inputBufferedBytes: number;
   controlBufferedBytes: number;
   stateBufferedBytes: number;
@@ -308,8 +311,11 @@ export class NetplayPeer {
   private _gameplayTransportState: GameplayTransportState = "closed";
   private _gameplayConnected = false;
   private _localHeldMask = 0;
-  private _resetSeqTo: number | null = null;
-  private _resetRepairSeqTo: number | null = null;
+  private _remoteExpectedInputSeq = 1;
+  private _remoteAppliedInputSeq = 0;
+  private _inputSeqGapCount = 0;
+  private _staleInputDropCount = 0;
+  private _staleRepairDropCount = 0;
   private _repairSyncTimer: ReturnType<typeof setInterval> | null = null;
   private _repairZeroFlushRemaining = 0;
   private _videoSenders: RTCRtpSender[] = [];
@@ -608,8 +614,13 @@ export class NetplayPeer {
   // --- Fire-and-forget resync ---
   /** Reset remote input sequence counter (after resync, GUEST resets) */
   resetRemoteSeq(nextExpectedSeq: number) {
-    this._resetSeqTo = nextExpectedSeq;
-    this._resetRepairSeqTo = nextExpectedSeq - 1;
+    const safeNextExpectedSeq = Number.isFinite(nextExpectedSeq)
+      ? Math.max(1, Math.floor(nextExpectedSeq))
+      : 1;
+    const appliedSeqFloor = safeNextExpectedSeq - 1;
+
+    this._remoteExpectedInputSeq = Math.max(this._remoteExpectedInputSeq, safeNextExpectedSeq);
+    this._remoteAppliedInputSeq = Math.max(this._remoteAppliedInputSeq, appliedSeqFloor);
   }
 
   sendResyncState(state: ArrayBuffer): boolean {
@@ -842,6 +853,7 @@ export class NetplayPeer {
   private setupPeerConnection(): RTCPeerConnection {
     const pc = new RTCPeerConnection(this._rtcConfig);
     this.pc = pc;
+    this.resetRemoteInputDiagnostics();
     this.startNetworkStatsPolling(pc);
 
     pc.onicecandidate = (e) => {
@@ -1086,6 +1098,9 @@ export class NetplayPeer {
             ? null
             : Math.max(0, Math.round(inboundFramesDropped)),
       inputRoundTripMs: this._lastInputRoundTripMs,
+      inputSeqGapCount: this._inputSeqGapCount,
+      staleInputDropCount: this._staleInputDropCount,
+      staleRepairDropCount: this._staleRepairDropCount,
       inputBufferedBytes: this.inputDc?.bufferedAmount ?? 0,
       controlBufferedBytes: this.controlDc?.bufferedAmount ?? 0,
       stateBufferedBytes: this.stateDc?.bufferedAmount ?? 0,
@@ -1314,8 +1329,6 @@ export class NetplayPeer {
     this.inputDc = dc;
     this.emitGameplayTransportState();
 
-    let expectedSeq = 1;
-
     dc.onopen = () => {
       this.emitGameplayTransportState();
     };
@@ -1333,19 +1346,28 @@ export class NetplayPeer {
         const msg = JSON.parse(e.data);
         if (msg.type === "input") {
           const inp = msg as InputMessage;
-          if (this._resetSeqTo !== null) {
-            expectedSeq = this._resetSeqTo;
-            this._resetSeqTo = null;
-          }
-          if (inp.seq < expectedSeq) {
-            console.log(`[PEER] ignoring stale input seq ${inp.seq} (< ${expectedSeq})`);
+          if (!Number.isFinite(inp.seq)) {
             return;
           }
-          if (inp.seq !== expectedSeq) {
-            console.warn(`[PEER] input seq gap: expected ${expectedSeq}, got ${inp.seq}`);
-            this.handler.onInputSeqGap?.(expectedSeq, inp.seq);
+
+          if (inp.seq <= this._remoteAppliedInputSeq) {
+            this._staleInputDropCount += 1;
+            console.log(
+              `[PEER] ignoring stale input seq ${inp.seq} (applied ${this._remoteAppliedInputSeq})`,
+            );
+            return;
           }
-          expectedSeq = inp.seq + 1;
+
+          if (inp.seq !== this._remoteExpectedInputSeq) {
+            this._inputSeqGapCount += 1;
+            console.warn(
+              `[PEER] input seq gap: expected ${this._remoteExpectedInputSeq}, got ${inp.seq}`,
+            );
+            this.handler.onInputSeqGap?.(this._remoteExpectedInputSeq, inp.seq);
+          }
+
+          this._remoteAppliedInputSeq = inp.seq;
+          this._remoteExpectedInputSeq = Math.max(this._remoteExpectedInputSeq, inp.seq + 1);
           this.handler.onInput(inp);
           this.sendInputAck(inp);
         }
@@ -1535,8 +1557,6 @@ export class NetplayPeer {
   private setupRepairDataChannel(dc: RTCDataChannel) {
     this.repairDc = dc;
 
-    let latestSeq = 0;
-
     dc.onopen = () => {
       this.updateRepairSyncLoop();
       this.sendRepairSync();
@@ -1560,17 +1580,17 @@ export class NetplayPeer {
         }
 
         if (msg.type !== "input-sync") return;
-
-        if (this._resetRepairSeqTo !== null) {
-          latestSeq = Math.max(latestSeq, this._resetRepairSeqTo);
-          this._resetRepairSeqTo = null;
-        }
-
-        if (msg.seq < latestSeq) {
+        if (!Number.isFinite(msg.seq)) {
           return;
         }
 
-        latestSeq = Math.max(latestSeq, msg.seq);
+        if (msg.seq <= this._remoteAppliedInputSeq) {
+          this._staleRepairDropCount += 1;
+          return;
+        }
+
+        this._remoteAppliedInputSeq = msg.seq;
+        this._remoteExpectedInputSeq = Math.max(this._remoteExpectedInputSeq, msg.seq + 1);
         this.handler.onRemoteHeldMask?.(msg.heldMask);
       } catch {
         /* ignore */
@@ -2105,6 +2125,14 @@ export class NetplayPeer {
       this._repairSyncTimer = null;
     }
     this._repairZeroFlushRemaining = 0;
+  }
+
+  private resetRemoteInputDiagnostics() {
+    this._remoteExpectedInputSeq = 1;
+    this._remoteAppliedInputSeq = 0;
+    this._inputSeqGapCount = 0;
+    this._staleInputDropCount = 0;
+    this._staleRepairDropCount = 0;
   }
 }
 

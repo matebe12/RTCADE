@@ -56,6 +56,9 @@ function getTitle(stats: NetplayNetworkStats | null) {
     `가용 ${formatKbps(stats.availableOutgoingBitrateKbps)}`,
     `FPS ${formatFps(stats.videoFps)}`,
     `입력 ${formatMs(stats.inputRoundTripMs)}`,
+    `입력gap ${stats.inputSeqGapCount}`,
+    `stale입력 ${stats.staleInputDropCount}`,
+    `stale보정 ${stats.staleRepairDropCount}`,
     `경로 ${stats.localCandidateType}->${stats.remoteCandidateType}`,
     `입력버퍼 ${stats.inputBufferedBytes}B`,
   ].join(" / ");
@@ -95,6 +98,10 @@ export default function NetplayNetworkStatsBadge({
           {!compact && <span>{formatFps(stats.videoFps)}</span>}
           {!compact && stats.inputRoundTripMs !== null && (
             <span>입력 {formatMs(stats.inputRoundTripMs)}</span>
+          )}
+          {!compact && stats.inputSeqGapCount > 0 && <span>gap {stats.inputSeqGapCount}</span>}
+          {!compact && stats.staleRepairDropCount > 0 && (
+            <span>보정drop {stats.staleRepairDropCount}</span>
           )}
         </>
       )}
