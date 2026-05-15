@@ -12,6 +12,7 @@ export type InputMessage = {
   down: boolean;
   heldMask: number;
   seq: number;
+  sentAt: number;
 };
 
 export type ResyncStatePayload = {
@@ -39,6 +40,36 @@ export type InputSyncMessage = {
   type: "input-sync";
   heldMask: number;
   seq: number;
+};
+
+type InputAckMessage = {
+  type: "input-ack";
+  seq: number;
+  sentAt: number;
+};
+
+export type NetplayNetworkQuality = "unknown" | "good" | "unstable" | "poor";
+
+export type NetplayCandidateType = "host" | "srflx" | "prflx" | "relay" | "unknown";
+
+export type NetplayNetworkStats = {
+  sampledAt: number;
+  quality: NetplayNetworkQuality;
+  rttMs: number | null;
+  jitterMs: number | null;
+  packetLossPercent: number | null;
+  availableOutgoingBitrateKbps: number | null;
+  videoBitrateKbps: number | null;
+  videoFps: number | null;
+  videoFramesDropped: number | null;
+  inputRoundTripMs: number | null;
+  inputBufferedBytes: number;
+  controlBufferedBytes: number;
+  stateBufferedBytes: number;
+  repairBufferedBytes: number;
+  chatBufferedBytes: number;
+  localCandidateType: NetplayCandidateType;
+  remoteCandidateType: NetplayCandidateType;
 };
 
 export type PeerEventHandler = {
@@ -75,6 +106,7 @@ export type PeerEventHandler = {
   onChatMessage?: (msg: ChatMessage) => void;
   onChatTyping?: (isTyping: boolean) => void;
   onVideoStream?: (stream: MediaStream) => void;
+  onNetworkStats?: (stats: NetplayNetworkStats) => void;
   onHeartbeat?: (ts: number) => void;
   onRoomLobbyUpdated?: (info: Omit<RoomLobbySnapshotMessage, "type">) => void;
   onSessionStarted?: (info: Omit<RoomSessionStartedMessage, "type">) => void;
@@ -108,6 +140,27 @@ type PendingSpectatorInfo = {
   spectatorAvatar?: string;
 };
 
+type StatsRecord = RTCStats & Record<string, unknown>;
+
+type VideoStatsDirection = "outbound" | "inbound";
+
+type VideoBitrateSample = {
+  bytes: number;
+  direction: VideoStatsDirection;
+  sampledAt: number;
+};
+
+type VideoFrameSample = {
+  direction: VideoStatsDirection;
+  frames: number;
+  sampledAt: number;
+};
+
+type PacketLossSample = {
+  packetsLost: number;
+  packetsTotal: number;
+};
+
 type PendingBinaryStream = {
   totalBytes: number;
   chunks: number;
@@ -135,17 +188,110 @@ const RESYNC_STATE_CHUNK_SIZE = 256 * 1024;
 const CHAT_BUFFER_THRESHOLD = 64 * 1024;
 const STATE_BUFFER_THRESHOLD = 512 * 1024;
 const DEFAULT_REMOTE_HELD_MASK = 0;
+const NETWORK_STATS_INTERVAL_MS = 1_000;
+const INPUT_BUFFER_UNSTABLE_THRESHOLD = 4 * 1024;
+const INPUT_BUFFER_POOR_THRESHOLD = 16 * 1024;
+const INPUT_BUFFER_SEND_THRESHOLD = 8 * 1024;
 const REPAIR_SYNC_INTERVAL_MS = 120;
 const REPAIR_SYNC_ZERO_FLUSH_COUNT = 3;
-const VIDEO_STREAM_MAX_BITRATE = 2_000_000;
-const VIDEO_STREAM_MAX_FRAMERATE = 40;
+const VIDEO_STREAM_MAX_BITRATE = 2_500_000;
+const VIDEO_STREAM_MAX_FRAMERATE = 60;
 const VIDEO_STREAM_SCALE_DOWN = 2.0;
-const VIDEO_STREAM_PLAYOUT_DELAY_SEC = 0.03;
+const VIDEO_STREAM_PLAYOUT_DELAY_SEC = 0;
 const GAMEPLAY_DISCONNECT_GRACE_MS = 4_000;
 
 const RTC_CONFIG: RTCConfiguration = {
   iceServers: [{ urls: "stun:stun.l.google.com:19302" }, { urls: "stun:stun1.l.google.com:19302" }],
 };
+
+function asStatsRecord(stats: RTCStats): StatsRecord {
+  return stats as StatsRecord;
+}
+
+function readNumber(stats: StatsRecord, key: string) {
+  const value = stats[key];
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function readString(stats: StatsRecord, key: string) {
+  const value = stats[key];
+  return typeof value === "string" && value.length > 0 ? value : null;
+}
+
+function normalizeCandidateType(value: string | null): NetplayCandidateType {
+  if (value === "host" || value === "srflx" || value === "prflx" || value === "relay") {
+    return value;
+  }
+
+  return "unknown";
+}
+
+function toRoundedMs(seconds: number | null) {
+  return seconds === null ? null : Math.max(0, Math.round(seconds * 1000));
+}
+
+function getRtpKind(stats: StatsRecord) {
+  return readString(stats, "kind") ?? readString(stats, "mediaType");
+}
+
+function getPacketLossSample(stats: StatsRecord): PacketLossSample | null {
+  const packetsLost = readNumber(stats, "packetsLost");
+  const packetsReceived = readNumber(stats, "packetsReceived");
+
+  if (packetsLost === null || packetsReceived === null) {
+    return null;
+  }
+
+  const safePacketsLost = Math.max(0, packetsLost);
+  const packetsTotal = Math.max(0, packetsReceived + safePacketsLost);
+
+  if (packetsTotal <= 0) {
+    return null;
+  }
+
+  return {
+    packetsLost: safePacketsLost,
+    packetsTotal,
+  };
+}
+
+function computeNetworkQuality(stats: Omit<NetplayNetworkStats, "quality">): NetplayNetworkQuality {
+  const hasSignal =
+    stats.rttMs !== null ||
+    stats.jitterMs !== null ||
+    stats.packetLossPercent !== null ||
+    stats.availableOutgoingBitrateKbps !== null ||
+    stats.videoBitrateKbps !== null ||
+    stats.videoFps !== null;
+
+  if (!hasSignal) {
+    return "unknown";
+  }
+
+  if (
+    (stats.rttMs !== null && stats.rttMs >= 180) ||
+    (stats.jitterMs !== null && stats.jitterMs >= 60) ||
+    (stats.packetLossPercent !== null && stats.packetLossPercent >= 3) ||
+    (stats.videoFps !== null && stats.videoFps < 20) ||
+    (stats.inputRoundTripMs !== null && stats.inputRoundTripMs >= 180) ||
+    stats.inputBufferedBytes >= INPUT_BUFFER_POOR_THRESHOLD
+  ) {
+    return "poor";
+  }
+
+  if (
+    (stats.rttMs !== null && stats.rttMs >= 100) ||
+    (stats.jitterMs !== null && stats.jitterMs >= 30) ||
+    (stats.packetLossPercent !== null && stats.packetLossPercent >= 1) ||
+    (stats.videoFps !== null && stats.videoFps < 32) ||
+    (stats.inputRoundTripMs !== null && stats.inputRoundTripMs >= 100) ||
+    stats.inputBufferedBytes >= INPUT_BUFFER_UNSTABLE_THRESHOLD
+  ) {
+    return "unstable";
+  }
+
+  return "good";
+}
 
 export class NetplayPeer {
   private signaling: SignalingClient;
@@ -179,6 +325,12 @@ export class NetplayPeer {
   private _rtcConfig: RTCConfiguration;
   private _disconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private _disconnectReason: string | null = null;
+  private _networkStatsTimer: ReturnType<typeof setInterval> | null = null;
+  private _networkStatsPolling = false;
+  private _lastVideoBitrateSample: VideoBitrateSample | null = null;
+  private _lastVideoFrameSample: VideoFrameSample | null = null;
+  private _lastPacketLossSample: PacketLossSample | null = null;
+  private _lastInputRoundTripMs: number | null = null;
 
   constructor(handler: PeerEventHandler, rtcConfig: RTCConfiguration = RTC_CONFIG) {
     this.handler = handler;
@@ -263,20 +415,38 @@ export class NetplayPeer {
   private _inputSeq = 0;
 
   sendInput(button: number, down: boolean) {
-    if (this.inputDc?.readyState === "open") {
-      this._localHeldMask = updateHeldMask(this._localHeldMask, button, down);
-      this.inputDc.send(
-        JSON.stringify({
-          type: "input",
-          button,
-          down,
-          heldMask: this._localHeldMask,
-          seq: ++this._inputSeq,
-        }),
-      );
-      this.sendRepairSync();
+    const nextHeldMask = updateHeldMask(this._localHeldMask, button, down);
+
+    if (nextHeldMask === this._localHeldMask) {
       this.updateRepairSyncLoop();
+      return;
     }
+
+    this._localHeldMask = nextHeldMask;
+    const seq = ++this._inputSeq;
+    const sentAt = performance.now();
+
+    if (this.inputDc?.readyState === "open") {
+      if (this.inputDc.bufferedAmount <= INPUT_BUFFER_SEND_THRESHOLD) {
+        this.inputDc.send(
+          JSON.stringify({
+            type: "input",
+            button,
+            down,
+            heldMask: this._localHeldMask,
+            seq,
+            sentAt,
+          }),
+        );
+      } else {
+        console.warn(
+          `[PEER] sendInput skipped due to backpressure, buffered=${this.inputDc.bufferedAmount}`,
+        );
+      }
+    }
+
+    this.sendRepairSync();
+    this.updateRepairSyncLoop();
   }
 
   sendPeerReady() {
@@ -476,6 +646,7 @@ export class NetplayPeer {
   close() {
     this._closing = true;
     this.clearPendingDisconnect();
+    this.stopNetworkStatsPolling();
     this.stopRepairSyncLoop();
     this.stopVideoStreaming();
     this.inputDc?.close();
@@ -671,6 +842,7 @@ export class NetplayPeer {
   private setupPeerConnection(): RTCPeerConnection {
     const pc = new RTCPeerConnection(this._rtcConfig);
     this.pc = pc;
+    this.startNetworkStatsPolling(pc);
 
     pc.onicecandidate = (e) => {
       if (e.candidate) {
@@ -741,6 +913,324 @@ export class NetplayPeer {
     };
 
     return pc;
+  }
+
+  private startNetworkStatsPolling(pc: RTCPeerConnection) {
+    this.stopNetworkStatsPolling();
+
+    const pollNetworkStats = () => {
+      if (this.pc !== pc || this._closing || this._networkStatsPolling) {
+        return;
+      }
+
+      this._networkStatsPolling = true;
+      void pc
+        .getStats()
+        .then((statsReport) => {
+          if (this.pc !== pc || this._closing) {
+            return;
+          }
+
+          this.handler.onNetworkStats?.(this.buildNetworkStats(statsReport));
+        })
+        .catch(() => {
+          /* getStats can fail while the browser is tearing down the connection. */
+        })
+        .finally(() => {
+          this._networkStatsPolling = false;
+        });
+    };
+
+    pollNetworkStats();
+    this._networkStatsTimer = setInterval(pollNetworkStats, NETWORK_STATS_INTERVAL_MS);
+  }
+
+  private stopNetworkStatsPolling() {
+    if (this._networkStatsTimer) {
+      clearInterval(this._networkStatsTimer);
+      this._networkStatsTimer = null;
+    }
+
+    this._networkStatsPolling = false;
+    this._lastVideoBitrateSample = null;
+    this._lastVideoFrameSample = null;
+    this._lastPacketLossSample = null;
+    this._lastInputRoundTripMs = null;
+  }
+
+  private buildNetworkStats(statsReport: RTCStatsReport): NetplayNetworkStats {
+    const sampledAt = Date.now();
+    const performanceSampledAt = performance.now();
+    const selectedCandidatePair = this.findSelectedCandidatePair(statsReport);
+    const rttMs = selectedCandidatePair
+      ? toRoundedMs(
+          readNumber(selectedCandidatePair, "currentRoundTripTime") ??
+            readNumber(selectedCandidatePair, "roundTripTime"),
+        )
+      : null;
+    const availableOutgoingBitrate = selectedCandidatePair
+      ? readNumber(selectedCandidatePair, "availableOutgoingBitrate")
+      : null;
+    const availableOutgoingBitrateKbps =
+      availableOutgoingBitrate === null
+        ? null
+        : Math.max(0, Math.round(availableOutgoingBitrate / 1000));
+    const localCandidateId = selectedCandidatePair
+      ? readString(selectedCandidatePair, "localCandidateId")
+      : null;
+    const remoteCandidateId = selectedCandidatePair
+      ? readString(selectedCandidatePair, "remoteCandidateId")
+      : null;
+    const localCandidateType = this.getCandidateType(statsReport, localCandidateId);
+    const remoteCandidateType = this.getCandidateType(statsReport, remoteCandidateId);
+
+    let inboundVideoBytes: number | null = null;
+    let outboundVideoBytes: number | null = null;
+    let inboundFrameCounter: number | null = null;
+    let outboundFrameCounter: number | null = null;
+    let directInboundFps: number | null = null;
+    let directOutboundFps: number | null = null;
+    let inboundFramesDropped: number | null = null;
+    let outboundFramesDropped: number | null = null;
+    let jitterMs: number | null = null;
+    let packetLossSample: PacketLossSample | null = null;
+    let fallbackPacketLossPercent: number | null = null;
+    let remoteInboundRttMs: number | null = null;
+
+    statsReport.forEach((statsValue) => {
+      const stats = asStatsRecord(statsValue);
+      const kind = getRtpKind(stats);
+
+      if (kind !== "video") {
+        return;
+      }
+
+      if (stats.type === "outbound-rtp") {
+        outboundVideoBytes = readNumber(stats, "bytesSent") ?? outboundVideoBytes;
+        outboundFrameCounter =
+          readNumber(stats, "framesEncoded") ??
+          readNumber(stats, "framesSent") ??
+          outboundFrameCounter;
+        directOutboundFps = readNumber(stats, "framesPerSecond") ?? directOutboundFps;
+        outboundFramesDropped = readNumber(stats, "framesDropped") ?? outboundFramesDropped;
+        return;
+      }
+
+      if (stats.type === "inbound-rtp") {
+        inboundVideoBytes = readNumber(stats, "bytesReceived") ?? inboundVideoBytes;
+        inboundFrameCounter = readNumber(stats, "framesDecoded") ?? inboundFrameCounter;
+        directInboundFps = readNumber(stats, "framesPerSecond") ?? directInboundFps;
+        inboundFramesDropped = readNumber(stats, "framesDropped") ?? inboundFramesDropped;
+        jitterMs = toRoundedMs(readNumber(stats, "jitter")) ?? jitterMs;
+      }
+
+      if (stats.type === "inbound-rtp" || stats.type === "remote-inbound-rtp") {
+        const nextPacketLossSample = getPacketLossSample(stats);
+
+        if (
+          nextPacketLossSample &&
+          (!packetLossSample || nextPacketLossSample.packetsTotal > packetLossSample.packetsTotal)
+        ) {
+          packetLossSample = nextPacketLossSample;
+        }
+
+        const fractionLost = readNumber(stats, "fractionLost");
+        if (fractionLost !== null) {
+          const normalizedLossPercent = fractionLost <= 1 ? fractionLost * 100 : fractionLost;
+          fallbackPacketLossPercent = Math.max(
+            fallbackPacketLossPercent ?? 0,
+            normalizedLossPercent,
+          );
+        }
+      }
+
+      if (stats.type === "remote-inbound-rtp") {
+        remoteInboundRttMs = toRoundedMs(readNumber(stats, "roundTripTime")) ?? remoteInboundRttMs;
+      }
+    });
+
+    const videoDirection: VideoStatsDirection | null =
+      outboundVideoBytes !== null ? "outbound" : inboundVideoBytes !== null ? "inbound" : null;
+    const videoBytes = videoDirection === "outbound" ? outboundVideoBytes : inboundVideoBytes;
+    const videoFrameDirection: VideoStatsDirection | null =
+      outboundFrameCounter !== null ? "outbound" : inboundFrameCounter !== null ? "inbound" : null;
+    const videoFrameCounter =
+      videoFrameDirection === "outbound" ? outboundFrameCounter : inboundFrameCounter;
+    const directVideoFps = directOutboundFps ?? directInboundFps;
+
+    const statsDraft: Omit<NetplayNetworkStats, "quality"> = {
+      sampledAt,
+      rttMs: rttMs ?? remoteInboundRttMs,
+      jitterMs,
+      packetLossPercent: this.updatePacketLossPercent(packetLossSample, fallbackPacketLossPercent),
+      availableOutgoingBitrateKbps,
+      videoBitrateKbps:
+        videoDirection && videoBytes !== null
+          ? this.updateVideoBitrateKbps(videoDirection, videoBytes, performanceSampledAt)
+          : null,
+      videoFps:
+        videoFrameDirection !== null
+          ? this.updateVideoFps(
+              videoFrameDirection,
+              videoFrameCounter,
+              directVideoFps,
+              performanceSampledAt,
+            )
+          : directVideoFps === null
+            ? null
+            : Math.max(0, Math.round(directVideoFps)),
+      videoFramesDropped:
+        outboundFramesDropped !== null
+          ? Math.max(0, Math.round(outboundFramesDropped))
+          : inboundFramesDropped === null
+            ? null
+            : Math.max(0, Math.round(inboundFramesDropped)),
+      inputRoundTripMs: this._lastInputRoundTripMs,
+      inputBufferedBytes: this.inputDc?.bufferedAmount ?? 0,
+      controlBufferedBytes: this.controlDc?.bufferedAmount ?? 0,
+      stateBufferedBytes: this.stateDc?.bufferedAmount ?? 0,
+      repairBufferedBytes: this.repairDc?.bufferedAmount ?? 0,
+      chatBufferedBytes: this.chatDc?.bufferedAmount ?? 0,
+      localCandidateType,
+      remoteCandidateType,
+    };
+
+    return {
+      ...statsDraft,
+      quality: computeNetworkQuality(statsDraft),
+    };
+  }
+
+  private findSelectedCandidatePair(statsReport: RTCStatsReport): StatsRecord | null {
+    let selectedCandidatePair: StatsRecord | null = null;
+
+    statsReport.forEach((statsValue) => {
+      const stats = asStatsRecord(statsValue);
+
+      if (stats.type === "transport") {
+        const selectedCandidatePairId = readString(stats, "selectedCandidatePairId");
+        const candidatePair = selectedCandidatePairId
+          ? statsReport.get(selectedCandidatePairId)
+          : undefined;
+
+        if (candidatePair) {
+          selectedCandidatePair = asStatsRecord(candidatePair);
+        }
+      }
+
+      if (stats.type !== "candidate-pair") {
+        return;
+      }
+
+      const state = readString(stats, "state");
+      const selected = stats.selected === true;
+      const nominated = stats.nominated === true && state === "succeeded";
+
+      if (selected || nominated) {
+        selectedCandidatePair = stats;
+      }
+    });
+
+    return selectedCandidatePair;
+  }
+
+  private getCandidateType(
+    statsReport: RTCStatsReport,
+    candidateId: string | null,
+  ): NetplayCandidateType {
+    if (!candidateId) {
+      return "unknown";
+    }
+
+    const candidate = statsReport.get(candidateId);
+
+    if (!candidate) {
+      return "unknown";
+    }
+
+    return normalizeCandidateType(readString(asStatsRecord(candidate), "candidateType"));
+  }
+
+  private updateVideoBitrateKbps(direction: VideoStatsDirection, bytes: number, sampledAt: number) {
+    const previousSample = this._lastVideoBitrateSample;
+    this._lastVideoBitrateSample = { bytes, direction, sampledAt };
+
+    if (!previousSample || previousSample.direction !== direction || bytes < previousSample.bytes) {
+      return null;
+    }
+
+    const elapsedSeconds = (sampledAt - previousSample.sampledAt) / 1000;
+
+    if (elapsedSeconds <= 0) {
+      return null;
+    }
+
+    return Math.max(0, Math.round(((bytes - previousSample.bytes) * 8) / elapsedSeconds / 1000));
+  }
+
+  private updateVideoFps(
+    direction: VideoStatsDirection,
+    frameCounter: number | null,
+    directFps: number | null,
+    sampledAt: number,
+  ) {
+    if (directFps !== null) {
+      return Math.max(0, Math.round(directFps));
+    }
+
+    if (frameCounter === null) {
+      return null;
+    }
+
+    const previousSample = this._lastVideoFrameSample;
+    this._lastVideoFrameSample = { direction, frames: frameCounter, sampledAt };
+
+    if (
+      !previousSample ||
+      previousSample.direction !== direction ||
+      frameCounter < previousSample.frames
+    ) {
+      return null;
+    }
+
+    const elapsedSeconds = (sampledAt - previousSample.sampledAt) / 1000;
+
+    if (elapsedSeconds <= 0) {
+      return null;
+    }
+
+    return Math.max(0, Math.round((frameCounter - previousSample.frames) / elapsedSeconds));
+  }
+
+  private updatePacketLossPercent(
+    packetLossSample: PacketLossSample | null,
+    fallbackPacketLossPercent: number | null,
+  ) {
+    if (!packetLossSample) {
+      return fallbackPacketLossPercent === null
+        ? null
+        : Math.min(100, Math.max(0, fallbackPacketLossPercent));
+    }
+
+    const previousSample = this._lastPacketLossSample;
+    this._lastPacketLossSample = packetLossSample;
+
+    if (previousSample && packetLossSample.packetsTotal > previousSample.packetsTotal) {
+      const deltaPacketsTotal = packetLossSample.packetsTotal - previousSample.packetsTotal;
+      const deltaPacketsLost = Math.max(
+        0,
+        packetLossSample.packetsLost - previousSample.packetsLost,
+      );
+
+      if (deltaPacketsTotal > 0) {
+        return Math.min(100, Math.max(0, (deltaPacketsLost / deltaPacketsTotal) * 100));
+      }
+    }
+
+    return Math.min(
+      100,
+      Math.max(0, (packetLossSample.packetsLost / packetLossSample.packetsTotal) * 100),
+    );
   }
 
   private emitGameplayTransportState() {
@@ -857,6 +1347,7 @@ export class NetplayPeer {
           }
           expectedSeq = inp.seq + 1;
           this.handler.onInput(inp);
+          this.sendInputAck(inp);
         }
       } catch {
         /* ignore */
@@ -1059,7 +1550,15 @@ export class NetplayPeer {
       if (typeof e.data !== "string") return;
 
       try {
-        const msg = JSON.parse(e.data) as InputSyncMessage;
+        const msg = JSON.parse(e.data) as InputSyncMessage | InputAckMessage;
+
+        if (msg.type === "input-ack") {
+          if (Number.isFinite(msg.sentAt)) {
+            this._lastInputRoundTripMs = Math.max(0, Math.round(performance.now() - msg.sentAt));
+          }
+          return;
+        }
+
         if (msg.type !== "input-sync") return;
 
         if (this._resetRepairSeqTo !== null) {
@@ -1077,6 +1576,19 @@ export class NetplayPeer {
         /* ignore */
       }
     };
+  }
+
+  private sendInputAck(input: InputMessage) {
+    if (this.repairDc?.readyState !== "open") return;
+    if (!Number.isFinite(input.sentAt)) return;
+
+    const message: InputAckMessage = {
+      type: "input-ack",
+      seq: input.seq,
+      sentAt: input.sentAt,
+    };
+
+    this.repairDc.send(JSON.stringify(message));
   }
 
   private setupChatDataChannel(dc: RTCDataChannel) {
@@ -1501,9 +2013,15 @@ export class NetplayPeer {
         const params = sender.getParameters();
         const encodings = params.encodings && params.encodings.length > 0 ? params.encodings : [{}];
         params.encodings = encodings;
-        params.encodings[0].maxBitrate = VIDEO_STREAM_MAX_BITRATE;
-        params.encodings[0].maxFramerate = VIDEO_STREAM_MAX_FRAMERATE;
-        params.encodings[0].scaleResolutionDownBy = VIDEO_STREAM_SCALE_DOWN;
+        const encoding = params.encodings[0] as RTCRtpEncodingParameters & {
+          networkPriority?: "high";
+          priority?: "high";
+        };
+        encoding.maxBitrate = VIDEO_STREAM_MAX_BITRATE;
+        encoding.maxFramerate = VIDEO_STREAM_MAX_FRAMERATE;
+        encoding.scaleResolutionDownBy = VIDEO_STREAM_SCALE_DOWN;
+        encoding.priority = "high";
+        encoding.networkPriority = "high";
         params.degradationPreference = "maintain-framerate";
         void sender.setParameters(params).catch(() => undefined);
       } catch {
