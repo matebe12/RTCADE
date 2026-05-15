@@ -4,7 +4,12 @@ import type { SystemCore } from "@/components/EmulatorPlayer";
 import type { NetplayChatMessage } from "@/components/NetplayChatPanel";
 import { createEmulatorRuntimeBridge } from "@/lib/emulator-runtime-bridge";
 import { type RecentGame, type RecentOpponent } from "@/lib/user-profile";
-import { NetplayPeer, type InputMessage, type ResyncStatePayload } from "@/netplay/peer";
+import {
+  NetplayPeer,
+  type InputMessage,
+  type NetplayNetworkStats,
+  type ResyncStatePayload,
+} from "@/netplay/peer";
 import { useNetplayChatControls } from "@/netplay/useNetplayChatControls";
 import { useNetplayPeerRoomFlow } from "@/netplay/useNetplayPeerRoomFlow";
 import { useNetplaySessionHistory } from "@/netplay/useNetplaySessionHistory";
@@ -61,6 +66,7 @@ interface UseNetplaySessionOptions {
   setIsPeerTyping: (isPeerTyping: boolean) => void;
   setChatChannelState: (chatChannelState: string) => void;
   setSyncDisplay: (syncDisplay: string) => void;
+  setNetworkStats: (networkStats: NetplayNetworkStats | null) => void;
   resetChatState: () => void;
   resetSessionUiState: () => void;
   fetchRoms: () => Promise<void>;
@@ -92,6 +98,7 @@ export function useNetplaySession({
   setIsPeerTyping,
   setChatChannelState,
   setSyncDisplay,
+  setNetworkStats,
   resetChatState: resetStoredChatState,
   resetSessionUiState,
   fetchRoms,
@@ -361,6 +368,13 @@ export function useNetplaySession({
     setVideoStreamCallbackRef.current?.(stream);
   }, []);
 
+  const handleNetworkStats = useCallback(
+    (stats: NetplayNetworkStats) => {
+      setNetworkStats(stats);
+    },
+    [setNetworkStats],
+  );
+
   /** HOST: video capture is now handled automatically by EmulatorPlayer via onCanvasStreamReady.
    *  This callback just logs for debugging. */
   const handleStartVideoCapture = useCallback(() => {
@@ -487,6 +501,7 @@ export function useNetplaySession({
     handlePeerResyncState,
     handlePeerResyncFailed,
     handleVideoStream,
+    handleNetworkStats,
     handleHeartbeat,
   });
 

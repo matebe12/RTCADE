@@ -10,6 +10,7 @@ import {
   type RecentGame,
   type RecentOpponent,
 } from "@/lib/user-profile";
+import type { NetplayNetworkStats } from "@/netplay/peer";
 import type { NetplaySessionRole } from "../../shared/emulator-protocol";
 
 const CHAT_MAX_MESSAGES = 100;
@@ -154,6 +155,7 @@ type NetplayLobbyStoreState = {
   isPeerTyping: boolean;
   chatChannelState: string;
   syncDisplay: string;
+  networkStats: NetplayNetworkStats | null;
 };
 
 type NetplayLobbyStoreActions = {
@@ -179,6 +181,7 @@ type NetplayLobbyStoreActions = {
   setIsPeerTyping: (isPeerTyping: boolean) => void;
   setChatChannelState: (chatChannelState: string) => void;
   setSyncDisplay: (syncDisplay: string) => void;
+  setNetworkStats: (networkStats: NetplayNetworkStats | null) => void;
   resetChatState: () => void;
   resetLobby: () => void;
   resetSessionUiState: () => void;
@@ -221,6 +224,7 @@ function getDefaultSessionUiState() {
     gameStarted: false,
     opponentProfile: null,
     syncDisplay: "",
+    networkStats: null,
   };
 }
 
@@ -272,6 +276,7 @@ export const useNetplayLobbyStore = create<NetplayLobbyStore>((set) => ({
   setIsPeerTyping: (isPeerTyping) => set({ isPeerTyping }),
   setChatChannelState: (chatChannelState) => set({ chatChannelState }),
   setSyncDisplay: (syncDisplay) => set({ syncDisplay }),
+  setNetworkStats: (networkStats) => set({ networkStats }),
   resetChatState: () => set(getDefaultChatState()),
   resetLobby: () => set(createInitialStoreState()),
   resetSessionUiState: () => set(getDefaultSessionUiState()),

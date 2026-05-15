@@ -69,6 +69,8 @@ export default function NetplayLobby() {
     setChatChannelState,
     syncDisplay,
     setSyncDisplay,
+    networkStats,
+    setNetworkStats,
     resetChatState: resetStoredChatState,
     resetSessionUiState,
   } = useNetplayLobbyStore();
@@ -152,6 +154,7 @@ export default function NetplayLobby() {
     setIsPeerTyping,
     setChatChannelState,
     setSyncDisplay,
+    setNetworkStats,
     resetChatState: resetStoredChatState,
     resetSessionUiState,
     fetchRoms,
@@ -178,7 +181,7 @@ export default function NetplayLobby() {
   }, [state.step]);
 
   useEffect(() => {
-    if (state.step === "waiting" && state.role === "host") {
+    if (state.step === "waiting" && waitingRoomRole === "host") {
       return;
     }
 
@@ -321,6 +324,7 @@ export default function NetplayLobby() {
     navigate,
     setError,
     setMode,
+    setRoomVisibility,
     setSearchQuery,
     setState,
     setStatus,
@@ -336,7 +340,7 @@ export default function NetplayLobby() {
   );
 
   const handleOpenRoomGamePicker = useCallback(async () => {
-    if (state.step !== "waiting" || state.role !== "host") {
+    if (state.step !== "waiting" || waitingRoomRole !== "host") {
       return;
     }
 
@@ -661,6 +665,7 @@ export default function NetplayLobby() {
         videoStream={state.step === "playing" ? guestVideoStream : null}
         disconnectSeverity={disconnectSeverity}
         disconnectCountdown={disconnectCountdown}
+        networkStats={networkStats}
       />
     );
   }
@@ -688,6 +693,7 @@ export default function NetplayLobby() {
         videoStream={state.step === "watching" ? guestVideoStream : null}
         disconnectSeverity={disconnectSeverity}
         disconnectCountdown={disconnectCountdown}
+        networkStats={networkStats}
       />
     );
   }
@@ -702,9 +708,5 @@ export default function NetplayLobby() {
     return null;
   }
 
-  return (
-    <div className="flex h-full flex-col gap-4">
-      {content}
-    </div>
-  );
+  return <div className="flex h-full flex-col gap-4">{content}</div>;
 }

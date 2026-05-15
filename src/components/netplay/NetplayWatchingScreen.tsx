@@ -4,6 +4,7 @@ import type { NetplayChatMessage } from "@/components/NetplayChatPanel";
 import NetplayChatOverlayComposer from "@/components/netplay/NetplayChatOverlayComposer";
 import NetplayChatOverlayPreview from "@/components/netplay/NetplayChatOverlayPreview";
 import GuestVideoDisplay from "@/components/netplay/GuestVideoDisplay";
+import NetplayNetworkStatsBadge from "@/components/netplay/NetplayNetworkStatsBadge";
 import { UserBadge } from "@/components/UserBadge";
 import {
   AlertDialog,
@@ -21,6 +22,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { UserProfile } from "@/lib/user-profile";
 import { getConnectionStatusLabel } from "@/netplay/netplayCopy";
+import type { NetplayNetworkStats } from "@/netplay/peer";
 import type { OpponentProfile } from "@/stores/useNetplayLobbyStore";
 import { ArrowLeft, Eye, Maximize2, MessageSquare, Minimize2, Wifi, WifiOff } from "lucide-react";
 import type { DisconnectSeverity } from "../../../shared/emulator-protocol";
@@ -50,10 +52,10 @@ interface NetplayWatchingScreenProps {
   videoStream: MediaStream | null;
   disconnectSeverity?: DisconnectSeverity;
   disconnectCountdown?: number;
+  networkStats: NetplayNetworkStats | null;
 }
 
 export default function NetplayWatchingScreen({
-  session: _session,
   myProfile,
   hostProfile,
   chatOpen,
@@ -73,6 +75,7 @@ export default function NetplayWatchingScreen({
   videoStream,
   disconnectSeverity,
   disconnectCountdown,
+  networkStats,
 }: NetplayWatchingScreenProps) {
   const localChatUser = myProfile ?? { nickname: "나", avatar: "👀" };
   const gameAreaRef = useRef<HTMLDivElement>(null);
@@ -165,6 +168,8 @@ export default function NetplayWatchingScreen({
           {getConnectionStatusLabel(dcState)}
         </Badge>
 
+        <NetplayNetworkStatsBadge stats={networkStats} />
+
         <Button
           type="button"
           variant="outline"
@@ -204,6 +209,7 @@ export default function NetplayWatchingScreen({
 
           {isFullscreen && (
             <div className="absolute right-3 top-3 z-50 flex items-center gap-2">
+              <NetplayNetworkStatsBadge stats={networkStats} compact className="bg-black/60" />
               <Button
                 type="button"
                 variant="secondary"

@@ -6,6 +6,7 @@ import {
   type ChatMessage as PeerChatMessage,
   type InputMessage,
   type NetplayPeer,
+  type NetplayNetworkStats,
   type ResyncStatePayload,
 } from "@/netplay/peer";
 import { useNetplayPeerFactory } from "@/netplay/useNetplayPeerFactory";
@@ -51,6 +52,7 @@ interface UseNetplayPeerRoomFlowOptions {
   handlePeerResyncState: (payload: ResyncStatePayload) => void;
   handlePeerResyncFailed: () => void;
   handleVideoStream?: (stream: MediaStream) => void;
+  handleNetworkStats?: (stats: NetplayNetworkStats) => void;
   handleHeartbeat?: (ts: number) => void;
 }
 
@@ -84,6 +86,7 @@ export function useNetplayPeerRoomFlow({
   handlePeerResyncState,
   handlePeerResyncFailed,
   handleVideoStream,
+  handleNetworkStats,
   handleHeartbeat,
 }: UseNetplayPeerRoomFlowOptions) {
   const { createPeer } = useNetplayPeerFactory({
@@ -112,6 +115,7 @@ export function useNetplayPeerRoomFlow({
     handlePeerResyncState,
     handlePeerResyncFailed,
     handleVideoStream,
+    handleNetworkStats,
     handleHeartbeat,
   });
 
@@ -154,7 +158,12 @@ export function useNetplayPeerRoomFlow({
       peerRef.current?.markSessionStarted();
     },
     handleKickRoomParticipant: (participantId: string) => {
-      if (state.step !== "waiting" || state.role !== "host" || !participantId || participantId === "host") {
+      if (
+        state.step !== "waiting" ||
+        state.role !== "host" ||
+        !participantId ||
+        participantId === "host"
+      ) {
         return;
       }
 
