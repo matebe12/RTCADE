@@ -3,6 +3,11 @@
 
 @custom-variant dark (&:is(.dark *));
 
+@keyframes joystick-swing {
+  0%, 100% { transform: rotate(-22deg); }
+  50%       { transform: rotate( 22deg); }
+}
+
 @font-face {
   font-family: "Pretendard";
   src: url("/font/Pretendard/Pretendard-Thin.woff2") format("woff2");

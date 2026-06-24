@@ -13,6 +13,55 @@ import { NavLink, useNavigate } from "react-router-dom";
 
 import { SYSTEM_OPTIONS } from "@/components/EmulatorPlayer";
 import { useOperationsNotices } from "@/hooks/useOperationsNotices";
+
+// 고퀄 조이스틱 — 받침대·소켓 고정, 레버+공이 좌우 흔들림
+function SpinningJoystick() {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      {/* 받침대 본체 */}
+      <path d="M2 18a2.5 2.5 0 0 1 2.5-2.5h15A2.5 2.5 0 0 1 22 18v1a2.5 2.5 0 0 1-2.5 2.5h-15A2.5 2.5 0 0 1 2 19v-1z" />
+      {/* 받침대 상단 테두리 라인 (입체감) */}
+      <path d="M4 15.5 Q12 14.5 20 15.5" />
+      {/* 소켓 (레버 연결부) */}
+      <ellipse cx="12" cy="15.5" rx="2.8" ry="1.1" />
+
+      {/* 레버 그룹 — 소켓(12, 15.5) 기준 좌우 흔들림 */}
+      <g
+        style={{
+          transformOrigin: "12px 15.5px",
+          animation: "joystick-swing 0.8s ease-in-out infinite",
+        }}
+      >
+        {/* 스틱 본체 — 두 선으로 튜브 입체감 */}
+        <path d="M10.8 15.5 L10.2 9.5" />
+        <path d="M13.2 15.5 L13.8 9.5" />
+        {/* 스틱 끝 공 (채워진 원 + 테두리) */}
+        <circle cx="12" cy="7" r="3.2" fill="currentColor" stroke="currentColor" strokeWidth="1.5" />
+        {/* 공 하이라이트 (광택 느낌) */}
+        <path
+          d="M10.5 5.6 Q12 4.4 13.5 5.6"
+          stroke="white"
+          strokeWidth="1"
+          strokeOpacity="0.45"
+          fill="none"
+        />
+        {/* 스틱↔공 연결 칼라(collar) */}
+        <path d="M10.5 9.5 Q12 10.2 13.5 9.5" />
+      </g>
+    </svg>
+  );
+}
 import { useOperationsStats } from "@/hooks/useOperationsStats";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -396,10 +445,10 @@ export default function HomePage({ hasProfile }: HomePageProps) {
                 브라우저에서 바로 실행되는 레트로 게임. 친구와 함께하거나 혼자서도 즐길 수 있어요.
               </p>
             </div>
-            <Button asChild size="lg" className="shrink-0 font-arcade text-sm">
+            <Button asChild size="lg" className="shrink-0 animate-bounce gap-2 font-bold tracking-tight shadow-lg shadow-primary/50">
               <NavLink to="/netplay">
                 플레이 시작
-                <ArrowRight className="size-4" />
+                <SpinningJoystick />
               </NavLink>
             </Button>
           </div>
@@ -467,10 +516,10 @@ export default function HomePage({ hasProfile }: HomePageProps) {
 
             <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               <div className="flex flex-wrap gap-3">
-                <Button asChild size="lg" className="font-arcade text-sm">
+                <Button asChild size="lg" className="animate-bounce gap-2 font-bold tracking-tight shadow-md shadow-primary/40">
                   <NavLink to="/netplay" data-tutorial="home-play-start">
                     플레이 시작
-                    <ArrowRight className="size-4" />
+                    <SpinningJoystick />
                   </NavLink>
                 </Button>
                 <Button asChild variant="outline" size="lg">
