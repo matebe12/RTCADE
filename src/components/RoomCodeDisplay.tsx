@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Copy, Check, Share2 } from "lucide-react";
+import { toast } from "sonner";
 
 interface RoomCodeDisplayProps {
   code: string;
@@ -43,16 +44,20 @@ export function RoomCodeDisplay({ code, className }: RoomCodeDisplayProps) {
     if (navigator.share) {
       try {
         await navigator.share({ title: "RTCADE 같이하기", text: `방 코드: ${code}`, url: link });
+        toast.success("친구에게 공유했어요!");
       } catch {
         // 사용자가 취소한 경우 — 무시
       }
       return;
     }
-    // 데스크탑: 클립보드 복사 폴백
+    // 데스크탑: 클립보드 복사 후 토스트
     try {
       await copyToClipboard(link);
       setShared(true);
       setTimeout(() => setShared(false), 2000);
+      toast.success("초대 링크가 복사됐어요!", {
+        description: "카카오톡, 디스코드 등 메신저에 붙여넣기해서 친구를 초대하세요 🔗",
+      });
     } catch {
       // ignore
     }
