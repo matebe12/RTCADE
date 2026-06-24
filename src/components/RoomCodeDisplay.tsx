@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { Copy, Check } from "lucide-react";
+import { Copy, Check, Share2 } from "lucide-react";
 
 interface RoomCodeDisplayProps {
   code: string;
@@ -70,8 +70,8 @@ export function RoomCodeDisplay({ code, className }: RoomCodeDisplayProps) {
       </Button>
 
       {/* 친구 초대 — 모바일: 공유 시트, 데스크탑: 링크 복사 */}
-      <Button variant="outline" size="sm" className="gap-1.5" onClick={handleShare}>
-        <span>{shared ? "✅" : "🔗"}</span>
+      <Button variant="ghost" size="sm" className="gap-1.5" onClick={handleShare}>
+        {shared ? <Check className="size-3.5 text-green-500" /> : <Share2 className="size-3.5" />}
         <span className="text-xs">{shared ? "복사됐어요!" : "초대하기"}</span>
       </Button>
     </div>
