@@ -126,6 +126,7 @@ export default function NetplayLobby() {
     handleSummaryChooseAnotherGame,
     handleSummaryRematch,
     handleCanvasStreamReady,
+    joinOrAutoSpectateWithCode,
     setVideoStreamCallbackRef,
     resetToMenu,
   } = useNetplaySession({
@@ -166,6 +167,9 @@ export default function NetplayLobby() {
   const [roomGamePickerOpen, setRoomGamePickerOpen] = useState(false);
   const [roomGamePickerLoading, setRoomGamePickerLoading] = useState(false);
   const handledEntryRequestRef = useRef<string | null>(null);
+  const handledCodeRequestRef = useRef<string | null>(null);
+  const joinOrAutoSpectateRef = useRef(joinOrAutoSpectateWithCode);
+  joinOrAutoSpectateRef.current = joinOrAutoSpectateWithCode;
   const currentLobbyStepRef = useRef(state.step);
   const waitingRoomRole = state.step === "waiting" ? state.role : null;
 
@@ -188,6 +192,25 @@ export default function NetplayLobby() {
     setRoomGamePickerOpen(false);
     setRoomGamePickerLoading(false);
   }, [state.step, waitingRoomRole]);
+
+  useEffect(() => {
+    const searchParams = new URLSearchParams(location.search);
+    const code = searchParams.get("code");
+
+    if (!code) return;
+
+    const entryRequestKey = `${location.pathname}?code=${code}`;
+    if (handledCodeRequestRef.current === entryRequestKey) return;
+
+    if (currentLobbyStepRef.current !== "menu") {
+      navigate(location.pathname, { replace: true });
+      return;
+    }
+
+    handledCodeRequestRef.current = entryRequestKey;
+    navigate(location.pathname, { replace: true });
+    void joinOrAutoSpectateRef.current(code);
+  }, [location.search, location.pathname, navigate]);
 
   useEffect(() => {
     const searchParams = new URLSearchParams(location.search);
