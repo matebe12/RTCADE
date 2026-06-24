@@ -25,7 +25,9 @@ type TutorialStage =
   | "solo-browse"
   | "solo-start-game"
   | "solo-controls"
-  | "solo-emulator";
+  | "solo-emulator"
+  | "solo-coin-insert"
+  | "solo-game-start";
 
 type TutorialProgress = {
   version: number;
@@ -703,7 +705,53 @@ export function AppTutorialProvider({ blocked = false, children }: AppTutorialPr
       popover: {
         title: "실제 플레이 화면",
         description:
-          "이제 실제 에뮬레이터가 실행 중입니다. 화면을 클릭한 뒤 바로 조작해 보세요. 튜토리얼은 여기서 끝납니다.",
+          "이제 실제 에뮬레이터가 실행 중입니다. 화면을 클릭하면 조작을 시작할 수 있습니다.",
+        nextBtnText: "코인 넣는 법 보기",
+        showButtons: ["next", "close"],
+        onNextClick: () => advanceTo("solo-coin-insert"),
+      },
+    });
+  }, [activeStage, advanceTo, blocked, highlightStage, lobbyStep, location.pathname]);
+
+  useEffect(() => {
+    if (blocked || activeStage !== "solo-coin-insert") {
+      return;
+    }
+
+    if (location.pathname !== "/netplay" || lobbyStep !== "solo-playing") {
+      return;
+    }
+
+    highlightStage("solo-coin-insert", {
+      element: '[data-tutorial="solo-emulator-stage"]',
+      disableActiveInteraction: true,
+      popover: {
+        title: "코인 넣기",
+        description:
+          "대부분의 아케이드 게임은 플레이 전에 코인을 먼저 넣어야 합니다. 5키를 누를 때마다 코인 1개가 들어갑니다. 호스트·게스트 모두 동일합니다.",
+        nextBtnText: "게임 시작법 보기",
+        showButtons: ["next", "close"],
+        onNextClick: () => advanceTo("solo-game-start"),
+      },
+    });
+  }, [activeStage, advanceTo, blocked, highlightStage, lobbyStep, location.pathname]);
+
+  useEffect(() => {
+    if (blocked || activeStage !== "solo-game-start") {
+      return;
+    }
+
+    if (location.pathname !== "/netplay" || lobbyStep !== "solo-playing") {
+      return;
+    }
+
+    highlightStage("solo-game-start", {
+      element: '[data-tutorial="solo-emulator-stage"]',
+      disableActiveInteraction: true,
+      popover: {
+        title: "1P 스타트",
+        description:
+          "코인을 넣은 뒤 1키를 누르면 게임이 시작됩니다. 호스트·게스트 모두 동일합니다. 일부 게임은 코인 없이 바로 시작하거나 메뉴가 뜨기도 해요. 튜토리얼은 여기서 끝납니다.",
         nextBtnText: "튜토리얼 완료",
         showButtons: ["next", "close"],
         onNextClick: () => finishTutorial("completed"),
