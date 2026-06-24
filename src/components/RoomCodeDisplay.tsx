@@ -44,7 +44,7 @@ export function RoomCodeDisplay({ code, className }: RoomCodeDisplayProps) {
     if (navigator.share) {
       try {
         await navigator.share({ title: "RTCADE 같이하기", text: `방 코드: ${code}`, url: link });
-        toast.success("친구에게 공유했어요!");
+        toast.info("친구에게 공유했어요!");
       } catch {
         // 사용자가 취소한 경우 — 무시
       }
@@ -55,7 +55,7 @@ export function RoomCodeDisplay({ code, className }: RoomCodeDisplayProps) {
       await copyToClipboard(link);
       setShared(true);
       setTimeout(() => setShared(false), 2000);
-      toast.success("초대 링크가 복사됐어요!", {
+      toast.info("초대 링크가 복사됐어요!", {
         description: "카카오톡, 디스코드 등 메신저에 붙여넣기해서 친구를 초대하세요",
       });
     } catch {
