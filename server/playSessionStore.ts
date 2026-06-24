@@ -28,6 +28,7 @@ export interface PlaySessionStore {
   endSession: (sessionId: string) => void;
   getActivitySnapshot: () => ActivePlaySnapshot;
   upsertSession: (input: UpsertPlaySessionInput) => void;
+  startPruneInterval: () => () => void;
 }
 
 const ACTIVE_SESSION_TTL_MS = 30_000;
@@ -110,6 +111,10 @@ export function createPlaySessionStore(options: CreatePlaySessionStoreOptions = 
         startedAt: existingSession?.startedAt ?? now,
         lastSeenAt: now,
       });
+    },
+    startPruneInterval: () => {
+      const intervalId = setInterval(pruneExpiredSessions, ACTIVE_SESSION_TTL_MS);
+      return () => clearInterval(intervalId);
     },
   };
 }

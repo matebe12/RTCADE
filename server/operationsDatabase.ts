@@ -59,6 +59,7 @@ export interface RecordGameSessionInput {
 }
 
 export interface OperationsDatabase {
+  closeStaleGameSessions: () => Promise<void>;
   completeGameSession: (sessionId: string, endedAt?: string) => Promise<void>;
   createNotice: (input: CreateNoticeInput) => Promise<NoticeRecord | null>;
   getGameMetrics: () => Promise<GameMetrics>;
@@ -269,7 +270,10 @@ async function listPopularGames(pool: Pool, whereClause: string) {
           SUM(
             CASE
               WHEN ended_at IS NOT NULL THEN GREATEST(duration_ms, 0)
-              ELSE GREATEST(0, FLOOR(EXTRACT(EPOCH FROM (NOW() - started_at)) * 1000)::bigint)
+              ELSE LEAST(
+                GREATEST(0, FLOOR(EXTRACT(EPOCH FROM (NOW() - started_at)) * 1000)::bigint),
+                1800000
+              )
             END
           ),
           0
@@ -328,6 +332,18 @@ export function createOperationsDatabase(databaseUrl: string | null): Operations
   }
 
   return {
+    closeStaleGameSessions: async () => {
+      await runSafely(async () => {
+        await pool!.query(`
+          UPDATE game_sessions
+          SET
+            ended_at = NOW(),
+            duration_ms = FLOOR(EXTRACT(EPOCH FROM (NOW() - started_at)) * 1000)::bigint
+          WHERE ended_at IS NULL
+            AND started_at < NOW() - INTERVAL '2 hours'
+        `);
+      }, undefined);
+    },
     completeGameSession: async (sessionId, endedAt) => {
       await runSafely(async () => {
         await pool!.query(

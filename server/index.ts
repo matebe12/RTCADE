@@ -31,6 +31,11 @@ async function bootstrap() {
 
   await operationsDatabase.initialize();
 
+  // Close sessions orphaned by previous server instance (server restart scenario)
+  await operationsDatabase.closeStaleGameSessions();
+
+  const stopPruneInterval = playSessionStore.startPruneInterval();
+
   app.use(express.json());
   app.use(createCorsMiddleware(config.allowedOrigins));
   app.use(createVisitorTrackingMiddleware(operationsDatabase));
@@ -52,6 +57,7 @@ async function bootstrap() {
     isShuttingDown = true;
     console.log(`[Server] Received ${signal}, shutting down gracefully...`);
 
+    stopPruneInterval();
     wss.close();
     server.close(() => {
       console.log("[Server] HTTP server closed.");
