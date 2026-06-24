@@ -19,7 +19,7 @@ function detectMobileAccess() {
   return narrowViewport && (touchDevice || mobileUserAgent);
 }
 
-export default function NetplayPage() {
+export default function NetplayPage({ hasProfile }: { hasProfile: boolean }) {
   usePageSeo({
     title: "플레이 로비",
     description:
@@ -133,7 +133,7 @@ export default function NetplayPage() {
         )}
 
         <div className="min-w-0 w-full lg:h-full">
-          <NetplayLobby />
+          <NetplayLobby hasProfile={hasProfile} />
         </div>
       </div>
     </div>

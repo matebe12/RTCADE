@@ -22,7 +22,7 @@ import { useSoloSession } from "@/solo/useSoloSession";
 import { type RomInfo, useNetplayLobbyStore } from "@/stores/useNetplayLobbyStore";
 import { toast } from "sonner";
 
-export default function NetplayLobby() {
+export default function NetplayLobby({ hasProfile = true }: { hasProfile?: boolean }) {
   const location = useLocation();
   const navigate = useNavigate();
   const {
@@ -168,6 +168,7 @@ export default function NetplayLobby() {
   const [roomGamePickerLoading, setRoomGamePickerLoading] = useState(false);
   const handledEntryRequestRef = useRef<string | null>(null);
   const handledCodeRequestRef = useRef<string | null>(null);
+  const pendingAutoJoinCodeRef = useRef<string | null>(null);
   const joinOrAutoSpectateRef = useRef(joinOrAutoSpectateWithCode);
   joinOrAutoSpectateRef.current = joinOrAutoSpectateWithCode;
   const currentLobbyStepRef = useRef(state.step);
@@ -209,8 +210,24 @@ export default function NetplayLobby() {
 
     handledCodeRequestRef.current = entryRequestKey;
     navigate(location.pathname, { replace: true });
+
+    // 프로필(닉네임)이 없는 신규 유저 — 설정 완료 후 join 실행
+    if (!hasProfile) {
+      pendingAutoJoinCodeRef.current = code;
+      return;
+    }
+
     void joinOrAutoSpectateRef.current(code);
-  }, [location.search, location.pathname, navigate]);
+  }, [location.search, location.pathname, navigate, hasProfile]);
+
+  // 닉네임 설정 완료 시 보류 중인 join 실행
+  useEffect(() => {
+    if (!hasProfile) return;
+    const code = pendingAutoJoinCodeRef.current;
+    if (!code) return;
+    pendingAutoJoinCodeRef.current = null;
+    void joinOrAutoSpectateRef.current(code);
+  }, [hasProfile]);
 
   useEffect(() => {
     const searchParams = new URLSearchParams(location.search);

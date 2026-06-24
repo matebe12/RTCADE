@@ -37,7 +37,7 @@ function App() {
               element={<AppShell profile={profile} onOpenProfile={() => setShowSetup(true)} />}
             >
               <Route index element={<HomePage hasProfile={!needsSetup} />} />
-              <Route path="netplay" element={<NetplayPage />} />
+              <Route path="netplay" element={<NetplayPage hasProfile={!needsSetup} />} />
               <Route path="notices" element={<NoticesPage />} />
               <Route
                 path="settings"
