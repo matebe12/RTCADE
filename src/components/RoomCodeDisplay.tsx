@@ -56,7 +56,7 @@ export function RoomCodeDisplay({ code, className }: RoomCodeDisplayProps) {
       setShared(true);
       setTimeout(() => setShared(false), 2000);
       toast.success("초대 링크가 복사됐어요!", {
-        description: "카카오톡, 디스코드 등 메신저에 붙여넣기해서 친구를 초대하세요 🔗",
+        description: "카카오톡, 디스코드 등 메신저에 붙여넣기해서 친구를 초대하세요",
       });
     } catch {
       // ignore
