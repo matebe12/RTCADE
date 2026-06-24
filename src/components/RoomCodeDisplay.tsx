@@ -49,19 +49,25 @@ export function RoomCodeDisplay({ code, className }: RoomCodeDisplayProps) {
   };
 
   return (
-    <div className={cn("flex items-center gap-3", className)}>
-      <span className="font-arcade text-2xl tracking-[0.5em] text-primary">{code}</span>
-      <Button variant="ghost" size="icon" className="size-8" onClick={handleCopy} title="코드 복사">
-        {copied ? <Check className="size-4 text-green-500" /> : <Copy className="size-4" />}
-      </Button>
+    <div className={cn("flex flex-col gap-2", className)}>
+      <div className="flex items-center gap-2">
+        <span className="font-arcade text-2xl tracking-[0.5em] text-primary">{code}</span>
+        <Button variant="ghost" size="icon" className="size-8" onClick={handleCopy} title="코드 복사">
+          {copied ? <Check className="size-4 text-green-500" /> : <Copy className="size-4" />}
+        </Button>
+      </div>
       <Button
-        variant="ghost"
-        size="icon"
-        className="size-8"
+        variant="outline"
+        size="sm"
+        className="gap-2 self-start text-xs"
         onClick={handleCopyLink}
-        title="참가 링크 복사"
       >
-        {linkCopied ? <Check className="size-4 text-green-500" /> : <Link2 className="size-4" />}
+        {linkCopied ? (
+          <Check className="size-3.5 text-green-500" />
+        ) : (
+          <Link2 className="size-3.5" />
+        )}
+        {linkCopied ? "복사됨!" : "링크로 친구 초대하기"}
       </Button>
     </div>
   );
