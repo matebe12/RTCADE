@@ -40,17 +40,6 @@ export function RoomCodeDisplay({ code, className }: RoomCodeDisplayProps) {
 
   const handleShare = async () => {
     const link = `${window.location.origin}/netplay?code=${code}`;
-    // 모바일: 네이티브 공유 시트 (카카오, 문자 등)
-    if (navigator.share) {
-      try {
-        await navigator.share({ title: "RTCADE 같이하기", text: `방 코드: ${code}`, url: link });
-        toast.info("친구에게 공유했어요!");
-      } catch {
-        // 사용자가 취소한 경우 — 무시
-      }
-      return;
-    }
-    // 데스크탑: 클립보드 복사 후 토스트
     try {
       await copyToClipboard(link);
       setShared(true);
