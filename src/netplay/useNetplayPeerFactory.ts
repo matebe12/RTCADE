@@ -54,7 +54,10 @@ interface UseNetplayPeerFactoryOptions {
   handleVideoStream?: (stream: MediaStream) => void;
   handleNetworkStats?: (stats: NetplayNetworkStats) => void;
   handleHeartbeat?: (ts: number) => void;
+  onRoomFull?: () => void;
 }
+
+const ROOM_FULL_ERROR = "방이 이미 가득 찼습니다.";
 
 export function useNetplayPeerFactory({
   peerRef,
@@ -84,6 +87,7 @@ export function useNetplayPeerFactory({
   handleVideoStream,
   handleNetworkStats,
   handleHeartbeat,
+  onRoomFull,
 }: UseNetplayPeerFactoryOptions) {
   const createPeer = useCallback(
     (rtcConfiguration?: RTCConfiguration): NetplayPeer => {
@@ -112,7 +116,14 @@ export function useNetplayPeerFactory({
           },
           onInput: handleRemoteInput,
           onRemoteHeldMask: handleRemoteHeldMask,
-          onError: (msg) => setError(msg),
+          onError: (msg) => {
+            if (msg === ROOM_FULL_ERROR && onRoomFull) {
+              onRoomFull();
+            } else {
+              setError(msg);
+              toast.error(msg);
+            }
+          },
           onDataChannelState: (nextState) => setDcState(nextState),
           onChatChannelState: (nextState) => setChatChannelState(nextState),
           onChatMessage: handleIncomingChatMessage,

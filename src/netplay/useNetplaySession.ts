@@ -471,6 +471,7 @@ export function useNetplaySession({
     handleSpectatePublicRoom,
     handleSpectateRoom,
     handleSummaryRematch,
+    joinOrAutoSpectateWithCode,
   } = useNetplayPeerRoomFlow({
     state,
     joinCode,
@@ -547,6 +548,7 @@ export function useNetplaySession({
     handleSummaryChooseAnotherGame,
     handleSummaryRematch,
     handleVideoStream,
+    joinOrAutoSpectateWithCode,
     resetToMenu,
     setVideoStreamCallbackRef,
   };

@@ -1,4 +1,5 @@
 import type { MutableRefObject } from "react";
+import { useCallback, useRef } from "react";
 
 import type { SessionEndReason } from "@/components/NetplaySessionSummary";
 import { NETPLAY_COPY } from "@/netplay/netplayCopy";
@@ -11,6 +12,7 @@ import {
 } from "@/netplay/peer";
 import { useNetplayPeerFactory } from "@/netplay/useNetplayPeerFactory";
 import { useNetplayRoomEntry } from "@/netplay/useNetplayRoomEntry";
+import { toast } from "sonner";
 import {
   type ActiveSession,
   type LobbyState,
@@ -89,6 +91,16 @@ export function useNetplayPeerRoomFlow({
   handleNetworkStats,
   handleHeartbeat,
 }: UseNetplayPeerRoomFlowOptions) {
+  const pendingAutoSpectateCodeRef = useRef<string | null>(null);
+  const spectatePublicRoomRef = useRef<(code: string) => Promise<void>>(async () => {});
+
+  const handleRoomFull = useCallback(() => {
+    const code = pendingAutoSpectateCodeRef.current;
+    if (!code) return;
+    toast.info("방이 가득 찼서 관전 모드로 입장합니다.");
+    void spectatePublicRoomRef.current(code);
+  }, []);
+
   const { createPeer } = useNetplayPeerFactory({
     peerRef,
     roleRef,
@@ -117,6 +129,7 @@ export function useNetplayPeerRoomFlow({
     handleVideoStream,
     handleNetworkStats,
     handleHeartbeat,
+    onRoomFull: handleRoomFull,
   });
 
   const {
@@ -136,6 +149,16 @@ export function useNetplayPeerRoomFlow({
     resetSessionRuntime,
     createPeer,
   });
+
+  spectatePublicRoomRef.current = handleSpectatePublicRoom;
+
+  const joinOrAutoSpectateWithCode = useCallback(
+    async (code: string) => {
+      pendingAutoSpectateCodeRef.current = code;
+      await handleJoinPublicRoom(code);
+    },
+    [handleJoinPublicRoom],
+  );
 
   return {
     handleCreateRoom,
@@ -181,5 +204,6 @@ export function useNetplayPeerRoomFlow({
     handleSpectatePublicRoom,
     handleSpectateRoom,
     handleSummaryRematch,
+    joinOrAutoSpectateWithCode,
   };
 }

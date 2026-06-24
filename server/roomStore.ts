@@ -207,10 +207,6 @@ export function createRoomStore(): RoomStore {
       return true;
     },
     attachSpectator: (room, spectator, options) => {
-      if (room.state !== "waiting") {
-        return null;
-      }
-
       if (room.spectators.size >= MAX_SPECTATORS_PER_ROOM) {
         return null;
       }

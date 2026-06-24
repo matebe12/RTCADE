@@ -154,13 +154,7 @@ export function attachSignalingServer(wss: WebSocketServer, roomStore: RoomStore
           });
 
           if (!attachedSpectator) {
-            send(ws, {
-              type: "error",
-              message:
-                room.state !== "waiting"
-                  ? "게임 시작 후에는 관전자 입장이 닫힙니다."
-                  : "관전자 정원이 가득 찼습니다.",
-            });
+            send(ws, { type: "error", message: "관전자 정원이 가득 찼습니다." });
             return;
           }
 
