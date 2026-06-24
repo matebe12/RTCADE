@@ -382,6 +382,30 @@ export default function HomePage({ hasProfile }: HomePageProps) {
 
   return (
     <div className="flex w-full flex-col gap-6 lg:gap-8">
+      {recentGames.length === 0 && (
+        <section className="overflow-hidden rounded-[28px] border border-primary/30 bg-gradient-to-br from-primary/15 via-card/95 to-card/80 p-6 shadow-sm shadow-primary/10 lg:p-8">
+          <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="space-y-2">
+              <Badge variant="secondary" className="w-fit text-[10px]">
+                처음 오셨나요?
+              </Badge>
+              <h2 className="text-2xl font-semibold tracking-tight text-foreground lg:text-3xl">
+                지금 바로 레트로 게임을 시작해보세요!
+              </h2>
+              <p className="max-w-xl text-sm leading-6 text-muted-foreground">
+                브라우저에서 바로 실행되는 레트로 게임. 친구와 함께하거나 혼자서도 즐길 수 있어요.
+              </p>
+            </div>
+            <Button asChild size="lg" className="shrink-0 font-arcade text-sm">
+              <NavLink to="/netplay">
+                플레이 시작
+                <ArrowRight className="size-4" />
+              </NavLink>
+            </Button>
+          </div>
+        </section>
+      )}
+
       <section className="grid gap-4 lg:grid-cols-[1.4fr_0.8fr]">
         <Card className="overflow-hidden border-border/70 bg-card/95">
           <CardHeader className="space-y-4">
@@ -443,7 +467,7 @@ export default function HomePage({ hasProfile }: HomePageProps) {
 
             <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               <div className="flex flex-wrap gap-3">
-                <Button asChild size="lg" className="font-arcade text-[11px]">
+                <Button asChild size="lg" className="font-arcade text-sm">
                   <NavLink to="/netplay" data-tutorial="home-play-start">
                     플레이 시작
                     <ArrowRight className="size-4" />
