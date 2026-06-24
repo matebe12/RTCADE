@@ -234,6 +234,7 @@ const GuestVideoDisplay = forwardRef<HTMLDivElement, GuestVideoDisplayProps>(
       };
 
       const handleKeyDown = (e: KeyboardEvent) => {
+        if (!e.isTrusted) return;
         // Chat shortcut (Enter)
         if (
           e.code === "Enter" &&
@@ -264,6 +265,7 @@ const GuestVideoDisplay = forwardRef<HTMLDivElement, GuestVideoDisplayProps>(
       };
 
       const handleKeyUp = (e: KeyboardEvent) => {
+        if (!e.isTrusted) return;
         const btn = KEY_TO_BUTTON[e.code];
         if (btn !== undefined) {
           e.stopImmediatePropagation();

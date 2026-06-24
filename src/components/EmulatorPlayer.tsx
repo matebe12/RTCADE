@@ -1,8 +1,9 @@
-import { useEffect, useRef, forwardRef, useImperativeHandle } from "react";
+import { useEffect, useRef, useState, forwardRef, useImperativeHandle } from "react";
+import { Maximize2, Minimize2 } from "lucide-react";
 
 import { appEnvironment } from "@/config/environment";
 import { createEmulatorRuntimeBridge } from "@/lib/emulator-runtime-bridge";
-import { CORE_REMAP, EJS_BUTTONS_CONFIG, KEY_TO_BUTTON } from "../../shared/emulator-protocol";
+import { CORE_REMAP, EJS_BUTTONS_CONFIG, KEY_TO_BUTTON, BLOCKED_KEYS } from "../../shared/emulator-protocol";
 import { buildBackendUrl } from "@/lib/backend-url";
 
 export type SystemCore =
@@ -354,6 +355,8 @@ const EmulatorPlayer = forwardRef<HTMLDivElement, EmulatorPlayerProps>(function 
   ref,
 ) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const scriptRef = useRef<HTMLScriptElement | null>(null);
   const styleRef = useRef<HTMLStyleElement | null>(null);
   const streamReadyFiredRef = useRef(false);
@@ -633,6 +636,7 @@ const EmulatorPlayer = forwardRef<HTMLDivElement, EmulatorPlayerProps>(function 
     if (isNetplay) {
       windowKeyDown = (e: KeyboardEvent) => {
         // Only intercept when our container (or a descendant) has focus
+        if (!e.isTrusted) return;
         if (!container.contains(document.activeElement)) return;
 
         // Chat shortcut
@@ -651,7 +655,13 @@ const EmulatorPlayer = forwardRef<HTMLDivElement, EmulatorPlayerProps>(function 
         }
 
         const btn = KEY_TO_BUTTON[e.code];
-        if (btn === undefined) return;
+        if (btn === undefined) {
+          if (BLOCKED_KEYS.has(e.code)) {
+            e.stopImmediatePropagation();
+            e.preventDefault();
+          }
+          return;
+        }
         e.stopImmediatePropagation();
         e.preventDefault();
 
@@ -666,9 +676,16 @@ const EmulatorPlayer = forwardRef<HTMLDivElement, EmulatorPlayerProps>(function 
         onLocalInput?.(btn, true);
       };
       windowKeyUp = (e: KeyboardEvent) => {
+        if (!e.isTrusted) return;
         if (!container.contains(document.activeElement)) return;
         const btn = KEY_TO_BUTTON[e.code];
-        if (btn === undefined) return;
+        if (btn === undefined) {
+          if (BLOCKED_KEYS.has(e.code)) {
+            e.stopImmediatePropagation();
+            e.preventDefault();
+          }
+          return;
+        }
         e.stopImmediatePropagation();
         e.preventDefault();
 
@@ -688,9 +705,16 @@ const EmulatorPlayer = forwardRef<HTMLDivElement, EmulatorPlayerProps>(function 
       // Solo mode: intercept keys and use same KEY_TO_BUTTON mapping
       // so controls are consistent with netplay (1/5/A/S/D/F).
       windowKeyDown = (e: KeyboardEvent) => {
+        if (!e.isTrusted) return;
         if (!container.contains(document.activeElement)) return;
         const btn = KEY_TO_BUTTON[e.code];
-        if (btn === undefined) return;
+        if (btn === undefined) {
+          if (BLOCKED_KEYS.has(e.code)) {
+            e.stopImmediatePropagation();
+            e.preventDefault();
+          }
+          return;
+        }
         e.stopImmediatePropagation();
         e.preventDefault();
         if (e.repeat || pressedButtonsRef.current.has(btn)) return;
@@ -702,9 +726,16 @@ const EmulatorPlayer = forwardRef<HTMLDivElement, EmulatorPlayerProps>(function 
         ejs?.gameManager?.simulateInput(0, btn, 1);
       };
       windowKeyUp = (e: KeyboardEvent) => {
+        if (!e.isTrusted) return;
         if (!container.contains(document.activeElement)) return;
         const btn = KEY_TO_BUTTON[e.code];
-        if (btn === undefined) return;
+        if (btn === undefined) {
+          if (BLOCKED_KEYS.has(e.code)) {
+            e.stopImmediatePropagation();
+            e.preventDefault();
+          }
+          return;
+        }
         e.stopImmediatePropagation();
         e.preventDefault();
         if (!pressedButtonsRef.current.has(btn)) return;
@@ -799,13 +830,52 @@ const EmulatorPlayer = forwardRef<HTMLDivElement, EmulatorPlayerProps>(function 
     return () => clearInterval(interval);
   }, [role, onCanvasStreamReady, shouldCaptureAudio]);
 
+  // Fullscreen toggle — requestFullscreen on the wrapper div so the button
+  // is included in the fullscreen surface. When fullscreen, aspect-4/3 is
+  // dropped and the container expands to fill the viewport.
+  useEffect(() => {
+    const wrapper = wrapperRef.current;
+    if (!wrapper) return undefined;
+
+    const handleFullscreenChange = () => {
+      setIsFullscreen(document.fullscreenElement === wrapper);
+    };
+
+    wrapper.addEventListener("fullscreenchange", handleFullscreenChange);
+    return () => wrapper.removeEventListener("fullscreenchange", handleFullscreenChange);
+  }, []);
+
+  const toggleFullscreen = () => {
+    if (!wrapperRef.current) return;
+    if (document.fullscreenElement) {
+      void document.exitFullscreen();
+    } else {
+      void wrapperRef.current.requestFullscreen();
+    }
+  };
+
   return (
-    <div
-      ref={containerRef}
-      tabIndex={0}
-      className="relative aspect-4/3 w-full overflow-hidden rounded-lg bg-neutral-900 outline-none focus:ring-2 focus:ring-primary/60"
-      style={{ contain: "layout style paint" }}
-    />
+    <div ref={wrapperRef} className="relative w-full">
+      <div
+        ref={containerRef}
+        tabIndex={0}
+        className={
+          isFullscreen
+            ? "relative h-dvh w-screen overflow-hidden bg-neutral-900 outline-none"
+            : "relative aspect-4/3 w-full overflow-hidden rounded-lg bg-neutral-900 outline-none focus:ring-2 focus:ring-primary/60"
+        }
+        style={isFullscreen ? undefined : { contain: "layout style paint" }}
+      />
+      <button
+        type="button"
+        onClick={toggleFullscreen}
+        title={isFullscreen ? "전체화면 종료" : "전체화면"}
+        className="absolute bottom-2 right-2 flex size-7 items-center justify-center rounded-md bg-black/50 text-white opacity-0 transition-opacity hover:bg-black/80 hover:opacity-100 focus:opacity-100 [div:fullscreen_&]:opacity-100"
+        aria-label={isFullscreen ? "전체화면 종료" : "전체화면"}
+      >
+        {isFullscreen ? <Minimize2 className="size-4" /> : <Maximize2 className="size-4" />}
+      </button>
+    </div>
   );
 });
 

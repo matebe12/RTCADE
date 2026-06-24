@@ -37,6 +37,19 @@ export const KEY_TO_BUTTON: Record<string, number> = {
   KeyE: 11,
 };
 
+/**
+ * Keys that EmulatorJS maps by default but are NOT in KEY_TO_BUTTON.
+ * The keyboard handler must stopImmediatePropagation + preventDefault for these
+ * to prevent EmulatorJS from processing them directly (which would affect only
+ * the host emulator without going through the DataChannel).
+ */
+export const BLOCKED_KEYS: ReadonlySet<string> = new Set([
+  "KeyZ", // EmulatorJS default: button 1 (B)
+  "KeyX", // EmulatorJS default: button 0 (A) — conflicts with our KeyA mapping
+  "KeyC", // EmulatorJS default: button 2 in some cores
+  "KeyV", // EmulatorJS default: button 3 in some cores
+]);
+
 /* ---------- EJS global config shape ---------- */
 
 export interface EJSGlobalConfig {
