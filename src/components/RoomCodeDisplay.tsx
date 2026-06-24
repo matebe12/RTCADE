@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { Copy, Check, Share2 } from "lucide-react";
+import { Copy, Check } from "lucide-react";
 
 interface RoomCodeDisplayProps {
   code: string;
@@ -59,23 +59,20 @@ export function RoomCodeDisplay({ code, className }: RoomCodeDisplayProps) {
   };
 
   return (
-    <div className={cn("space-y-3", className)}>
+    <div className={cn("flex flex-wrap items-center gap-2", className)}>
       {/* 방 코드 */}
-      <div className="flex items-center gap-2">
-        <span className="font-arcade text-2xl tracking-[0.5em] text-primary">{code}</span>
-        <Button variant="ghost" size="icon" className="size-7 shrink-0" onClick={handleCopy} title="코드 복사">
-          {copied ? <Check className="size-3.5 text-green-500" /> : <Copy className="size-3.5" />}
-        </Button>
-      </div>
+      <span className="font-arcade text-2xl tracking-[0.5em] text-primary">{code}</span>
+
+      {/* 코드 복사 */}
+      <Button variant="ghost" size="sm" className="gap-1.5" onClick={handleCopy}>
+        {copied ? <Check className="size-3.5 text-green-500" /> : <Copy className="size-3.5" />}
+        <span className="text-xs">{copied ? "복사됨!" : "코드 복사"}</span>
+      </Button>
 
       {/* 친구 초대 — 모바일: 공유 시트, 데스크탑: 링크 복사 */}
-      <Button variant="secondary" className="w-full gap-2" onClick={handleShare}>
-        {shared ? (
-          <Check className="size-4 text-green-500" />
-        ) : (
-          <Share2 className="size-4" />
-        )}
-        {shared ? "링크가 복사됐어요!" : "친구 초대하기"}
+      <Button variant="outline" size="sm" className="gap-1.5" onClick={handleShare}>
+        <span>{shared ? "✅" : "🔗"}</span>
+        <span className="text-xs">{shared ? "복사됐어요!" : "초대하기"}</span>
       </Button>
     </div>
   );

@@ -125,7 +125,7 @@ export default function SettingsPage({ profile, onOpenProfile }: SettingsPagePro
                 key={option.value}
                 type="button"
                 onClick={() => setTheme(option.value)}
-                className={`rounded-xl border px-4 py-4 text-left transition-colors ${
+                className={`cursor-pointer rounded-xl border px-4 py-4 text-left transition-colors ${
                   theme === option.value
                     ? "border-primary bg-primary/10"
                     : "border-border/70 bg-background/40 hover:bg-accent"
