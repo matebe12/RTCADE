@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import type { SystemCore } from "@/components/EmulatorPlayer";
 import type { NetplayChatMessage } from "@/components/NetplayChatPanel";
 import { createEmulatorRuntimeBridge } from "@/lib/emulator-runtime-bridge";
 import { type RecentGame, type RecentOpponent } from "@/lib/user-profile";
@@ -8,7 +7,6 @@ import {
   NetplayPeer,
   type InputMessage,
   type NetplayNetworkStats,
-  type ResyncStatePayload,
 } from "@/netplay/peer";
 import { useNetplayChatControls } from "@/netplay/useNetplayChatControls";
 import { useNetplayPeerRoomFlow } from "@/netplay/useNetplayPeerRoomFlow";
@@ -32,6 +30,7 @@ import {
 
 type SetLobbyState = (next: LobbyState | ((previous: LobbyState) => LobbyState)) => void;
 
+/** 원격 플레이어 버튼 개수 (0~11). */
 const REMOTE_INPUT_BUTTON_COUNT = 12;
 
 function updateHeldMask(mask: number, button: number, down: boolean) {
@@ -40,6 +39,7 @@ function updateHeldMask(mask: number, button: number, down: boolean) {
   return down ? mask | bit : mask & ~bit;
 }
 
+/** {@link useNetplaySession} hook 옵션 인터페이스. */
 interface UseNetplaySessionOptions {
   state: LobbyState;
   setLobbyState: SetLobbyState;
@@ -72,6 +72,18 @@ interface UseNetplaySessionOptions {
   fetchRoms: () => Promise<void>;
 }
 
+/**
+ * 넷플레이 세션 전체 생명주기를 관리하는 최상위 hook.
+ *
+ * 담당 범위:
+ * - 방 생성/입장/관전 (`useNetplayPeerRoomFlow`)
+ * - HOST/GUEST 게임 시작 동기화 (`useNetplaySyncRuntime`)
+ * - 원격 입력 수신 및 에뮬레이터 반영
+ * - 비디오 스트리밍: HOST는 캔버스를 캡처해 WebRTC로 전송, GUEST는 `<video>`로 수신
+ * - 채팅 (`useNetplayChatControls`)
+ * - 하트비트로 연결 상태 모니터링
+ * - 세션 기록 및 종료 처리
+ */
 export function useNetplaySession({
   state,
   setLobbyState: setState,
@@ -107,11 +119,7 @@ export function useNetplaySession({
   const peerRef = useRef<NetplayPeer | null>(null);
   const emulatorRef = useRef<HTMLDivElement>(null);
   const roleRef = useRef<NetplaySessionRole | null>(null);
-  const sessionCoreRef = useRef<SystemCore | null>(null);
-  const lastInputTimeRef = useRef(0);
   const remoteHeldMaskRef = useRef(0);
-  const queuedRemoteHeldMaskRef = useRef<number | null>(null);
-  const guestResyncPendingRef = useRef(false);
   const opponentProfileRef = useRef<OpponentProfile | null>(null);
   const activeSessionRef = useRef<ActiveSession | null>(null);
   const recordedSessionIdRef = useRef<string | null>(null);
@@ -131,17 +139,9 @@ export function useNetplaySession({
     return emulatorRuntimeRef.current;
   }, []);
 
-  // Video streaming mode is always ON for netplay
-  const videoStreamingMode = true;
-
   // Disconnect detection state for GUEST UI
   const [disconnectSeverity, setDisconnectSeverity] = useState<DisconnectSeverity>("connected");
   const [disconnectCountdown, setDisconnectCountdown] = useState<number | undefined>(undefined);
-
-  useEffect(() => {
-    sessionCoreRef.current =
-      "core" in state ? state.core : (activeSessionRef.current?.core ?? null);
-  }, [state]);
 
   useEffect(() => {
     opponentProfileRef.current = opponentProfile;
@@ -150,8 +150,6 @@ export function useNetplaySession({
   useEffect(() => {
     if (state.step === "playing") return;
     remoteHeldMaskRef.current = 0;
-    queuedRemoteHeldMaskRef.current = null;
-    guestResyncPendingRef.current = false;
   }, [state.step]);
 
   const reconcileRemoteHeldMask = useCallback(
@@ -175,35 +173,7 @@ export function useNetplaySession({
     [getEmulatorRuntime],
   );
 
-  const handleGuestResyncState = useCallback((payload: ResyncStatePayload) => {
-    if (roleRef.current !== "guest") return;
-
-    guestResyncPendingRef.current = true;
-    queuedRemoteHeldMaskRef.current = null;
-    remoteHeldMaskRef.current = payload.remoteHeldMask;
-  }, []);
-
-  const handleGuestResyncLoaded = useCallback(() => {
-    if (roleRef.current !== "guest") return;
-
-    guestResyncPendingRef.current = false;
-
-    const queuedHeldMask = queuedRemoteHeldMaskRef.current;
-    queuedRemoteHeldMaskRef.current = null;
-
-    if (queuedHeldMask !== null) {
-      reconcileRemoteHeldMask(queuedHeldMask);
-    }
-  }, [reconcileRemoteHeldMask]);
-
-  const handleGuestResyncFailed = useCallback(() => {
-    if (roleRef.current !== "guest") return;
-
-    guestResyncPendingRef.current = false;
-    queuedRemoteHeldMaskRef.current = null;
-  }, []);
-
-  // --- Heartbeat logic (HOST sends, GUEST monitors) ---
+  // --- 하트비트 로직 (HOST 전송, GUEST 모니터링) ---
 
   const clearHeartbeatTimers = useCallback(() => {
     if (heartbeatTimerRef.current) {
@@ -313,17 +283,10 @@ export function useNetplaySession({
 
   const handleRemoteInput = useCallback(
     (msg: InputMessage) => {
-      lastInputTimeRef.current = Date.now();
-
       const nextHeldMask =
         typeof msg.heldMask === "number"
           ? msg.heldMask
           : updateHeldMask(remoteHeldMaskRef.current, msg.button, msg.down);
-
-      if (guestResyncPendingRef.current) {
-        queuedRemoteHeldMaskRef.current = nextHeldMask;
-        return;
-      }
 
       reconcileRemoteHeldMask(nextHeldMask);
     },
@@ -332,13 +295,6 @@ export function useNetplaySession({
 
   const handleRemoteHeldMask = useCallback(
     (heldMask: number) => {
-      lastInputTimeRef.current = Date.now();
-
-      if (guestResyncPendingRef.current) {
-        queuedRemoteHeldMaskRef.current = heldMask;
-        return;
-      }
-
       reconcileRemoteHeldMask(heldMask);
     },
     [reconcileRemoteHeldMask],
@@ -349,19 +305,18 @@ export function useNetplaySession({
       return;
     }
 
-    lastInputTimeRef.current = Date.now();
     peerRef.current?.sendInput(button, down);
   }, []);
 
-  // --- Video streaming handlers ---
+  // --- 비디오 스트리밍 핸들러 ---
 
-  /** HOST: canvas stream is ready → attach to peer connection */
+  /** HOST: 캔버스 스트림이 준비되면 Peer에 붙인다. */
   const handleCanvasStreamReady = useCallback((stream: MediaStream) => {
     console.log("[LOBBY] HOST canvas stream ready, attaching to peer");
     peerRef.current?.startVideoStreaming(stream);
   }, []);
 
-  /** GUEST: video stream received from HOST via WebRTC */
+  /** GUEST: HOST로부터 WebRTC 비디오 스트림을 수신했다. */
   const handleVideoStream = useCallback((stream: MediaStream) => {
     console.log("[LOBBY] GUEST received video stream from HOST");
     videoStreamRef.current = stream;
@@ -375,8 +330,7 @@ export function useNetplaySession({
     [setNetworkStats],
   );
 
-  /** HOST: video capture is now handled automatically by EmulatorPlayer via onCanvasStreamReady.
-   *  This callback just logs for debugging. */
+  /** HOST: 비디오 캡처 시작 콜백. EmulatorPlayer의 onCanvasStreamReady가 자동 처리하므로 로그만 남긴다. */
   const handleStartVideoCapture = useCallback(() => {
     if (roleRef.current !== "host") return;
     console.log(
@@ -405,18 +359,7 @@ export function useNetplaySession({
   const {
     handleEmulatorReady,
     handlePeerReady,
-    handlePeerResyncLoaded,
-    handlePeerResyncFailed,
-    handlePeerResyncState,
-    handlePeerSaveState,
     handlePeerStartSignal,
-    handlePeerStateLoaded,
-    handleResyncFailed,
-    handleResyncLoaded,
-    handleResyncState,
-    handleSaveState,
-    handleSaveStateError,
-    handleStateLoaded,
     resetSyncRuntime,
   } = useNetplaySyncRuntime({
     dcState,
@@ -424,12 +367,6 @@ export function useNetplaySession({
     peerRef,
     emulatorRef,
     roleRef,
-    lastInputTimeRef,
-    sessionCoreRef,
-    videoStreamingMode,
-    onGuestResyncLoaded: handleGuestResyncLoaded,
-    onGuestResyncFailed: handleGuestResyncFailed,
-    onGuestResyncState: handleGuestResyncState,
     setGameStarted: updateGameStarted,
     updateSync,
     markSessionStarted,
@@ -495,12 +432,7 @@ export function useNetplaySession({
     handleIncomingChatMessage,
     handleIncomingTypingState,
     handlePeerReady,
-    handlePeerSaveState,
-    handlePeerStateLoaded,
     handlePeerStartSignal,
-    handlePeerResyncLoaded,
-    handlePeerResyncState,
-    handlePeerResyncFailed,
     handleVideoStream,
     handleNetworkStats,
     handleHeartbeat,
@@ -538,13 +470,7 @@ export function useNetplaySession({
     handleStartRoomSession,
     handleSpectatePublicRoom,
     handleSpectateRoom,
-    handleResyncFailed,
-    handleResyncLoaded,
-    handleResyncState,
-    handleSaveState,
-    handleSaveStateError,
     handleSendChat,
-    handleStateLoaded,
     handleSummaryChooseAnotherGame,
     handleSummaryRematch,
     handleVideoStream,

@@ -4,8 +4,8 @@ import {
   type RoomSessionStartedMessage,
   type SignalingMessage,
 } from "./signaling";
-import { deflate, inflate } from "pako";
 
+/** HOST를 포함한 입력 메시지. DataChannel `input`으로 전송된다. */
 export type InputMessage = {
   type: "input";
   button: number;
@@ -27,6 +27,7 @@ export type ResyncStatePayload = {
   };
 };
 
+/** 채팅 메시지. DataChannel `chat`으로 전송된다. */
 export type ChatMessage = {
   id: string;
   text: string;
@@ -36,6 +37,7 @@ export type ChatMessage = {
   authorRole?: "host" | "guest" | "spectator";
 };
 
+/** 엄보에 대한 코렇션 메시지. `repair` DataChannel으로 120ms 주기로 전송한다. */
 export type InputSyncMessage = {
   type: "input-sync";
   heldMask: number;
@@ -48,10 +50,13 @@ type InputAckMessage = {
   sentAt: number;
 };
 
+/** 네트워크 품질 등급. RTT 및 입력 버퍼 상태를 기반으로 산정한다. */
 export type NetplayNetworkQuality = "unknown" | "good" | "unstable" | "poor";
 
+/** WebRTC ICE 코디이트 유형. `relay`는 TURN 서버 경유를 의미한다. */
 export type NetplayCandidateType = "host" | "srflx" | "prflx" | "relay" | "unknown";
 
+/** 네트워크 통계 스냅샷. 1초 주기로 수집되다. */
 export type NetplayNetworkStats = {
   sampledAt: number;
   quality: NetplayNetworkQuality;
@@ -68,20 +73,30 @@ export type NetplayNetworkStats = {
   staleRepairDropCount: number;
   inputBufferedBytes: number;
   controlBufferedBytes: number;
-  stateBufferedBytes: number;
   repairBufferedBytes: number;
   chatBufferedBytes: number;
   localCandidateType: NetplayCandidateType;
   remoteCandidateType: NetplayCandidateType;
 };
 
+/**
+ * NetplayPeer 이벤트 콜백 인터페이스.
+ * `useNetplayPeerFactory`에서 모든 콜백을 연결한 후 `NetplayPeer` 생성시 주입한다.
+ */
 export type PeerEventHandler = {
+  /** P2P 연결이 열렸다. */
   onConnected: () => void;
+  /** P2P 연결이 닫혔다. */
   onDisconnected: () => void;
+  /** 원격 플레이어의 입력 메시지를 수신했다. */
   onInput: (msg: InputMessage) => void;
+  /** 에러가 발생했다. */
   onError: (msg: string) => void;
+  /** GUEST가 방에 열린다 (HOST 측). */
   onGuestJoined?: (info: { guestNickname?: string; guestAvatar?: string }) => void;
+  /** 방이 생성되었다 (HOST 측). */
   onRoomCreated?: (code: string) => void;
+  /** 방에 입장했다 (GUEST/관전자 측). */
   onRoomJoined?: (info: {
     code: string;
     participantId: string;
@@ -94,15 +109,11 @@ export type PeerEventHandler = {
     hostAvatar?: string;
   }) => void;
   onDataChannelState?: (state: string) => void;
+  /** DataChannel이 열리면 게임플레이어가 준비 완료 신호를 보냈다. */
   onPeerReady?: () => void;
-  onSaveState?: (state: ArrayBuffer) => void;
-  onStateLoaded?: () => void;
-  onStartSignal?: () => void; // GUEST receives "go" from HOST
-  // Fire-and-forget resync
-  onResyncState?: (payload: ResyncStatePayload) => void; // GUEST: load this state
-  onResyncLoaded?: () => void; // HOST: guest applied correction
-  onResyncFailed?: () => void; // Resync failed
-  // Input sequence gap detection
+  /** HOST에서 "go" 신호를 수신했다 (GUEST 측). */
+  onStartSignal?: () => void;
+  /** 입력 시퀀스 공백이 감지되었다. 네트워크 유실 검사용. */
   onInputSeqGap?: (expected: number, got: number) => void;
   onRemoteHeldMask?: (heldMask: number) => void;
   onChatChannelState?: (state: string) => void;
@@ -173,23 +184,11 @@ type PendingBinaryStream = {
   writeOffset: number;
 };
 
-type PendingResyncStream = PendingBinaryStream & {
-  compressed: boolean;
-  heldMask: number;
-  inputSeq: number;
-  rawBytes: number;
-  startedAt: number;
-};
-
 const INPUT_CHANNEL_LABEL = "input";
 const CONTROL_CHANNEL_LABEL = "control";
-const STATE_CHANNEL_LABEL = "state";
 const REPAIR_CHANNEL_LABEL = "repair";
 const CHAT_CHANNEL_LABEL = "chat";
-const SAVE_STATE_CHUNK_SIZE = 64 * 1024;
-const RESYNC_STATE_CHUNK_SIZE = 256 * 1024;
 const CHAT_BUFFER_THRESHOLD = 64 * 1024;
-const STATE_BUFFER_THRESHOLD = 512 * 1024;
 const DEFAULT_REMOTE_HELD_MASK = 0;
 const NETWORK_STATS_INTERVAL_MS = 1_000;
 const INPUT_BUFFER_UNSTABLE_THRESHOLD = 4 * 1024;
@@ -296,12 +295,16 @@ function computeNetworkQuality(stats: Omit<NetplayNetworkStats, "quality">): Net
   return "good";
 }
 
+/**
+ * WebRTC 기반 P2P 넷플레이 코어 클래스.
+ * 시그널링 연결, RTCPeerConnection 관리, DataChannel (input/control/repair/chat),
+ * 비디오 스트리밍, 관전자 지원, 네트워크 통계 수집을 담당한다.
+ */
 export class NetplayPeer {
   private signaling: SignalingClient;
   private pc: RTCPeerConnection | null = null;
   private inputDc: RTCDataChannel | null = null;
   private controlDc: RTCDataChannel | null = null;
-  private stateDc: RTCDataChannel | null = null;
   private repairDc: RTCDataChannel | null = null;
   private chatDc: RTCDataChannel | null = null;
   private handler: PeerEventHandler;
@@ -344,10 +347,23 @@ export class NetplayPeer {
     this.signaling = new SignalingClient(this.onSignaling);
   }
 
+  /**
+   * 시그널링 서버에 연결한다.
+   * @param serverUrl - WebSocket 시그널링 서버 URL
+   */
   async connect(serverUrl: string) {
     await this.signaling.connect(serverUrl);
   }
 
+  /**
+   * 새 방을 생성한다 (HOST 역할로 등록됨).
+   * @param romFilename - ROM 파일명
+   * @param core - 에뮬레이터 코어명
+   * @param bios - BIOS 경로 (optional)
+   * @param nickname - HOST 닉네임
+   * @param avatar - HOST 아바타 이모지
+   * @param isPublic - 공개 방 여부
+   */
   createRoom(
     romFilename: string,
     core: string,
@@ -372,6 +388,12 @@ export class NetplayPeer {
     });
   }
 
+  /**
+   * 기존 방에 입장한다 (GUEST 역할).
+   * @param code - 6자리 방 코드
+   * @param nickname - GUEST 닉네임
+   * @param avatar - GUEST 아바타
+   */
   joinRoom(code: string, nickname?: string, avatar?: string) {
     this._connectionMode = "guest";
     this._sessionStarted = false;
@@ -379,6 +401,12 @@ export class NetplayPeer {
     this.signaling.send({ type: "join-room", code, nickname, avatar });
   }
 
+  /**
+   * 방을 관전한다 (관전자 역할).
+   * @param code - 6자리 방 코드
+   * @param nickname - 관전자 닉네임
+   * @param avatar - 관전자 아바타
+   */
   spectateRoom(code: string, nickname?: string, avatar?: string) {
     this._connectionMode = "spectator";
     this._sessionStarted = false;
@@ -410,6 +438,7 @@ export class NetplayPeer {
     this.signaling.send({ type: "kick-room-participant", participantId });
   }
 
+  /** 게임 세션이 시작되었음을 마크하고 관전자들에게 통지한다. */
   markSessionStarted() {
     if (this._connectionMode !== "host") {
       return;
@@ -420,6 +449,12 @@ export class NetplayPeer {
 
   private _inputSeq = 0;
 
+  /**
+   * 버튼 입력 이벤트를 원격 Peer에 전송한다.
+   * `repair` DataChannel을 통한 코렇션이 진행 중이면 드락한다.
+   * @param button - 버튼 인덱스 (0~11)
+   * @param down - 누름 여부
+   */
   sendInput(button: number, down: boolean) {
     const nextHeldMask = updateHeldMask(this._localHeldMask, button, down);
 
@@ -455,6 +490,10 @@ export class NetplayPeer {
     this.updateRepairSyncLoop();
   }
 
+  /**
+   * 로컈 Peer가 준비 완료되었음을 상대에게 알린다.
+   * GUEST는 DataChannel이 열리면 자동으로 호출한다.
+   */
   sendPeerReady() {
     console.log("[PEER] sendPeerReady, control dc:", this.controlDc?.readyState);
     if (this.controlDc?.readyState === "open") {
@@ -462,56 +501,15 @@ export class NetplayPeer {
     }
   }
 
-  // Send save state as chunked binary over DataChannel
-  sendSaveState(state: ArrayBuffer): boolean {
-    if (this.stateDc?.readyState !== "open") {
-      console.warn("[PEER] sendSaveState: state DC not open");
-      return false;
-    }
-    if (this.stateDc.bufferedAmount > STATE_BUFFER_THRESHOLD) {
-      console.warn(`[PEER] sendSaveState: backpressure, buffered=${this.stateDc.bufferedAmount}`);
-      return false;
-    }
-    const total = state.byteLength;
-    const numChunks = Math.ceil(total / SAVE_STATE_CHUNK_SIZE);
-    console.log(`[PEER] sendSaveState: ${total} bytes, ${numChunks} chunks`);
-    this.stateDc.send(
-      JSON.stringify({ type: "save-state-header", totalBytes: total, chunks: numChunks }),
-    );
-    for (let i = 0; i < numChunks; i++) {
-      const start = i * SAVE_STATE_CHUNK_SIZE;
-      const end = Math.min(start + SAVE_STATE_CHUNK_SIZE, total);
-      this.stateDc.send(state.slice(start, end));
-    }
-    console.log("[PEER] sendSaveState: all chunks sent");
-    return true;
-  }
-
-  // Tell HOST that GUEST loaded the state
-  sendStateLoaded() {
-    console.log("[PEER] sendStateLoaded");
-    if (this.controlDc?.readyState === "open") {
-      this.controlDc.send(JSON.stringify({ type: "state-loaded" }));
-    }
-  }
-
   // HOST tells GUEST to start the game
+  /**
+   * HOST가 GUEST에게 게임 시작 신호를 보냈다.
+   * GUEST는 이 신호를 받아야 에뮬레이터를 시작한다.
+   */
   sendStartSignal() {
     console.log("[PEER] sendStartSignal");
     if (this.controlDc?.readyState === "open") {
       this.controlDc.send(JSON.stringify({ type: "start-signal" }));
-    }
-  }
-
-  sendResyncFailed() {
-    if (this.controlDc?.readyState === "open") {
-      this.controlDc.send(JSON.stringify({ type: "resync-failed" }));
-    }
-  }
-
-  sendResyncLoaded() {
-    if (this.controlDc?.readyState === "open") {
-      this.controlDc.send(JSON.stringify({ type: "resync-loaded" }));
     }
   }
 
@@ -528,6 +526,11 @@ export class NetplayPeer {
     }
   }
 
+  /**
+   * 채팅 메시지를 전송한다.
+   * @param text - 도자 텍스트
+   * @returns 전송된 ChatMessage 또는 연결 안됨 시 `null`
+   */
   sendChatMessage(text: string): ChatMessage | null {
     const trimmed = text.trim().slice(0, 300);
     if (!trimmed) return null;
@@ -561,6 +564,10 @@ export class NetplayPeer {
     return message;
   }
 
+  /**
+   * 로컈 사용자의 타이핑 상태를 상대에게 알린다.
+   * @param isTyping - 입력 중이면 `true`
+   */
   sendTypingState(isTyping: boolean) {
     if (this.chatDc?.readyState !== "open") return;
     if (this._lastTypingState === isTyping) return;
@@ -569,6 +576,10 @@ export class NetplayPeer {
   }
 
   /** Add video+audio tracks from a MediaStream to the peer connection and trigger renegotiation */
+  /**
+   * HOST의 canvas/오디오 MediaStream을 모든 Peer (GUEST, 관전자)에게 스트리밍으로 전송한다.
+   * @param stream - 캔버스를 `captureStream()`한 MediaStream
+   */
   startVideoStreaming(stream: MediaStream) {
     this._stream = stream;
 
@@ -612,7 +623,7 @@ export class NetplayPeer {
   }
 
   // --- Fire-and-forget resync ---
-  /** Reset remote input sequence counter (after resync, GUEST resets) */
+  /** Reset remote input sequence counter */
   resetRemoteSeq(nextExpectedSeq: number) {
     const safeNextExpectedSeq = Number.isFinite(nextExpectedSeq)
       ? Math.max(1, Math.floor(nextExpectedSeq))
@@ -623,37 +634,10 @@ export class NetplayPeer {
     this._remoteAppliedInputSeq = Math.max(this._remoteAppliedInputSeq, appliedSeqFloor);
   }
 
-  sendResyncState(state: ArrayBuffer): boolean {
-    if (this.stateDc?.readyState !== "open") return false;
-    if (this.stateDc.bufferedAmount > STATE_BUFFER_THRESHOLD) {
-      console.warn(`[PEER] sendResyncState: backpressure, buffered=${this.stateDc.bufferedAmount}`);
-      return false;
-    }
-    const compressed = deflate(new Uint8Array(state));
-    const total = compressed.byteLength;
-    const numChunks = Math.ceil(total / RESYNC_STATE_CHUNK_SIZE);
-    console.log(
-      `[PEER] sendResyncState: raw=${state.byteLength}, compressed=${total} (${((1 - total / state.byteLength) * 100).toFixed(0)}% reduction)`,
-    );
-    this.stateDc.send(
-      JSON.stringify({
-        type: "resync-state-header",
-        totalBytes: total,
-        chunks: numChunks,
-        compressed: true,
-        heldMask: this._localHeldMask,
-        inputSeq: this._inputSeq,
-        rawBytes: state.byteLength,
-      }),
-    );
-    for (let i = 0; i < numChunks; i++) {
-      const start = i * RESYNC_STATE_CHUNK_SIZE;
-      const end = Math.min(start + RESYNC_STATE_CHUNK_SIZE, total);
-      this.stateDc.send(compressed.slice(start, end).buffer);
-    }
-    return true;
-  }
-
+  /**
+   * Peer 연결을 종료하고 모든 리소스를 정리한다.
+   * DataChannel, RTCPeerConnection, 타이머, 시그널링 연결을 전부 닫는다.
+   */
   close() {
     this._closing = true;
     this.clearPendingDisconnect();
@@ -662,7 +646,6 @@ export class NetplayPeer {
     this.stopVideoStreaming();
     this.inputDc?.close();
     this.controlDc?.close();
-    this.stateDc?.close();
     this.repairDc?.close();
     this.chatDc?.close();
     this.pc?.close();
@@ -674,7 +657,6 @@ export class NetplayPeer {
     this.signaling.close();
     this.inputDc = null;
     this.controlDc = null;
-    this.stateDc = null;
     this.repairDc = null;
     this.chatDc = null;
     this.pc = null;
@@ -1103,7 +1085,6 @@ export class NetplayPeer {
       staleRepairDropCount: this._staleRepairDropCount,
       inputBufferedBytes: this.inputDc?.bufferedAmount ?? 0,
       controlBufferedBytes: this.controlDc?.bufferedAmount ?? 0,
-      stateBufferedBytes: this.stateDc?.bufferedAmount ?? 0,
       repairBufferedBytes: this.repairDc?.bufferedAmount ?? 0,
       chatBufferedBytes: this.chatDc?.bufferedAmount ?? 0,
       localCandidateType,
@@ -1285,20 +1266,17 @@ export class NetplayPeer {
 
     const inputState = this.inputDc?.readyState ?? "closed";
     const controlState = this.controlDc?.readyState ?? "closed";
-    const stateState = this.stateDc?.readyState ?? "closed";
 
     let nextState: GameplayTransportState = "closed";
-    if (inputState === "open" && controlState === "open" && stateState === "open") {
+    if (inputState === "open" && controlState === "open") {
       nextState = "open";
-    } else if (inputState === "closing" || controlState === "closing" || stateState === "closing") {
+    } else if (inputState === "closing" || controlState === "closing") {
       nextState = "closing";
     } else if (
       inputState === "connecting" ||
       controlState === "connecting" ||
-      stateState === "connecting" ||
       inputState === "open" ||
-      controlState === "open" ||
-      stateState === "open"
+      controlState === "open"
     ) {
       nextState = "connecting";
     }
@@ -1399,154 +1377,11 @@ export class NetplayPeer {
         if (msg.type === "peer-ready") {
           console.log("[PEER] received peer-ready");
           this.handler.onPeerReady?.();
-        } else if (msg.type === "state-loaded") {
-          console.log("[PEER] received state-loaded");
-          this.handler.onStateLoaded?.();
         } else if (msg.type === "start-signal") {
           console.log("[PEER] received start-signal");
           this.handler.onStartSignal?.();
-        } else if (msg.type === "resync-loaded") {
-          this.handler.onResyncLoaded?.();
-        } else if (msg.type === "resync-failed") {
-          this.handler.onResyncFailed?.();
         } else if (msg.type === "heartbeat") {
           this.handler.onHeartbeat?.(msg.ts);
-        }
-      } catch {
-        /* ignore */
-      }
-    };
-  }
-
-  private setupStateDataChannel(dc: RTCDataChannel) {
-    this.stateDc = dc;
-    dc.binaryType = "arraybuffer";
-    this.emitGameplayTransportState();
-
-    let pendingState: PendingBinaryStream | null = null;
-    let pendingResync: PendingResyncStream | null = null;
-
-    dc.onopen = () => {
-      this.emitGameplayTransportState();
-    };
-
-    dc.onclose = () => {
-      this.emitGameplayTransportState();
-    };
-
-    dc.onmessage = (e) => {
-      if (e.data instanceof ArrayBuffer) {
-        if (pendingResync) {
-          const chunk = new Uint8Array(e.data);
-          const nextOffset = Math.min(
-            pendingResync.writeOffset + chunk.byteLength,
-            pendingResync.totalBytes,
-          );
-          pendingResync.buffer.set(
-            chunk.subarray(0, nextOffset - pendingResync.writeOffset),
-            pendingResync.writeOffset,
-          );
-          pendingResync.writeOffset = nextOffset;
-          pendingResync.bytesReceived += chunk.byteLength;
-          pendingResync.chunksReceived += 1;
-          if (
-            pendingResync.chunksReceived >= pendingResync.chunks ||
-            pendingResync.writeOffset >= pendingResync.totalBytes
-          ) {
-            const full = pendingResync.buffer;
-            const wasCompressed = pendingResync.compressed;
-            const remoteHeldMask = pendingResync.heldMask;
-            const remoteInputSeq = pendingResync.inputSeq;
-            const compressedBytes = pendingResync.totalBytes;
-            const rawBytes = pendingResync.rawBytes;
-            const receiveMs = Math.max(0, performance.now() - pendingResync.startedAt);
-            pendingResync = null;
-            if (wasCompressed) {
-              const inflateStartedAt = performance.now();
-              const decompressed = inflate(full);
-              this.handler.onResyncState?.({
-                stateBuffer: decompressed.buffer,
-                remoteHeldMask,
-                remoteInputSeq,
-                stats: {
-                  compressedBytes,
-                  decompressMs: Math.max(0, performance.now() - inflateStartedAt),
-                  rawBytes: decompressed.byteLength || rawBytes,
-                  receiveMs,
-                },
-              });
-            } else {
-              this.handler.onResyncState?.({
-                stateBuffer: full.buffer as ArrayBuffer,
-                remoteHeldMask,
-                remoteInputSeq,
-                stats: {
-                  compressedBytes,
-                  decompressMs: 0,
-                  rawBytes,
-                  receiveMs,
-                },
-              });
-            }
-          }
-          return;
-        }
-
-        if (!pendingState) return;
-
-        const chunk = new Uint8Array(e.data);
-        const nextOffset = Math.min(
-          pendingState.writeOffset + chunk.byteLength,
-          pendingState.totalBytes,
-        );
-        pendingState.buffer.set(
-          chunk.subarray(0, nextOffset - pendingState.writeOffset),
-          pendingState.writeOffset,
-        );
-        pendingState.writeOffset = nextOffset;
-        pendingState.bytesReceived += chunk.byteLength;
-        pendingState.chunksReceived += 1;
-        if (
-          pendingState.chunksReceived >= pendingState.chunks ||
-          pendingState.writeOffset >= pendingState.totalBytes
-        ) {
-          const full = pendingState.buffer;
-          pendingState = null;
-          this.handler.onSaveState?.(full.buffer as ArrayBuffer);
-        }
-        return;
-      }
-
-      if (typeof e.data !== "string") return;
-
-      try {
-        const msg = JSON.parse(e.data);
-        if (msg.type === "save-state-header") {
-          console.log(
-            `[PEER] received save-state-header: ${msg.totalBytes} bytes, ${msg.chunks} chunks`,
-          );
-          pendingState = {
-            totalBytes: msg.totalBytes,
-            chunks: msg.chunks,
-            buffer: new Uint8Array(msg.totalBytes),
-            bytesReceived: 0,
-            chunksReceived: 0,
-            writeOffset: 0,
-          };
-        } else if (msg.type === "resync-state-header") {
-          pendingResync = {
-            totalBytes: msg.totalBytes,
-            chunks: msg.chunks,
-            buffer: new Uint8Array(msg.totalBytes),
-            bytesReceived: 0,
-            chunksReceived: 0,
-            writeOffset: 0,
-            compressed: !!msg.compressed,
-            heldMask: typeof msg.heldMask === "number" ? msg.heldMask : DEFAULT_REMOTE_HELD_MASK,
-            inputSeq: typeof msg.inputSeq === "number" ? msg.inputSeq : 0,
-            rawBytes: typeof msg.rawBytes === "number" ? msg.rawBytes : msg.totalBytes,
-            startedAt: performance.now(),
-          };
         }
       } catch {
         /* ignore */
@@ -1678,7 +1513,6 @@ export class NetplayPeer {
         maxRetransmits: 0,
       });
       const controlDc = pc.createDataChannel(CONTROL_CHANNEL_LABEL);
-      const stateDc = pc.createDataChannel(STATE_CHANNEL_LABEL);
       const repairDc = pc.createDataChannel(REPAIR_CHANNEL_LABEL, {
         ordered: false,
         maxRetransmits: 0,
@@ -1686,7 +1520,6 @@ export class NetplayPeer {
       const chatDc = pc.createDataChannel(CHAT_CHANNEL_LABEL);
       this.setupInputDataChannel(inputDc);
       this.setupControlDataChannel(controlDc);
-      this.setupStateDataChannel(stateDc);
       this.setupRepairDataChannel(repairDc);
       this.setupChatDataChannel(chatDc);
 
@@ -1735,14 +1568,6 @@ export class NetplayPeer {
 
       if (e.channel.label === CONTROL_CHANNEL_LABEL) {
         this.setupControlDataChannel(e.channel);
-        return;
-      }
-
-      if (e.channel.label === STATE_CHANNEL_LABEL) {
-        if (this._connectionMode === "spectator") {
-          return;
-        }
-        this.setupStateDataChannel(e.channel);
         return;
       }
 

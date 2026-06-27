@@ -1,3 +1,4 @@
+/** 넷플레이 히어로 섹션에 표시되는 마케팅 문구 모음. */
 export const NETPLAY_HERO_COPY = {
   badge: "온라인 대전",
   title: "친구와 바로 연결해 같은 게임을 시작하세요.",
@@ -9,6 +10,7 @@ export const NETPLAY_HERO_COPY = {
   ],
 } as const;
 
+/** 넷플레이 흐름 전반에 사용되는 UI 문구 상수 모음. */
 export const NETPLAY_COPY = {
   roomCreating: "방을 만들고 있습니다...",
   waitingForOpponent: "상대방을 기다리는 중... 코드를 공유해 주세요.",
@@ -61,6 +63,11 @@ export const NETPLAY_COPY = {
   sessionHint: "같은 게임으로 새 방을 만들면 바로 다시 초대할 수 있습니다.",
 } as const;
 
+/**
+ * DataChannel 상태값을 화면 표시용 한국어 라벨로 변환한다.
+ * @param dcState - RTCDataChannel 상태 문자열 (`open`, `connecting`, `closing`, 등)
+ * @returns 한국어 라벨 문자열
+ */
 export function getConnectionStatusLabel(dcState: string) {
   switch (dcState) {
     case "open":

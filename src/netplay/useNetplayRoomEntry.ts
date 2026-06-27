@@ -18,6 +18,7 @@ function getRomFilename(romPath: string) {
   return romPath.split("/").pop() ?? romPath;
 }
 
+/** {@link useNetplayRoomEntry} hook 옵션 인터페이스. */
 interface UseNetplayRoomEntryOptions {
   state: LobbyState;
   joinCode: string;
@@ -29,6 +30,10 @@ interface UseNetplayRoomEntryOptions {
   createPeer: (rtcConfiguration?: RTCConfiguration) => NetplayPeer;
 }
 
+/**
+ * 넷플레이 방 생성/입장/관전 로직을 담당하는 hook.
+ * ICE 서버 설정을 가져와 Peer를 생성하고, 시그널링 서버에 연결한다.
+ */
 export function useNetplayRoomEntry({
   state,
   joinCode,

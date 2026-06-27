@@ -1,25 +1,16 @@
 import { useCallback, useRef, type MutableRefObject, type RefObject } from "react";
 
 import type { NetplayPeer } from "@/netplay/peer";
-import type { ResyncStatePayload } from "@/netplay/peer";
 import { useNetplayInitialSync } from "@/netplay/useNetplayInitialSync";
-import { useNetplayResyncLoop } from "@/netplay/useNetplayResyncLoop";
-import type { SystemCore } from "@/components/EmulatorPlayer";
 import type { NetplaySessionRole } from "../../shared/emulator-protocol";
 
+/** {@link useNetplaySyncRuntime} hook 옵션 인터페이스. */
 interface UseNetplaySyncRuntimeOptions {
   dcState: string;
   gameStarted: boolean;
   peerRef: MutableRefObject<NetplayPeer | null>;
   emulatorRef: RefObject<HTMLDivElement | null>;
   roleRef: MutableRefObject<NetplaySessionRole | null>;
-  lastInputTimeRef: MutableRefObject<number>;
-  sessionCoreRef: MutableRefObject<SystemCore | null>;
-  /** When true, use video streaming instead of state sync */
-  videoStreamingMode?: boolean;
-  onGuestResyncLoaded?: () => void;
-  onGuestResyncFailed?: () => void;
-  onGuestResyncState?: (payload: ResyncStatePayload) => void;
   setGameStarted: (gameStarted: boolean) => void;
   updateSync: (message: string) => void;
   markSessionStarted: () => void;
@@ -27,18 +18,17 @@ interface UseNetplaySyncRuntimeOptions {
   onStartVideoCapture?: () => void;
 }
 
+/**
+ * `useNetplayInitialSync`의 래퍼 hook.
+ * 게임 시작 동기화 런타임 핸들러를 제공하고,
+ * 세션 리셋 시 관련 상태를 일괄 정리한다.
+ */
 export function useNetplaySyncRuntime({
   dcState,
   gameStarted,
   peerRef,
   emulatorRef,
   roleRef,
-  lastInputTimeRef,
-  sessionCoreRef,
-  videoStreamingMode,
-  onGuestResyncLoaded,
-  onGuestResyncFailed,
-  onGuestResyncState,
   setGameStarted,
   updateSync,
   markSessionStarted,
@@ -46,37 +36,11 @@ export function useNetplaySyncRuntime({
   onStartVideoCapture,
 }: UseNetplaySyncRuntimeOptions) {
   const gameStartedRef = useRef(false);
-  const {
-    handlePeerResyncLoaded,
-    handlePeerResyncFailed,
-    handlePeerResyncState,
-    handleResyncFailed,
-    handleResyncLoaded,
-    handleResyncState,
-    resetResyncRuntime,
-    startPeriodicResync,
-  } = useNetplayResyncLoop({
-    peerRef,
-    emulatorRef,
-    roleRef,
-    gameStartedRef,
-    lastInputTimeRef,
-    sessionCoreRef,
-    videoStreamingMode,
-    onGuestResyncLoaded,
-    onGuestResyncFailed,
-    onGuestResyncState,
-  });
 
   const {
     handleEmulatorReady,
     handlePeerReady,
-    handlePeerSaveState,
     handlePeerStartSignal,
-    handlePeerStateLoaded,
-    handleSaveState,
-    handleSaveStateError,
-    handleStateLoaded,
     resetInitialSyncRuntime,
   } = useNetplayInitialSync({
     dcState,
@@ -89,29 +53,17 @@ export function useNetplaySyncRuntime({
     updateSync,
     markSessionStarted,
     onHostGameStarted,
-    startPeriodicResync,
     onStartVideoCapture,
   });
+
   const resetSyncRuntime = useCallback(() => {
     resetInitialSyncRuntime();
-    resetResyncRuntime();
-  }, [resetInitialSyncRuntime, resetResyncRuntime]);
+  }, [resetInitialSyncRuntime]);
 
   return {
     handleEmulatorReady,
     handlePeerReady,
-    handlePeerResyncLoaded,
-    handlePeerResyncFailed,
-    handlePeerResyncState,
-    handlePeerSaveState,
     handlePeerStartSignal,
-    handlePeerStateLoaded,
-    handleResyncFailed,
-    handleResyncLoaded,
-    handleResyncState,
-    handleSaveState,
-    handleSaveStateError,
-    handleStateLoaded,
     resetSyncRuntime,
   };
 }

@@ -13,6 +13,7 @@ import type { ChatMessage as PeerChatMessage, NetplayPeer } from "@/netplay/peer
 import { NETPLAY_COPY } from "@/netplay/netplayCopy";
 import { toast } from "sonner";
 
+/** 입력 중입 상태를 자동으로 완료하는 타임아웃 (ms). */
 const CHAT_TYPING_TIMEOUT_MS = 2000;
 
 function focusChatInputWithoutScroll(input: HTMLInputElement | null) {
@@ -22,6 +23,7 @@ function focusChatInputWithoutScroll(input: HTMLInputElement | null) {
   input.select();
 }
 
+/** {@link useNetplayChatControls} hook 옵션 인터페이스. */
 interface UseNetplayChatControlsOptions {
   currentStep: string;
   chatOpen: boolean;
@@ -39,6 +41,10 @@ interface UseNetplayChatControlsOptions {
   resetStoredChatState: () => void;
 }
 
+/**
+ * 넷플레이 채팅 입력/타이핑 상태를 관리하는 hook.
+ * Enter 단쳐론 채팅 열기, 이모지 입력, 타이핑 예고 신호 전송을 담당한다.
+ */
 export function useNetplayChatControls({
   currentStep,
   chatOpen,

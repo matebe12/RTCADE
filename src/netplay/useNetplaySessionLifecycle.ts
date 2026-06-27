@@ -13,6 +13,7 @@ import type { NetplaySessionRole } from "../../shared/emulator-protocol";
 
 type SetLobbyState = (next: LobbyState | ((previous: LobbyState) => LobbyState)) => void;
 
+/** {@link useNetplaySessionLifecycle} hook 옵션 인터페이스. */
 interface UseNetplaySessionLifecycleOptions {
   state: LobbyState;
   setLobbyState: SetLobbyState;
@@ -30,6 +31,10 @@ interface UseNetplaySessionLifecycleOptions {
   fetchRoms: () => Promise<void>;
 }
 
+/**
+ * 넷플레이 세션 시작/종료 생명주기를 관리하는 hook.
+ * 세션 종료 시 cleanup, 통계 API 수수, 세션 요약 데이터 생성을 담당한다.
+ */
 export function useNetplaySessionLifecycle({
   state,
   setLobbyState: setState,

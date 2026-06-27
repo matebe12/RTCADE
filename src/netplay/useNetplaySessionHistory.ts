@@ -28,6 +28,7 @@ function createSessionId() {
   return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
+/** {@link useNetplaySessionHistory} hook 옵션 인터페이스. */
 interface UseNetplaySessionHistoryOptions {
   activeSessionRef: MutableRefObject<ActiveSession | null>;
   opponentProfileRef: MutableRefObject<OpponentProfile | null>;
@@ -37,6 +38,10 @@ interface UseNetplaySessionHistoryOptions {
   setRecentOpponents: (recentOpponents: RecentOpponent[]) => void;
 }
 
+/**
+ * 넷플레이 세션 기록(localStorage)과 서버 통계를 관리하는 hook.
+ * 최근 게임/상대 목록 저장과 게임 세션 시작 시간 기록, 서버 API 수수를 담당한다.
+ */
 export function useNetplaySessionHistory({
   activeSessionRef,
   opponentProfileRef,
@@ -89,7 +94,7 @@ export function useNetplaySessionHistory({
   );
 
   const markSessionStarted = useCallback(() => {
-    if (sessionStartedAtRef.current !== null) return;
+    if (sessionStartedAtRef.current !== null) return; // 중복 호출 방지
 
     sessionStartedAtRef.current = Date.now();
     const activeSession = activeSessionRef.current;
@@ -101,6 +106,7 @@ export function useNetplaySessionHistory({
       incrementTotalPlayedCount();
 
       if (activeSession.mode === "solo" || activeSession.role === "host") {
+        // solo나 host만 서버에 세션을 수속한다 (GUEST는 HOST가 기록함)
         const sessionId = recordedSessionIdRef.current ?? createSessionId();
         recordedSessionIdRef.current = sessionId;
 

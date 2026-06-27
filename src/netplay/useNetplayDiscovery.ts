@@ -12,6 +12,7 @@ import { toast } from "sonner";
 
 type SetLobbyState = (next: LobbyState | ((previous: LobbyState) => LobbyState)) => void;
 
+/** {@link useNetplayDiscovery} hook 옵션 인터페이스. */
 interface UseNetplayDiscoveryOptions {
   currentStep: LobbyState["step"];
   setLobbyState: SetLobbyState;
@@ -21,6 +22,10 @@ interface UseNetplayDiscoveryOptions {
 
 type DiscoveryMode = "netplay" | "solo";
 
+/**
+ * ROM 목록, 공개 방 목록, 플레이 중인 방 목록을 서버 API에서 가져오는 hook.
+ * 메뉴 화면에서는 10초 주기로, 공개 방 화면에서는 5초 주기로 자동 새로고침된다.
+ */
 export function useNetplayDiscovery({
   currentStep,
   setLobbyState,
@@ -138,8 +143,8 @@ export function useNetplayDiscovery({
       if (!response.ok) return;
       const rooms: PublicRoomInfo[] = await response.json();
       setMenuPublicRooms(rooms.slice(0, 2));
+    // 메뉴 예고 파내역: 실패 시 조용히 무시
     } catch {
-      // Menu preview should fail silently.
     }
   }, [setMenuPublicRooms]);
 

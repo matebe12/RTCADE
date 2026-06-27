@@ -8,7 +8,6 @@ import {
   type InputMessage,
   type NetplayPeer,
   type NetplayNetworkStats,
-  type ResyncStatePayload,
 } from "@/netplay/peer";
 import { useNetplayPeerFactory } from "@/netplay/useNetplayPeerFactory";
 import { useNetplayRoomEntry } from "@/netplay/useNetplayRoomEntry";
@@ -24,6 +23,7 @@ import type { NetplaySessionRole } from "../../shared/emulator-protocol";
 
 type SetLobbyState = (next: LobbyState | ((previous: LobbyState) => LobbyState)) => void;
 
+/** {@link useNetplayPeerRoomFlow} hook 옵션 인터페이스. */
 interface UseNetplayPeerRoomFlowOptions {
   state: LobbyState;
   joinCode: string;
@@ -47,17 +47,16 @@ interface UseNetplayPeerRoomFlowOptions {
   handleIncomingChatMessage: (message: PeerChatMessage) => void;
   handleIncomingTypingState: (isTyping: boolean) => void;
   handlePeerReady: () => void;
-  handlePeerSaveState: (stateBuffer: ArrayBuffer) => void;
-  handlePeerStateLoaded: () => void;
   handlePeerStartSignal: () => void;
-  handlePeerResyncLoaded: () => void;
-  handlePeerResyncState: (payload: ResyncStatePayload) => void;
-  handlePeerResyncFailed: () => void;
   handleVideoStream?: (stream: MediaStream) => void;
   handleNetworkStats?: (stats: NetplayNetworkStats) => void;
   handleHeartbeat?: (ts: number) => void;
 }
 
+/**
+ * `useNetplayPeerFactory`와 `useNetplayRoomEntry`를 통합한 hook.
+ * Peer 생성, 시그널링 연결, 방 생성/입장/관전 로직을 일괄 제공한다.
+ */
 export function useNetplayPeerRoomFlow({
   state,
   joinCode,
@@ -81,12 +80,7 @@ export function useNetplayPeerRoomFlow({
   handleIncomingChatMessage,
   handleIncomingTypingState,
   handlePeerReady,
-  handlePeerSaveState,
-  handlePeerStateLoaded,
   handlePeerStartSignal,
-  handlePeerResyncLoaded,
-  handlePeerResyncState,
-  handlePeerResyncFailed,
   handleVideoStream,
   handleNetworkStats,
   handleHeartbeat,
@@ -120,12 +114,7 @@ export function useNetplayPeerRoomFlow({
     handleIncomingChatMessage,
     handleIncomingTypingState,
     handlePeerReady,
-    handlePeerSaveState,
-    handlePeerStateLoaded,
     handlePeerStartSignal,
-    handlePeerResyncLoaded,
-    handlePeerResyncState,
-    handlePeerResyncFailed,
     handleVideoStream,
     handleNetworkStats,
     handleHeartbeat,
