@@ -3,35 +3,35 @@ import type { RefObject } from "react";
 import type { EJSEmulatorInstance } from "../../shared/emulator-protocol";
 
 /**
- * Direct runtime bridge to EmulatorJS running in the parent DOM.
- * Replaces the old postMessage-based iframe bridge.
- * All calls go directly to window.EJS_emulator / gameManager.
+ * React DOM에서 직접 실행되는 EmulatorJS와의 런타임 연결 계층.
+ * 이전에 iframe postMessage 방식을 대체하며, 직접 `window.EJS_emulator` / `gameManager`를 호출한다.
  */
 
 export interface EmulatorRuntimeBridge {
   input: {
+    /** 로컀 플레이어의 에뮬레이터 입력을 시뮬레이션한다. */
     simulateLocalInput: (player: number, button: number, value: number) => void;
+    /** 원격 플레이어(원개임 HOST)의 입력을 에뮬레이터에 전달한다. GUEST에서 호출한다. */
     sendRemoteInput: (button: number, down: boolean) => void;
   };
   sync: {
-    getSaveState: () => ArrayBuffer | null;
-    loadSaveState: (state: ArrayBuffer) => boolean;
-    getResyncState: () => ArrayBuffer | null;
-    loadResyncState: (state: ArrayBuffer) => boolean;
+    /** 에뮬레이터를 시작(재개)시킨다. HOST가 게임 시작 신호를 받았을 때 호출한다. */
     startGame: () => void;
-    pause: () => void;
-    play: () => void;
   };
   capture: {
-    /** Get a MediaStream captured from the emulator canvas. autoFps=0 means manual requestFrame(). */
+    /**
+     * 에뮬레이터 캔버스에서 MediaStream을 캡처한다.
+     * @param fps - 추출 프레임레이트 (0이면 수동 requestFrame)
+     */
     getCaptureStream: (fps?: number) => MediaStream | null;
-    /** Get an audio MediaStream by tapping into the emulator's AudioContext. */
+    /** EmulatorJS의 AudioContext에서 오디오 MediaStream을 캡처한다. */
     getAudioStream: () => MediaStream | null;
   };
   ui: {
+    /** 에뮬레이터 컨테이너에 포커스를 설정한다. */
     focus: () => void;
   };
-  /** Get the EJS_emulator instance if available. */
+  /** 에뮬레이터 인스턴스(`window.EJS_emulator`)를 반환한다. 초기화 전이라면 `null`. */
   getEmulator: () => EJSEmulatorInstance | null;
 }
 
@@ -56,29 +56,30 @@ function findEmulatorCanvas(target: EmulatorContainerTarget): HTMLCanvasElement 
 }
 
 /**
- * Try to find the AudioContext used by EmulatorJS and create a MediaStream
- * destination from it for audio capture.
+ * EmulatorJS의 AudioContext를 색인하여 오디오 MediaStream을 캡처하려 시도한다.
+ * `window.__rtcade_audio_splitter`가 EmulatorPlayer에서 사전 설치되어 있어야 실제 오디오를 얻을 수 있다.
+ * @returns 오디오 MediaStream 또는 `null`
  */
 function captureAudioFromEJS(): MediaStream | null {
   try {
     const ejs = getEJSEmulator();
     if (!ejs) return null;
 
-    // EmulatorJS stores its AudioContext on the emulator instance or globally.
-    // Try known paths to find it.
+    // EmulatorJS는 에뮬레이터 인스턴스 또는 전역에 AudioContext를 저장한다.
+    // 알려진 경로를 순서대로 탐색한다.
     const runtime = ejs as unknown as Record<string, unknown>;
 
-    // Path 1: EJS_emulator.Module.SDL2.audioContext (Emscripten SDL2 audio)
+    // 경로 1: EJS_emulator.Module.SDL2.audioContext (Emscripten SDL2 오디오)
     const module = runtime.Module as Record<string, unknown> | undefined;
     const sdl2 = module?.SDL2 as Record<string, unknown> | undefined;
     let audioCtx = sdl2?.audioContext as AudioContext | undefined;
 
-    // Path 2: direct audioContext property
+    // 경로 2: audioContext 직접 프로퍼티
     if (!audioCtx) {
       audioCtx = runtime.audioContext as AudioContext | undefined;
     }
 
-    // Path 3: search for any AudioContext in the Emscripten module
+    // 경로 3: Emscripten 모듈 내부에서 AudioContext 실뢰 탐색
     if (!audioCtx && module) {
       for (const key of Object.keys(module)) {
         const val = module[key];
@@ -111,7 +112,7 @@ function captureAudioFromEJS(): MediaStream | null {
     // For now, return null and we'll capture audio in EmulatorPlayer via
     // AudioContext monkey-patching before EJS loads.
 
-    // If we already have a splitter node installed (see EmulatorPlayer), use it
+    // 오디오 캡처를 위해 EmulatorPlayer에서 사전에 설치한 splitter 노드를 확인한다.
     const splitter = (window as unknown as Record<string, unknown>).__rtcade_audio_splitter as
       | {
           stream: MediaStream;
@@ -127,6 +128,14 @@ function captureAudioFromEJS(): MediaStream | null {
   }
 }
 
+/**
+ * EmulatorRuntimeBridge 인스턴스를 생성한다.
+ * 동일한 `containerTarget`에 대해 여러 번 호출해도 안전하다.
+ * @param containerTarget - 에뮬레이터가 마운트된 DOM 컨테이너 (React ref 또는 getter 함수)
+ * @param _localPlayer - 로컀 플레이어 인덱스 (0 기본값, 현재 미사용)
+ * @param remotePlayer - 원격 플레이어 인덱스 (GUEST 입력 수신 시 적용되는 슬롯)
+ * @returns EmulatorRuntimeBridge 인터페이스 객체
+ */
 export function createEmulatorRuntimeBridge(
   containerTarget: EmulatorContainerTarget,
   /** 0 = local player, 1 = remote player (or vice versa for guest) */
@@ -147,81 +156,7 @@ export function createEmulatorRuntimeBridge(
       },
     },
     sync: {
-      getSaveState(): ArrayBuffer | null {
-        try {
-          const ejs = getEJSEmulator();
-          if (!ejs) return null;
-          const state = ejs.gameManager.getState();
-          const buf = (state as unknown as { buffer?: ArrayBuffer }).buffer ?? state;
-          if (buf instanceof ArrayBuffer && buf.byteLength > 0) return buf;
-          if (ArrayBuffer.isView(buf) && buf.byteLength > 0)
-            return (buf as Uint8Array).buffer as ArrayBuffer;
-          return null;
-        } catch (e) {
-          console.warn("[BRIDGE] getSaveState failed:", e);
-          return null;
-        }
-      },
-      loadSaveState(state: ArrayBuffer): boolean {
-        try {
-          const ejs = getEJSEmulator();
-          if (!ejs) return false;
-          ejs.gameManager.loadState(new Uint8Array(state));
-          return true;
-        } catch (e) {
-          console.warn("[BRIDGE] loadSaveState failed:", e);
-          return false;
-        }
-      },
-      getResyncState(): ArrayBuffer | null {
-        try {
-          const ejs = getEJSEmulator();
-          if (!ejs) return null;
-          ejs.pause();
-          const state = ejs.gameManager.getState();
-          const buf = (state as unknown as { buffer?: ArrayBuffer }).buffer ?? state;
-          ejs.play();
-          if (buf instanceof ArrayBuffer && buf.byteLength > 0) return buf;
-          if (ArrayBuffer.isView(buf) && buf.byteLength > 0)
-            return (buf as Uint8Array).buffer as ArrayBuffer;
-          return null;
-        } catch (e) {
-          console.warn("[BRIDGE] getResyncState failed:", e);
-          try {
-            getEJSEmulator()?.play();
-          } catch {
-            /* */
-          }
-          return null;
-        }
-      },
-      loadResyncState(state: ArrayBuffer): boolean {
-        try {
-          const ejs = getEJSEmulator();
-          if (!ejs) return false;
-          ejs.pause();
-          ejs.gameManager.loadState(new Uint8Array(state));
-          ejs.play();
-          return true;
-        } catch (e) {
-          console.warn("[BRIDGE] loadResyncState failed:", e);
-          try {
-            getEJSEmulator()?.play();
-          } catch {
-            /* */
-          }
-          return false;
-        }
-      },
       startGame() {
-        const ejs = getEJSEmulator();
-        ejs?.play();
-      },
-      pause() {
-        const ejs = getEJSEmulator();
-        ejs?.pause();
-      },
-      play() {
         const ejs = getEJSEmulator();
         ejs?.play();
       },

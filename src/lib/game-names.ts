@@ -1,6 +1,6 @@
 /**
- * MAME 2003 Plus ROM short-code → 한글 게임명 매핑.
- * 부모 ROM 기준, 클론/지역판(j,u,a,b 접미사)은 parent로 자동 폴백.
+ * MAME 2003 Plus ROM 숫코드 → 한글 게임명 매핑.
+ * 부모 ROM 기준, 클론/지역판(j,u,a,b 접미사)은 parent로 자동 폴백한다.
  * https://archive.org/download/mame-2003-plus-reference-set/roms/ 기준 전수 조사.
  */
 const MAME_NAMES: Record<string, string> = {
@@ -1339,17 +1339,31 @@ function resolveArcadeLookupKey<T>(lookup: Record<string, T>, filename: string) 
   return null;
 }
 
+/**
+ * 주어진 코어가 아케이드(마임) 코어인지 확인한다.
+ * @param core - 에뮬레이터 코어명 (ex: `arcade`, `mame2003`)
+ * @returns 아케이드 코어이면 `true`
+ */
 export function isArcadeCore(core: string) {
   return ARCADE_CORES.has(core);
 }
 
+/**
+ * ROM 파일명에서 매핑 테이블의 값을 조회한다. 코드가 다른 파일명으로의 폴백도 타지원한다.
+ * @param filename - ROM 파일명 (ex: `mslug3.zip`)
+ * @param lookup - 코드 → 값 매핑 테이블
+ * @returns 황다 값 또는 `null`
+ */
 export function resolveArcadeLookupValue<T>(filename: string, lookup: Record<string, T>): T | null {
   const key = resolveArcadeLookupKey(lookup, filename);
   return key ? lookup[key] : null;
 }
 
 /**
- * ROM shortcode의 카테고리를 반환. 매핑에 없으면 "etc".
+ * ROM shortcode의 카테고리를 반환한다. 매핑에 없으면 `"etc"`.
+ * @param filename - ROM 파일명
+ * @param core - 에뮬레이터 코어명
+ * @returns 게임 카테고리 ({@link GameCategory})
  */
 export function getRomCategory(filename: string, core: string): GameCategory {
   if (!isArcadeCore(core)) {
@@ -1360,24 +1374,27 @@ export function getRomCategory(filename: string, core: string): GameCategory {
 }
 
 /**
- * Convert a ROM filename like "mslug3.zip" or "Super_Mario_Bros.nes"
- * into a human-friendly display name.
+ * ROM 파일명을 화면에 표시할 사람이 읽을 수 있는 이름으로 변환한다.
+ * 아케이드 코어이면 매핑 테이블에서 멊저 조회하고, 없으면 파일명을 휴메나이즈한다.
+ * @param filename - ROM 파일명 (ex: `mslug3.zip`, `Super_Mario_Bros.nes`)
+ * @param core - 에뮬레이터 코어명
+ * @returns 화면 표시용 게임명 문자열
  */
 export function parseRomName(filename: string, core: string): string {
-  // Strip extension
+  // 확장자 제거
   const base = stripRomExtension(filename);
 
-  // For MAME/arcade cores, try the lookup table first
+  // 마임/아케이드 코어이면 매핑 테이블에서 멏저 조회
   if (isArcadeCore(core)) {
     const known = resolveArcadeLookupValue(filename, MAME_NAMES);
     if (known) return known;
   }
 
-  // Fallback: humanize the filename
+  // 폴백: 파일명을 휴메나이즈
   return base
-    .replace(/[_-]/g, " ") // underscores/hyphens → spaces
-    .replace(/([a-z])([A-Z])/g, "$1 $2") // camelCase split
-    .replace(/\s+/g, " ") // collapse whitespace
+    .replace(/[_-]/g, " ") // 밀줄/하이픈 → 공백
+    .replace(/([a-z])([A-Z])/g, "$1 $2") // camelCase 분리
+    .replace(/\s+/g, " ") // 연속 공백 정리
     .trim()
-    .replace(/\b\w/g, (c) => c.toUpperCase()); // title case
+    .replace(/\b\w/g, (c) => c.toUpperCase()); // 타이틀 케이스
 }

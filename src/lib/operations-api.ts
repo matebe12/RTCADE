@@ -1,7 +1,9 @@
 import { buildBackendUrl } from "@/lib/backend-url";
 
+/** 운영 통계 갱신 요청을 알리는 커스텀 DOM 이벤트 이름. */
 const OPERATIONS_STATS_REFRESH_EVENT = "rtcade:operations-stats-refresh";
 
+/** 인기 게임 요약 정보. */
 export interface PopularGameSummary {
   core?: string;
   gameName: string;
@@ -21,6 +23,7 @@ const FALLBACK_ICE_SERVERS: RTCIceServer[] = [
 let cachedRtcConfiguration: RTCConfiguration | null = null;
 let rtcConfigurationPromise: Promise<RTCConfiguration> | null = null;
 
+/** `/api/stats` 응답 스키마. 서버 운영 지표와 인기 게임 정보를 포함한다. */
 export interface OperationsStats {
   activeRooms: number;
   activeNetplayRooms: number;
@@ -41,6 +44,7 @@ export interface OperationsStats {
   weeklyPopularGame: PopularGameSummary | null;
 }
 
+/** `/api/game-sessions` POST 요청 본문 타입. 게임 세션 시작 시 기록한다. */
 export interface RecordGameSessionInput {
   core: string;
   gameName: string;
@@ -48,6 +52,7 @@ export interface RecordGameSessionInput {
   sessionId: string;
 }
 
+/** `/api/active-play-sessions` POST 요청 본문 타입. 솔로 플레이 세션 등록 시 사용한다. */
 export interface ActivePlaySessionInput {
   core: string;
   gameName: string;
@@ -56,6 +61,7 @@ export interface ActivePlaySessionInput {
   sessionId: string;
 }
 
+/** 관리자 공지 항목. `/api/notices` 응답에 포함된다. */
 export interface NoticeItem {
   body: string;
   createdAt: string;
@@ -227,6 +233,9 @@ async function fetchJson<T>(pathname: string, init?: RequestInit): Promise<T> {
   return (await response.json()) as T;
 }
 
+/**
+ * 운영 통계 갱신 이벤트를 주사한다. 통계 지표를 바라보는 컴포넌트가 새로고침 신호로 활용한다.
+ */
 export function notifyOperationsStatsRefresh() {
   if (typeof window === "undefined") {
     return;
@@ -235,10 +244,20 @@ export function notifyOperationsStatsRefresh() {
   window.dispatchEvent(new Event(OPERATIONS_STATS_REFRESH_EVENT));
 }
 
+/**
+ * 운영 통계 갱신 이벤트 이름을 반환한다. `addEventListener` 등록 시 사용한다.
+ * @returns DOM 커스텀 이벤트 이름 문자열
+ */
 export function getOperationsStatsRefreshEventName() {
   return OPERATIONS_STATS_REFRESH_EVENT;
 }
 
+/**
+ * `navigator.sendBeacon`으로 솔로 플레이 세션을 종료한다.
+ * 페이지 닫혀도 안정적으로 요청이 전송된다.
+ * @param sessionId - 종료할 세션 ID
+ * @returns 비콘 전송 성공 여부
+ */
 export function endActivePlaySessionWithBeacon(sessionId: string) {
   if (
     typeof window === "undefined" ||
@@ -261,6 +280,12 @@ export function endActivePlaySessionWithBeacon(sessionId: string) {
   return navigator.sendBeacon(targetUrl);
 }
 
+/**
+ * `navigator.sendBeacon`으로 게임 세션을 완료 상태로 멈쪸다.
+ * 페이지 닫혀도 안정적으로 요청이 전송된다.
+ * @param sessionId - 완료할 게임 세션 ID
+ * @returns 비콜 전송 성공 여부
+ */
 export function completeGameSessionWithBeacon(sessionId: string) {
   if (
     typeof window === "undefined" ||
@@ -281,10 +306,20 @@ export function completeGameSessionWithBeacon(sessionId: string) {
   return navigator.sendBeacon(targetUrl);
 }
 
+/**
+ * 서버에서 운영 통계를 조회한다.
+ * @returns 정상화된 {@link OperationsStats} 객체
+ */
 export function fetchOperationsStats() {
   return fetchJson<unknown>("/api/stats").then(normalizeOperationsStats);
 }
 
+/**
+ * WebRTC ICE 서버 설정을 서버에서 가져온다.
+ * 응답은 모눣스로 기복하며, 실패 시 STUN 폴스백 서버를 사용한다.
+ * @param forceRefresh - `true`이면 캐시를 무시하고 다시 가져온다
+ * @returns RTCConfiguration 객체 (iceServers 포함)
+ */
 export function fetchNetplayRtcConfiguration(forceRefresh = false) {
   if (!forceRefresh && cachedRtcConfiguration) {
     return Promise.resolve(cachedRtcConfiguration);
@@ -307,6 +342,10 @@ export function fetchNetplayRtcConfiguration(forceRefresh = false) {
   return rtcConfigurationPromise;
 }
 
+/**
+ * 게임 세션 시작을 서버에 기록한다.
+ * @param input - 코어, 게임명, ROM 경로, 세션 ID
+ */
 export async function recordGameSession(input: RecordGameSessionInput) {
   await request("/api/game-sessions", {
     method: "POST",
@@ -319,6 +358,10 @@ export async function recordGameSession(input: RecordGameSessionInput) {
   notifyOperationsStatsRefresh();
 }
 
+/**
+ * 게임 세션을 완료 상태로 멈쪸다.
+ * @param sessionId - 완료할 게임 세션 ID
+ */
 export async function completeGameSession(sessionId: string) {
   await request(`/api/game-sessions/${encodeURIComponent(sessionId)}/end`, {
     method: "POST",
@@ -327,6 +370,10 @@ export async function completeGameSession(sessionId: string) {
   notifyOperationsStatsRefresh();
 }
 
+/**
+ * 솔로 플레이 세션을 등록하거나 업데이트한다. TTL 기반 자동 만료를 서버가 관리한다.
+ * @param input - 코어, 게임명, ROM 경로, 세션 ID, 모드
+ */
 export async function upsertActivePlaySession(input: ActivePlaySessionInput) {
   await request("/api/active-play-sessions", {
     method: "POST",
@@ -337,6 +384,10 @@ export async function upsertActivePlaySession(input: ActivePlaySessionInput) {
   });
 }
 
+/**
+ * 솔로 플레이 세션을 종료한다.
+ * @param sessionId - 종료할 세션 ID
+ */
 export async function endActivePlaySession(sessionId: string) {
   await request(`/api/active-play-sessions/${encodeURIComponent(sessionId)}/end`, {
     method: "POST",
@@ -346,6 +397,10 @@ export async function endActivePlaySession(sessionId: string) {
   notifyOperationsStatsRefresh();
 }
 
+/**
+ * 관리자 공지 목록을 가져온다.
+ * @returns 공지 항목 배열 ({@link NoticeItem}[])
+ */
 export async function fetchNotices() {
   const response = await fetchJson<NoticeResponse>("/api/notices");
   return response.items;

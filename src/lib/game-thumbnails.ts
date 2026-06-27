@@ -1,14 +1,14 @@
 import { isArcadeCore, parseRomName, resolveArcadeLookupValue } from "@/lib/game-names";
 
 /**
- * MAME ROM shortcode → 영어 MAME 데이터베이스 이름 매핑.
- * libretro-thumbnails CDN에서 스크린샷을 가져오기 위한 이름.
+ * 아케이드 ROM 숨코드 → 영어 MAME 데이터베이스 이름 매핑.
+ * libretro-thumbnails CDN에서 스크린샷을 가져오기 위한 이름이다.
  * https://thumbnails.libretro.com/MAME/Named_Snaps/{name}.png
  *
  * 파일명 규칙:
- *  - ':' → '_'
- *  - '/' → '_'
- *  - 나머지는 그대로 (URL 인코딩은 getGameThumbnailUrl에서 처리)
+ *  - `:` → `_`
+ *  - `/` → `_`
+ *  - 나머지는 그대로 (URL 인코딩은 `getGameThumbnailUrl`에서 처리)
  */
 const MAME_THUMBNAIL_NAMES: Record<string, string> = {
   // ── # 숫자 ──
@@ -493,6 +493,13 @@ function stripRomExtension(filename: string) {
   return filename.replace(ROM_FILENAME_EXTENSION_PATTERN, "");
 }
 
+/**
+ * ROM에 해당하는 실제 스크린샷이 없을 때 사용하는 SVG 폴라백 썸네일 URL을 반환한다.
+ * 게임명 액자, 코어 배지, ROM 코드를 시각적으로 표현한다.
+ * @param filename - ROM 파일명
+ * @param core - 에뮬레이터 코어명
+ * @returns `data:image/svg+xml;...` 형식 URL
+ */
 export function getFallbackGameThumbnailUrl(filename: string, core: string) {
   const title = parseRomName(filename, core);
   const monogram = getThumbnailMonogram(title);
@@ -532,8 +539,11 @@ export function getFallbackGameThumbnailUrl(filename: string, core: string) {
 }
 
 /**
- * ROM shortcode에 해당하는 썸네일 이미지 URL을 반환.
- * 매핑에 없으면 null.
+ * ROM 파일명에 해당하는 libretro-thumbnails CDN 스크린샷 URL을 반환한다.
+ * 매핑에 없으면 `null`을 반환하면 폴라백 썸네일을 사용하여야 한다.
+ * @param filename - ROM 파일명
+ * @param core - 에뮬레이터 코어명
+ * @returns CDN URL 문자열 또는 `null`
  */
 export function getGameThumbnailUrl(filename: string, core: string): string | null {
   if (!isArcadeCore(core)) {
@@ -548,11 +558,9 @@ export function getGameThumbnailUrl(filename: string, core: string): string | nu
   const englishName = resolveArcadeLookupValue(filename, MAME_THUMBNAIL_NAMES);
   if (!englishName) return null;
 
-  // URL-encode the name (spaces → %20, etc.)
+  // URL 인코딩 처리 (%20 형식 유지)
   const encoded = encodeURIComponent(englishName + ".png")
-    // encodeURIComponent encodes too aggressively for URLs;
-    // restore characters that the CDN expects unencoded
-    .replace(/%20/g, "%20"); // keep %20 as-is
+    .replace(/%20/g, "%20");
 
   return THUMBNAIL_CDN_BASE + encoded;
 }

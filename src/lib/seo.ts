@@ -2,9 +2,13 @@ import { useEffect } from "react";
 
 import { appEnvironment } from "@/config/environment";
 
+/** 페이지별 SEO 메타 태그 옵션. */
 type PageSeoOptions = {
+  /** 페이지 제목 (사이트명이 자동 부가됨). */
   title: string;
+  /** 메타 description 및 OG/Twitter 설명 문구. */
   description: string;
+  /** `true`이면 `noindex,nofollow`로 검색엔진 수집을 차단한다. */
   noIndex?: boolean;
 };
 
@@ -49,6 +53,11 @@ function updateCanonical(url: string) {
   element.setAttribute("href", url);
 }
 
+/**
+ * 페이지의 SEO 메타 태그를 동적으로 업데이트하는 React Hook.
+ * `<title>`, `description`, `robots`, OG 태그, Twitter Card, canonical URL을 스열친다.
+ * @param options - 페이지 SEO 옵션 ({@link PageSeoOptions})
+ */
 export function usePageSeo({ title, description, noIndex = false }: PageSeoOptions) {
   useEffect(() => {
     const fullTitle = `${title} | ${appEnvironment.siteName}`;
