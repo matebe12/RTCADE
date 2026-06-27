@@ -116,13 +116,7 @@ export default function NetplayLobby({ hasProfile = true }: { hasProfile?: boole
     handleStartRoomSession,
     handleSpectatePublicRoom,
     handleSpectateRoom,
-    handleResyncFailed,
-    handleResyncLoaded,
-    handleResyncState,
-    handleSaveState,
-    handleSaveStateError,
     handleSendChat,
-    handleStateLoaded,
     handleSummaryChooseAnotherGame,
     handleSummaryRematch,
     handleCanvasStreamReady,
@@ -694,12 +688,6 @@ export default function NetplayLobby({ hasProfile = true }: { hasProfile?: boole
         onSendChat={handleSendChat}
         onLocalInput={handleLocalInput}
         onEmulatorReady={handleEmulatorReady}
-        onSaveState={handleSaveState}
-        onStateLoaded={handleStateLoaded}
-        onSaveStateError={handleSaveStateError}
-        onResyncState={handleResyncState}
-        onResyncLoaded={handleResyncLoaded}
-        onResyncFailed={handleResyncFailed}
         onChatShortcut={handleChatShortcut}
         onCanvasStreamReady={handleCanvasStreamReady}
         videoStream={state.step === "playing" ? guestVideoStream : null}

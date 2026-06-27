@@ -66,12 +66,6 @@ interface NetplayPlayingScreenProps {
   onSendChat: () => boolean;
   onLocalInput: (button: number, down: boolean) => void;
   onEmulatorReady: () => void;
-  onSaveState: (state: ArrayBuffer) => void;
-  onStateLoaded: () => void;
-  onSaveStateError: (error: string) => void;
-  onResyncState: (state: ArrayBuffer) => void;
-  onResyncLoaded: () => void;
-  onResyncFailed: () => void;
   onChatShortcut: () => void;
   onCanvasStreamReady?: (stream: MediaStream) => void;
   videoStream: MediaStream | null;
@@ -102,12 +96,6 @@ export default function NetplayPlayingScreen({
   onSendChat,
   onLocalInput,
   onEmulatorReady,
-  onSaveState,
-  onStateLoaded,
-  onSaveStateError,
-  onResyncState,
-  onResyncLoaded,
-  onResyncFailed,
   onChatShortcut,
   onCanvasStreamReady,
   videoStream,
@@ -270,12 +258,6 @@ export default function NetplayPlayingScreen({
               biosPath={session.biosPath}
               onLocalInput={onLocalInput}
               onEmulatorReady={onEmulatorReady}
-              onSaveState={onSaveState}
-              onStateLoaded={onStateLoaded}
-              onSaveStateError={onSaveStateError}
-              onResyncState={onResyncState}
-              onResyncLoaded={onResyncLoaded}
-              onResyncFailed={onResyncFailed}
               onChatShortcut={onChatShortcut}
               onCanvasStreamReady={onCanvasStreamReady}
             />

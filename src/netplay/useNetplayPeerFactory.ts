@@ -7,7 +7,6 @@ import {
   type ChatMessage as PeerChatMessage,
   type InputMessage,
   type NetplayNetworkStats,
-  type ResyncStatePayload,
 } from "@/netplay/peer";
 import { NETPLAY_COPY } from "@/netplay/netplayCopy";
 import {
@@ -26,6 +25,7 @@ type StartedNetplaySession = ActiveSession & {
   role: NetplaySessionRole;
 };
 
+/** {@link useNetplayPeerFactory} hook 옵션 인터페이스. */
 interface UseNetplayPeerFactoryOptions {
   peerRef: MutableRefObject<NetplayPeer | null>;
   roleRef: MutableRefObject<NetplaySessionRole | null>;
@@ -45,12 +45,7 @@ interface UseNetplayPeerFactoryOptions {
   handleIncomingChatMessage: (message: PeerChatMessage) => void;
   handleIncomingTypingState: (isTyping: boolean) => void;
   handlePeerReady: () => void;
-  handlePeerSaveState: (stateBuffer: ArrayBuffer) => void;
-  handlePeerStateLoaded: () => void;
   handlePeerStartSignal: () => void;
-  handlePeerResyncLoaded: () => void;
-  handlePeerResyncState: (payload: ResyncStatePayload) => void;
-  handlePeerResyncFailed: () => void;
   handleVideoStream?: (stream: MediaStream) => void;
   handleNetworkStats?: (stats: NetplayNetworkStats) => void;
   handleHeartbeat?: (ts: number) => void;
@@ -59,6 +54,10 @@ interface UseNetplayPeerFactoryOptions {
 
 const ROOM_FULL_ERROR = "방이 이미 가득 찼습니다.";
 
+/**
+ * `NetplayPeer` 인스턴스를 생성하고 모든 이벤트 핸들러를 연결하는 hook.
+ * `createPeer()` 함수를 반환하며, 호출할 때마다 새 Peer를 생성한다.
+ */
 export function useNetplayPeerFactory({
   peerRef,
   roleRef,
@@ -78,12 +77,7 @@ export function useNetplayPeerFactory({
   handleIncomingChatMessage,
   handleIncomingTypingState,
   handlePeerReady,
-  handlePeerSaveState,
-  handlePeerStateLoaded,
   handlePeerStartSignal,
-  handlePeerResyncLoaded,
-  handlePeerResyncState,
-  handlePeerResyncFailed,
   handleVideoStream,
   handleNetworkStats,
   handleHeartbeat,
@@ -129,12 +123,7 @@ export function useNetplayPeerFactory({
           onChatMessage: handleIncomingChatMessage,
           onChatTyping: handleIncomingTypingState,
           onPeerReady: handlePeerReady,
-          onSaveState: handlePeerSaveState,
-          onStateLoaded: handlePeerStateLoaded,
           onStartSignal: handlePeerStartSignal,
-          onResyncLoaded: handlePeerResyncLoaded,
-          onResyncState: handlePeerResyncState,
-          onResyncFailed: handlePeerResyncFailed,
           onInputSeqGap: (expected: number, got: number) => {
             console.warn(`[LOBBY] Input seq gap: expected ${expected}, got ${got}`);
           },
@@ -310,12 +299,7 @@ export function useNetplayPeerFactory({
       handleIncomingChatMessage,
       handleIncomingTypingState,
       handlePeerReady,
-      handlePeerResyncFailed,
-      handlePeerResyncState,
-      handlePeerSaveState,
       handlePeerStartSignal,
-      handlePeerResyncLoaded,
-      handlePeerStateLoaded,
       handleRemoteHeldMask,
       handleRemoteInput,
       handleNetworkStats,

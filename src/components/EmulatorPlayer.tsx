@@ -42,12 +42,6 @@ interface EmulatorPlayerProps {
   biosPath?: string; // e.g. "mame2003/neogeo.zip"
   onLocalInput?: (button: number, down: boolean) => void;
   onEmulatorReady?: () => void;
-  onSaveState?: (state: ArrayBuffer) => void;
-  onStateLoaded?: () => void;
-  onSaveStateError?: (error: string) => void;
-  onResyncState?: (state: ArrayBuffer) => void;
-  onResyncLoaded?: () => void;
-  onResyncFailed?: () => void;
   onChatShortcut?: () => void;
   onCanvasStreamReady?: (stream: MediaStream) => void;
 }
@@ -343,12 +337,6 @@ const EmulatorPlayer = forwardRef<HTMLDivElement, EmulatorPlayerProps>(function 
     biosPath,
     onLocalInput,
     onEmulatorReady,
-    onSaveState: _onSaveState,
-    onStateLoaded: _onStateLoaded,
-    onSaveStateError: _onSaveStateError,
-    onResyncState: _onResyncState,
-    onResyncLoaded: _onResyncLoaded,
-    onResyncFailed: _onResyncFailed,
     onChatShortcut,
     onCanvasStreamReady,
   },
@@ -896,45 +884,6 @@ export function focusEmulator(containerRef: React.RefObject<HTMLDivElement | nul
 }
 
 /**
- * Get a save state from the emulator (HOST).
- * Returns the state buffer or null on failure.
- * Retries up to `maxRetries` times for MAME cores.
- */
-export async function requestSaveState(
-  containerRef: React.RefObject<HTMLDivElement | null>,
-  maxRetries = 5,
-): Promise<ArrayBuffer | null> {
-  const bridge = createEmulatorRuntimeBridge(containerRef);
-
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    const state = bridge.sync.getSaveState();
-    if (state && state.byteLength > 0) {
-      console.log(`[EMULATOR] getState() success on attempt ${attempt}, size: ${state.byteLength}`);
-      return state;
-    }
-    console.warn(`[EMULATOR] getState() attempt ${attempt} failed, retrying...`);
-    // Play briefly then pause before retry (MAME needs this)
-    bridge.sync.play();
-    await new Promise((r) => setTimeout(r, 300));
-    bridge.sync.pause();
-    await new Promise((r) => setTimeout(r, 300));
-  }
-  console.error("[EMULATOR] getState() failed after all retries");
-  return null;
-}
-
-/**
- * Load a save state into the emulator (GUEST).
- */
-export function loadSaveState(
-  containerRef: React.RefObject<HTMLDivElement | null>,
-  state: ArrayBuffer,
-): boolean {
-  const bridge = createEmulatorRuntimeBridge(containerRef);
-  return bridge.sync.loadSaveState(state);
-}
-
-/**
  * Send a remote input event into the emulator.
  */
 export function sendRemoteInput(
@@ -944,27 +893,6 @@ export function sendRemoteInput(
 ) {
   const bridge = createEmulatorRuntimeBridge(containerRef);
   bridge.input.sendRemoteInput(button, down);
-}
-
-/**
- * Get a resync state (micro-pause, get state, resume).
- */
-export function requestResyncGetState(
-  containerRef: React.RefObject<HTMLDivElement | null>,
-): ArrayBuffer | null {
-  const bridge = createEmulatorRuntimeBridge(containerRef);
-  return bridge.sync.getResyncState();
-}
-
-/**
- * Load a resync state (micro-pause, load state, resume).
- */
-export function requestResyncLoadState(
-  containerRef: React.RefObject<HTMLDivElement | null>,
-  state: ArrayBuffer,
-): boolean {
-  const bridge = createEmulatorRuntimeBridge(containerRef);
-  return bridge.sync.loadResyncState(state);
 }
 
 /** Mark the game as "running" for input gating (netplay) */
