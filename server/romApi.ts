@@ -176,6 +176,13 @@ function listRoms(romsDir: string): RomInfo[] {
   return roms;
 }
 
+/**
+ * ROM 서빙 및 카탈로그 API 라우트를 등록한다.
+ * - `GET /roms/*` — ROM 정적 파일 서빙
+ * - `GET /api/roms` — 코어별 ROM 목록 (bios 정보 포함)
+ * @param app - Express 앱 인스턴스
+ * @param romsDir - ROM 디렉토리 경로
+ */
 export function registerRomRoutes(app: Express, romsDir: string) {
   app.use("/roms", express.static(romsDir));
 

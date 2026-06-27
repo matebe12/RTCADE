@@ -1,5 +1,6 @@
 type SessionMode = "solo";
 
+/** 솔로 플레이 세션 데이터. TTL 기반 자동 만료가 지원된다. */
 export interface ActivePlaySession {
   sessionId: string;
   visitorId: string;
@@ -11,6 +12,7 @@ export interface ActivePlaySession {
   lastSeenAt: number;
 }
 
+/** `/api/stats`에서 사용되는 솔로 세션 활동 요약. */
 export interface ActivePlaySnapshot {
   soloSessions: number;
 }
@@ -31,6 +33,7 @@ export interface PlaySessionStore {
   startPruneInterval: () => () => void;
 }
 
+/** 사든현안 안옥되면 TTL(30초) 초과 시 자동으로 만료첲리된다. */
 const ACTIVE_SESSION_TTL_MS = 30_000;
 
 interface CreatePlaySessionStoreOptions {
@@ -41,6 +44,12 @@ function isNonEmptyString(value: unknown): value is string {
   return typeof value === "string" && value.trim().length > 0;
 }
 
+/**
+ * 즔로 플레이 세션 저장소를 생성한다.
+ * 세션은 TTL 기반 자동 만료되며, 명시적으로도 종료할 수 있다.
+ * @param options.onSessionEnded - 세션이 종료될 때 호출되는 콜백
+ * @returns {@link PlaySessionStore} 인터페이스 구현체
+ */
 export function createPlaySessionStore(options: CreatePlaySessionStoreOptions = {}): PlaySessionStore {
   const sessions = new Map<string, ActivePlaySession>();
   const notifySessionEnded = options.onSessionEnded;

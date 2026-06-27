@@ -1,5 +1,6 @@
 import { Pool } from "pg";
 
+/** DB에서 읽은 공지 레코드. */
 export interface NoticeRecord {
   id: number;
   title: string;
@@ -11,6 +12,7 @@ export interface NoticeRecord {
   updatedAt: string;
 }
 
+/** 공지 생성 입력값. */
 export interface CreateNoticeInput {
   body: string;
   isPinned?: boolean;
@@ -19,6 +21,7 @@ export interface CreateNoticeInput {
   title: string;
 }
 
+/** 공지 수정 입력값. 지정하지 않은 필드는 변경되지 않는다. */
 export interface UpdateNoticeInput {
   body?: string;
   isPinned?: boolean;
@@ -27,11 +30,13 @@ export interface UpdateNoticeInput {
   title?: string;
 }
 
+/** 방문자 집계데이터. */
 export interface VisitorCounts {
   todayVisitors: number;
   totalVisitors: number;
 }
 
+/** 인기 게임 집계 레코드. */
 export interface PopularGameRecord {
   core: string;
   gameName: string;
@@ -40,6 +45,7 @@ export interface PopularGameRecord {
   totalPlayTimeMs: number;
 }
 
+/** 일/주/월 단위로 집계된 게임 지표. */
 export interface GameMetrics {
   monthlyPopularGames: PopularGameRecord[];
   monthlyPopularGame: PopularGameRecord | null;
@@ -51,6 +57,7 @@ export interface GameMetrics {
   weeklyPopularGame: PopularGameRecord | null;
 }
 
+/** 게임 세션 기록 입력값. */
 export interface RecordGameSessionInput {
   core: string;
   gameName: string;
@@ -58,6 +65,10 @@ export interface RecordGameSessionInput {
   sessionId: string;
 }
 
+/**
+ * PostgreSQL 연동을 통해 방문자/게임세션/공지를 관리하는 DB 인터페이스.
+ * `isEnabled`는 실제 DB 연결 여부를 나타낰며, 미연결 시도 폴백 모드로 동작한다.
+ */
 export interface OperationsDatabase {
   closeStaleGameSessions: () => Promise<void>;
   completeGameSession: (sessionId: string, endedAt?: string) => Promise<void>;
@@ -309,6 +320,12 @@ async function seedDefaultNotices(pool: Pool) {
   }
 }
 
+/**
+ * PostgreSQL 데이터베이스에 연결하는 {@link OperationsDatabase} 인스턴스를 생성한다.
+ * `databaseUrl`이 `null`이면 폴백 모드(모든 작업 no-op)로 동작한다.
+ * @param databaseUrl - PostgreSQL 연결 URL, 연결 없으면 `null`
+ * @returns {@link OperationsDatabase} 구현체
+ */
 export function createOperationsDatabase(databaseUrl: string | null): OperationsDatabase {
   let pool =
     databaseUrl !== null

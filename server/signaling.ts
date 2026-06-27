@@ -4,7 +4,7 @@ import type { RawData } from "ws";
 
 import type { Room, RoomStore } from "./roomStore";
 
-/** Interval between server→client WebSocket pings to keep the connection alive. */
+/** 서버 → 클라이언트 WebSocket 핑 주기 (ms). 연결 유지에 사용된다. */
 const WS_PING_INTERVAL_MS = 30_000;
 
 type ClientRole = "host" | "guest" | "spectator" | null;
@@ -44,6 +44,12 @@ function broadcastRoomLobby(room: Room, roomStore: RoomStore) {
   }
 }
 
+/**
+ * WebSocket 서버를 Express 프로세스에 연결하여 시그널링을 시작한다.
+ * offer/answer/ice-candidate 메시지를 중계하고, 방 라이프사이클을 관리한다.
+ * @param wss - ws.WebSocketServer 인스턴스
+ * @param roomStore - 방 저장소 인스턴스
+ */
 export function attachSignalingServer(wss: WebSocketServer, roomStore: RoomStore) {
   const kickedSockets = new WeakSet<WebSocket>();
 

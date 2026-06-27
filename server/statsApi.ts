@@ -21,6 +21,17 @@ function getQueryString(value: unknown) {
   return "";
 }
 
+/**
+ * 통계 조회/기록 REST 라우트를 등록한다.
+ * - `GET /api/stats` — 방문자 수, 방 수, 솔로 세션 수, 게임 지표 집계
+ * - `POST /api/game-sessions` — 게임 세션 기록
+ * - `POST /api/active-play-sessions` — 아쿟티브 좄로 세션 upsert
+ * - `DELETE /api/active-play-sessions/:id` — 쉄로 세션 명시 종료
+ * @param app - Express 앱 인스턴스
+ * @param roomStore - 방 저장소
+ * @param playSessionStore - 아쿟티브 솔로 세션 저장소
+ * @param db - DB 인터페이스
+ */
 export function registerStatsRoutes(
   app: Express,
   operationsDatabase: OperationsDatabase,

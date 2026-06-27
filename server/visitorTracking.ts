@@ -3,8 +3,11 @@ import type { RequestHandler } from "express";
 
 import type { OperationsDatabase } from "./operationsDatabase";
 
+/** 방문자 쿠키 이름. */
 const VISITOR_COOKIE_NAME = "rtcade_visitor_id";
+/** 쿠키 만료 시간 (1년). */
 const ONE_YEAR_IN_SECONDS = 60 * 60 * 24 * 365;
+/** 쿠키를 사용하지 못하는 클라이언트를 위한 쿼리파라미터 이름. */
 const VISITOR_QUERY_PARAM = "visitorId";
 
 function isValidVisitorId(value: string) {
@@ -66,6 +69,13 @@ function shouldTrackPath(pathname: string) {
   return !pathname.startsWith("/roms/");
 }
 
+/**
+ * 방문자 식별 미들웨어를 생성한다.
+ * GET 요청에서 식별자를 쿠키 또는 쿼리파라미터로 추출하고, DB에 방문을 기록한다.
+ * DB가 비활성화된 경우 추적 없이 다음 미들웨어로 넘어간다.
+ * @param operationsDatabase - DB 인터페이스
+ * @returns Express 요청 핸들러
+ */
 export function createVisitorTrackingMiddleware(
   operationsDatabase: OperationsDatabase,
 ): RequestHandler {

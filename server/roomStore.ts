@@ -4,8 +4,10 @@ import type { WebSocket } from "ws";
 
 import { MAX_SPECTATORS_PER_ROOM } from "../shared/emulator-protocol";
 
+/** 방 상태. `waiting`은 대기 중, `playing`은 게임 진행 중. */
 export type RoomState = "waiting" | "playing";
 
+/** 대기실 코드에서 한 참가자 요약 정보. */
 export interface RoomLobbyParticipantSummary {
   id: string;
   role: "host" | "guest" | "spectator";
@@ -15,6 +17,7 @@ export interface RoomLobbyParticipantSummary {
   joinedAt: number;
 }
 
+/** 대기실 스냅샷. 순참자들에게 주기적으로 broadcast할 때 사용된다. */
 export interface RoomLobbySnapshot {
   code: string;
   roomState: RoomState;
@@ -30,6 +33,7 @@ export interface RoomLobbySnapshot {
   roleLocked: boolean;
 }
 
+/** 방에 입장한 GUEST 정보. */
 export interface RoomGuest {
   socket: WebSocket;
   nickname?: string;
@@ -38,6 +42,7 @@ export interface RoomGuest {
   joinedAt: number;
 }
 
+/** 방에 들어온 관전자 정보. */
 export interface RoomSpectator {
   id: string;
   socket: WebSocket;
@@ -47,6 +52,7 @@ export interface RoomSpectator {
   joinedAt: number;
 }
 
+/** 서버 메모리에 저장되는 단일 방 데이터. */
 export interface Room {
   code: string;
   host: WebSocket;
@@ -63,6 +69,7 @@ export interface Room {
   spectators: Map<string, RoomSpectator>;
 }
 
+/** 공개 방 목록 API 응답에 포함되는 요약. */
 export interface PublicRoomSummary {
   code: string;
   romPath: string;
@@ -73,11 +80,13 @@ export interface PublicRoomSummary {
   hostAvatar?: string;
 }
 
+/** 플레이 중인 관전 가능 방 목록 API 응답에 포함되는 요약. */
 export interface PlayingRoomSummary extends PublicRoomSummary {
   startedAt: number;
   spectatorCount: number;
 }
 
+/** `/api/stats` 에서 사용되는 방 활동 요약. */
 export interface RoomActivitySnapshot {
   activeRooms: number;
   connectedPlayers: number;
@@ -96,6 +105,10 @@ interface CreateRoomOptions {
   hostAvatar?: string;
 }
 
+/**
+ * 모든 방 상태를 메모리에 저장하는 방 저장소 인터페이스.
+ * signaling.ts와 라우트 모듈에서 공유한다.
+ */
 export interface RoomStore {
   attachGuest: (
     room: Room,
@@ -125,6 +138,7 @@ export interface RoomStore {
   updateRoomGame: (room: Room, options: { romPath: string; core: string; bios?: string }) => boolean;
 }
 
+/** 중복되지 않는 6자리 방 코드를 생성한다. */
 function generateCode(rooms: Map<string, Room>): string {
   let code: string;
 
@@ -135,20 +149,24 @@ function generateCode(rooms: Map<string, Room>): string {
   return code;
 }
 
+/** 방의 관전자 Map을 비우고 제거된 관전자 배열을 반환한다. */
 function clearSpectators(room: Room) {
   const spectators = Array.from(room.spectators.values());
   room.spectators.clear();
   return spectators;
 }
 
+/** ROM 경로에서 파일명만 추출한다. */
 function getRomFilename(romPath: string) {
   return romPath.split("/").pop() ?? romPath;
 }
 
+/** guest와 모든 관전자가 ready 상태일 때 `true`를 반환한다. */
 function canStartRoomSession(room: Room) {
   return room.guest !== null && room.guest.ready && Array.from(room.spectators.values()).every((spectator) => spectator.ready);
 }
 
+/** 대기실 코드에 표시할 참가자 목록을 구성한다. host는 항상 첫 번째. */
 function buildLobbyParticipants(room: Room): RoomLobbyParticipantSummary[] {
   const participants: RoomLobbyParticipantSummary[] = [
     {
@@ -188,6 +206,11 @@ function buildLobbyParticipants(room: Room): RoomLobbyParticipantSummary[] {
   return participants;
 }
 
+/**
+ * 모든 방 상태를 메모리에 저장하는 저장소를 생성한다.
+ * 서버 재시작 시 모든 데이터는 소멸된다.
+ * @returns {@link RoomStore} 인터페이스 구현체
+ */
 export function createRoomStore(): RoomStore {
   const rooms = new Map<string, Room>();
 

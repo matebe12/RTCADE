@@ -4,7 +4,6 @@ import { WebSocketServer } from "ws";
 
 import { createCorsMiddleware, getServerConfig } from "./config";
 import { createOperationsDatabase } from "./operationsDatabase";
-import { registerEmulatorRoute } from "./emulator";
 import { registerIceServerRoutes } from "./iceServerApi";
 import { registerNoticeRoutes } from "./noticeApi";
 import { createPlaySessionStore } from "./playSessionStore";
@@ -31,7 +30,7 @@ async function bootstrap() {
 
   await operationsDatabase.initialize();
 
-  // Close sessions orphaned by previous server instance (server restart scenario)
+  // 이전 서버 인스턴스가 남긴 미완료 게임 세션 정리 (서버 재시작 시나리오)
   await operationsDatabase.closeStaleGameSessions();
 
   const stopPruneInterval = playSessionStore.startPruneInterval();
@@ -40,7 +39,6 @@ async function bootstrap() {
   app.use(createCorsMiddleware(config.allowedOrigins));
   app.use(createVisitorTrackingMiddleware(operationsDatabase));
   registerRomRoutes(app, config.romsDir);
-  registerEmulatorRoute(app, config.emulatorJsDataUrl);
   registerIceServerRoutes(app, config.iceServers);
   registerPublicRoomRoutes(app, roomStore);
   registerNoticeRoutes(app, operationsDatabase, config.noticeAdminToken);

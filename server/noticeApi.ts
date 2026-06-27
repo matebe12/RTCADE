@@ -76,6 +76,13 @@ function validateUpdateNoticeInput(body: unknown): UpdateNoticeInput | null {
   return Object.keys(nextInput).length > 0 ? nextInput : null;
 }
 
+/**
+ * 공지 조회/생성/수정 REST 라우트를 등록한다.
+ * 생성/수정 엔드포인트는 `NOTICE_ADMIN_TOKEN`으로만 접근 가능하다.
+ * @param app - Express 앱 인스턴스
+ * @param db - DB 인터페이스
+ * @param adminToken - 관리자 API 토큰
+ */
 export function registerNoticeRoutes(
   app: Express,
   operationsDatabase: OperationsDatabase,
