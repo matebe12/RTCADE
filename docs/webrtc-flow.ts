@@ -28,15 +28,15 @@ import { createEmulatorRuntimeBridge } from "../src/lib/emulator-runtime-bridge"
 //      → 6자리 코드 생성 → "room-created" 응답 → LobbyState.step = "waiting"
 
 const _1_host_creates_room = {
-  entryHook:        useNetplayRoomEntry,
-  roomFlowHook:     useNetplayPeerRoomFlow,
-  sessionHook:      useNetplaySession,
-  factoryHook:      useNetplayPeerFactory,
-  peerClass:        NetplayPeer,
-  signalingClient:  SignalingClient,
-  serverHandler:    attachSignalingServer,
-  serverStore:      createRoomStore,
-  createRoom:       NetplayPeer.prototype.createRoom,
+  sessionHook:      useNetplaySession,        // 1. 최상위 훅 (NetplayLobby가 사용)
+  roomFlowHook:     useNetplayPeerRoomFlow,   // 2. session이 위임하는 중간 조합 훅
+  entryHook:        useNetplayRoomEntry,      // 3. 실제 방 생성/입장 로직 담당
+  factoryHook:      useNetplayPeerFactory,    // 4. NetplayPeer 인스턴스 생성
+  peerClass:        NetplayPeer,             // 5. RTCPeerConnection + DataChannel 관리
+  createRoom:       NetplayPeer.prototype.createRoom, // 6. 방 만들기 메서드 호출
+  signalingClient:  SignalingClient,         // 7. 서버 WebSocket 통신 클라이언트
+  serverHandler:    attachSignalingServer,   // 8. 서버 측 시그널링 핸들러
+  serverStore:      createRoomStore,         // 9. 방 코드 생성 및 메모리 저장
 };
 
 // ────────────────────────────────────────────────────────────────────────────
