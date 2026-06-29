@@ -175,21 +175,11 @@ type PacketLossSample = {
   packetsTotal: number;
 };
 
-type PendingBinaryStream = {
-  totalBytes: number;
-  chunks: number;
-  buffer: Uint8Array;
-  bytesReceived: number;
-  chunksReceived: number;
-  writeOffset: number;
-};
-
 const INPUT_CHANNEL_LABEL = "input";
 const CONTROL_CHANNEL_LABEL = "control";
 const REPAIR_CHANNEL_LABEL = "repair";
 const CHAT_CHANNEL_LABEL = "chat";
 const CHAT_BUFFER_THRESHOLD = 64 * 1024;
-const DEFAULT_REMOTE_HELD_MASK = 0;
 const NETWORK_STATS_INTERVAL_MS = 1_000;
 const INPUT_BUFFER_UNSTABLE_THRESHOLD = 4 * 1024;
 const INPUT_BUFFER_POOR_THRESHOLD = 16 * 1024;
