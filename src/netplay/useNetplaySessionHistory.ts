@@ -1,6 +1,7 @@
 import { useCallback, type MutableRefObject } from "react";
 
 import type { SessionEndReason } from "@/components/NetplaySessionSummary";
+import { trackEvent } from "@/lib/analytics";
 import { parseRomName } from "@/lib/game-names";
 import { recordGameSession } from "@/lib/operations-api";
 import {
@@ -101,6 +102,14 @@ export function useNetplaySessionHistory({
 
     if (activeSession) {
       const gameName = parseRomName(getRomFilename(activeSession.romPath), activeSession.core);
+
+      if (activeSession.mode === "netplay" && activeSession.role !== "spectator") {
+        trackEvent("netplay_game_started", {
+          core: activeSession.core,
+          game_name: gameName,
+          role: activeSession.role,
+        });
+      }
 
       recordRecentGame(activeSession);
       incrementTotalPlayedCount();

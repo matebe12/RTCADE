@@ -2,6 +2,8 @@ import { useCallback } from "react";
 
 import type { SystemCore } from "@/components/EmulatorPlayer";
 import { appEnvironment } from "@/config/environment";
+import { trackEvent } from "@/lib/analytics";
+import { parseRomName } from "@/lib/game-names";
 import { fetchNetplayRtcConfiguration } from "@/lib/operations-api";
 import { getUserProfile } from "@/lib/user-profile";
 import { NETPLAY_COPY } from "@/netplay/netplayCopy";
@@ -80,6 +82,11 @@ export function useNetplayRoomEntry({
       const originalOnRoomCreated = originalHandler.onRoomCreated;
       originalHandler.onRoomCreated = (code: string) => {
         originalOnRoomCreated?.(code);
+        trackEvent("netplay_room_created", {
+          core,
+          game_name: parseRomName(romFilename, core),
+          visibility: isPublic ? "public" : "private",
+        });
         setState({
           step: "waiting",
           code,

@@ -1,8 +1,10 @@
-import { Suspense, lazy, useState } from "react";
-import { Navigate, Route, Routes } from "react-router-dom";
+import * as Sentry from "@sentry/react";
+import { Suspense, lazy, useEffect, useState } from "react";
+import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 
 import { NicknameSetup } from "@/components/NicknameSetup";
 import { Toaster } from "@/components/ui/sonner";
+import { trackEvent } from "@/lib/analytics";
 import { type UserProfile, getUserProfile } from "@/lib/user-profile";
 import { AppTutorialProvider } from "@/tutorial/AppTutorialProvider";
 
@@ -11,6 +13,8 @@ const HomePage = lazy(() => import("@/pages/HomePage"));
 const NetplayPage = lazy(() => import("@/pages/NetplayPage"));
 const NoticesPage = lazy(() => import("@/pages/NoticesPage"));
 const SettingsPage = lazy(() => import("@/pages/SettingsPage"));
+
+const SentryRoutes = Sentry.withSentryReactRouterV6Routing(Routes);
 
 function RouteFallback() {
   return (
@@ -22,6 +26,16 @@ function RouteFallback() {
   );
 }
 
+function PageViewTracker() {
+  const location = useLocation();
+
+  useEffect(() => {
+    trackEvent("page_view", { path: location.pathname });
+  }, [location.pathname]);
+
+  return null;
+}
+
 function App() {
   const [profile, setProfile] = useState<UserProfile | null>(getUserProfile);
   const [showSetup, setShowSetup] = useState(false);
@@ -29,10 +43,11 @@ function App() {
   const needsSetup = !profile;
 
   return (
-    <>
+    <Sentry.ErrorBoundary fallback={<RouteFallback />}>
+      <PageViewTracker />
       <AppTutorialProvider blocked={needsSetup || showSetup}>
         <Suspense fallback={<RouteFallback />}>
-          <Routes>
+          <SentryRoutes>
             <Route
               element={<AppShell profile={profile} onOpenProfile={() => setShowSetup(true)} />}
             >
@@ -47,7 +62,7 @@ function App() {
               />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Route>
-          </Routes>
+          </SentryRoutes>
         </Suspense>
       </AppTutorialProvider>
 
@@ -63,7 +78,7 @@ function App() {
       />
 
       <Toaster position="top-center" richColors />
-    </>
+    </Sentry.ErrorBoundary>
   );
 }
 

@@ -2,6 +2,8 @@ import { useCallback, type MutableRefObject } from "react";
 
 import type { SystemCore } from "@/components/EmulatorPlayer";
 import type { SessionEndReason } from "@/components/NetplaySessionSummary";
+import { trackEvent } from "@/lib/analytics";
+import { parseRomName } from "@/lib/game-names";
 import {
   NetplayPeer,
   type ChatMessage as PeerChatMessage,
@@ -160,6 +162,16 @@ export function useNetplayPeerFactory({
             setGameStarted(false);
             activeSessionRef.current = null;
             sessionStartedAtRef.current = null;
+
+            if (info.role === "guest") {
+              trackEvent("netplay_room_joined", {
+                core: info.core,
+                game_name: parseRomName(info.romFilename ?? "", info.core),
+              });
+            } else if (info.role === "spectator") {
+              trackEvent("spectate_started");
+            }
+
             setState({
               step: "waiting",
               code: info.code,

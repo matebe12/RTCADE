@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { SystemCore } from "@/components/EmulatorPlayer";
+import { trackEvent } from "@/lib/analytics";
 import { parseRomName } from "@/lib/game-names";
 import {
   completeGameSession,
@@ -75,9 +76,19 @@ export function useSoloSession({
       return;
     }
 
+    const activeSession = activeSessionRef.current;
+    const startedAt = sessionStartedAtRef.current;
+    if (activeSession && startedAt !== null) {
+      trackEvent("solo_game_ended", {
+        core: activeSession.core,
+        game_name: parseRomName(getRomFilename(activeSession.romPath), activeSession.core),
+        duration_ms: Date.now() - startedAt,
+      });
+    }
+
     void completeGameSession(activeSessionId).catch(() => undefined);
     void endActivePlaySession(activeSessionId).catch(() => undefined);
-  }, []);
+  }, [activeSessionRef, sessionStartedAtRef]);
 
   const stopSoloTrackingImmediately = useCallback(() => {
     const activeSessionId = activeSoloSessionIdRef.current;
@@ -130,6 +141,8 @@ export function useSoloSession({
         };
         activeSoloSessionIdRef.current = nextSessionId;
         sessionStartedAtRef.current = startedAt;
+
+        trackEvent("solo_game_started", { core: rom.core, game_name: gameName });
 
         const nextRecentGames = upsertRecentGame({
           romPath: rom.path,

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, type MutableRefObject } from "react";
 
 import type { SessionEndReason } from "@/components/NetplaySessionSummary";
+import { trackEvent } from "@/lib/analytics";
 import { completeGameSession, completeGameSessionWithBeacon } from "@/lib/operations-api";
 import type { NetplayPeer } from "@/netplay/peer";
 import {
@@ -116,6 +117,17 @@ export function useNetplaySessionLifecycle({
       if (activeSessionRef.current) {
         recordRecentOpponent(endReason);
       }
+
+      if (summary) {
+        trackEvent("netplay_session_ended", {
+          core: summary.core,
+          game_name: summary.gameName,
+          role: summary.role ?? "host",
+          duration_ms: summary.durationMs,
+          end_reason: endReason,
+        });
+      }
+
       resetSessionRuntime();
 
       if (summary) {

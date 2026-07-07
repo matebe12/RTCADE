@@ -8,6 +8,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { trackEvent } from "@/lib/analytics";
 import { type UserProfile, AVATAR_OPTIONS, saveUserProfile } from "@/lib/user-profile";
 import { cn } from "@/lib/utils";
 
@@ -44,9 +45,10 @@ export function NicknameSetup({
       setError("닉네임은 2~10자로 입력해주세요");
       return;
     }
-    const profile: UserProfile = { nickname: trimmed, avatar };
-    saveUserProfile(profile);
-    onComplete(profile);
+    const newProfile: UserProfile = { nickname: trimmed, avatar };
+    saveUserProfile(newProfile);
+    trackEvent(profile === null ? "profile_created" : "profile_updated");
+    onComplete(newProfile);
   };
 
   return (

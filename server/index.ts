@@ -1,3 +1,4 @@
+import * as Sentry from "@sentry/node";
 import express from "express";
 import { createServer } from "http";
 import { WebSocketServer } from "ws";
@@ -16,6 +17,16 @@ import { createVisitorTrackingMiddleware } from "./visitorTracking";
 
 async function bootstrap() {
   const config = getServerConfig();
+
+  if (config.sentryDsn) {
+    Sentry.init({
+      dsn: config.sentryDsn,
+      environment: process.env.NODE_ENV || "development",
+      integrations: [Sentry.expressIntegration(), Sentry.httpIntegration()],
+      tracesSampleRate: 0.2,
+    });
+  }
+
   const roomStore = createRoomStore();
   const operationsDatabase = createOperationsDatabase(config.databaseUrl);
   const playSessionStore = createPlaySessionStore({
@@ -44,6 +55,11 @@ async function bootstrap() {
   registerNoticeRoutes(app, operationsDatabase, config.noticeAdminToken);
   registerStatsRoutes(app, operationsDatabase, roomStore, playSessionStore);
   attachSignalingServer(wss, roomStore);
+
+  // Sentry 에러 핸들러는 모든 라우트 등록 이후에 추가해야 한다.
+  if (config.sentryDsn) {
+    Sentry.setupExpressErrorHandler(app);
+  }
 
   let isShuttingDown = false;
 

@@ -10,6 +10,7 @@ export interface ServerConfig {
   noticeAdminToken: string | null;
   emulatorJsDataUrl: string;
   iceServers: IceServerDefinition[];
+  sentryDsn: string | null;
 }
 
 /** 단일 ICE 서버 정의. STUN 또는 TURN 서버 URL과 인증 정보를 포함한다. */
@@ -121,6 +122,7 @@ export function getServerConfig(): ServerConfig {
       process.env.EMULATORJS_DATA_URL || "https://cdn.emulatorjs.org/stable/data/",
     ),
     iceServers: getIceServersFromEnv(),
+    sentryDsn: normalizeOptionalEnv(process.env.SENTRY_DSN) ?? null,
   };
 }
 

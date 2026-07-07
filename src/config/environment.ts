@@ -60,4 +60,10 @@ export const appEnvironment = {
     adsenseClientId: normalizeOptionalEnv(import.meta.env.VITE_ADSENSE_CLIENT_ID),
     adsenseTestMode: normalizeBooleanEnv(import.meta.env.VITE_ADSENSE_TEST_MODE, true),
   },
+  monitoring: {
+    amplitudeApiKey: normalizeOptionalEnv(import.meta.env.VITE_AMPLITUDE_API_KEY),
+    sentryDsn: normalizeOptionalEnv(import.meta.env.VITE_SENTRY_DSN),
+    sentryRelease: normalizeOptionalEnv(import.meta.env.VITE_SENTRY_RELEASE),
+    appEnv: (import.meta.env.VITE_APP_ENV as string | undefined) || import.meta.env.MODE || "development",
+  },
 } as const;
