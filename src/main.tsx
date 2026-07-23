@@ -32,6 +32,36 @@ if (sentryDsn) {
       }),
     ],
     tracesSampleRate: 0.2,
+    beforeSend(event, hint) {
+      const original = hint.originalException;
+
+      if (
+        original &&
+        typeof original === "object" &&
+        !(original instanceof Error)
+      ) {
+        const keys = Object.keys(original);
+        const detail = keys
+          .map((k) => `${k}=${JSON.stringify(original[k])}`)
+          .join(", ");
+
+        const error = new Error(
+          `Non-Error exception captured: { ${detail} }`,
+        );
+
+        event.exception = {
+          values: [
+            {
+              type: error.name,
+              value: error.message,
+              mechanism: event.exception?.values?.[0]?.mechanism,
+            },
+          ],
+        };
+      }
+
+      return event;
+    },
   });
 }
 
