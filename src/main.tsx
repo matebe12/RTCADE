@@ -40,9 +40,10 @@ if (sentryDsn) {
         typeof original === "object" &&
         !(original instanceof Error)
       ) {
-        const keys = Object.keys(original);
+        const plain = original as Record<string, unknown>;
+        const keys = Object.keys(plain);
         const detail = keys
-          .map((k) => `${k}=${JSON.stringify(original[k])}`)
+          .map((k) => `${k}=${JSON.stringify(plain[k])}`)
           .join(", ");
 
         const error = new Error(
