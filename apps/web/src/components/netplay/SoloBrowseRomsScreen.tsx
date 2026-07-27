@@ -7,7 +7,6 @@ import { VirtualGameCardList } from "@/components/VirtualGameCardList";
 import { Button } from "@rtcade/ui";
 import { Card, CardContent, CardHeader, CardTitle } from "@rtcade/ui";
 import { Input } from "@rtcade/ui";
-import { ScrollArea } from "@rtcade/ui";
 import { parseRomName, getRomCategory, CATEGORY_INFO, type GameCategory } from "@/lib/game-names";
 import type { RecentGame } from "@/lib/user-profile";
 import type { RomInfo } from "@/stores/useNetplayLobbyStore";
@@ -121,30 +120,7 @@ export default function SoloBrowseRomsScreen({
   const recommendedRomPath =
     recentRoms[0]?.path ?? favoriteRoms[0]?.path ?? filteredBrowseRoms[0]?.path ?? null;
 
-  const categoryGroups = useMemo(() => {
-    if (isSearching || categoryFilter) return [];
-    const groups: Record<GameCategory, RomInfo[]> = {
-      fighting: [],
-      action: [],
-      shooting: [],
-      puzzle: [],
-      sports: [],
-      etc: [],
-    };
-    browseRoms.forEach((rom) => {
-      const cat = getRomCategory(rom.filename, rom.core);
-      groups[cat].push(rom);
-    });
-    return (Object.entries(CATEGORY_INFO) as [GameCategory, (typeof CATEGORY_INFO)[GameCategory]][])
-      .sort(([, a], [, b]) => a.order - b.order)
-      .map(([key, info]) => ({
-        category: key,
-        label: info.label,
-        icon: info.icon,
-        roms: groups[key],
-      }))
-      .filter((group) => group.roms.length > 0);
-  }, [browseRoms, isSearching, categoryFilter]);
+  const virtualListRoms = isSearching || categoryFilter ? filteredBrowseRoms : browseRoms;
 
   return (
     <Card className="w-full border-border/70 bg-card/95" data-tutorial="solo-browse-panel">
@@ -204,124 +180,88 @@ export default function SoloBrowseRomsScreen({
             ))}
           </div>
         )}
-        <ScrollArea className="h-120">
-          <div className="flex flex-col gap-2 pr-3">
-            {showPersonalizedSections && recentRoms.length > 0 && (
-              <div className="flex flex-col gap-2 pb-3">
-                <div className="flex items-center justify-between">
-                  <p className="text-xs font-medium text-foreground">최근 플레이</p>
-                  <span className="text-[11px] text-muted-foreground">바로 다시 시작</span>
-                </div>
-                {recentRoms.map((rom) => {
-                  const sys = SYSTEM_OPTIONS.find((system) => system.value === rom.core);
-                  return (
-                    <GameCard
-                      key={`recent-${rom.path}`}
-                      filename={rom.filename}
-                      core={rom.core}
-                      systemLabel={sys?.label || rom.core}
-                      displayName={rom.displayName}
-                      dataTutorial={
-                        rom.path === recommendedRomPath ? "solo-primary-game" : undefined
-                      }
-                      favorite={favoriteGames.includes(rom.path)}
-                      disabled={isStarting}
-                      selected={startingRomPath === rom.path}
-                      onToggleFavorite={() => onToggleFavoriteGame(rom.path)}
-                      onClick={() => onStartSoloGame(rom)}
-                    />
-                  );
-                })}
-              </div>
-            )}
-
-            {showPersonalizedSections && favoriteRoms.length > 0 && (
-              <div className="flex flex-col gap-2 border-t border-border/70 pb-3 pt-3">
-                <div className="flex items-center justify-between">
-                  <p className="text-xs font-medium text-foreground">즐겨찾기</p>
-                  <span className="text-[11px] text-muted-foreground">자주 하는 게임</span>
-                </div>
-                {favoriteRoms.map((rom) => {
-                  const sys = SYSTEM_OPTIONS.find((system) => system.value === rom.core);
-                  return (
-                    <GameCard
-                      key={`favorite-${rom.path}`}
-                      filename={rom.filename}
-                      core={rom.core}
-                      systemLabel={sys?.label || rom.core}
-                      dataTutorial={
-                        rom.path === recommendedRomPath ? "solo-primary-game" : undefined
-                      }
-                      disabled={isStarting}
-                      selected={startingRomPath === rom.path}
-                      favorite={true}
-                      onToggleFavorite={() => onToggleFavoriteGame(rom.path)}
-                      onClick={() => onStartSoloGame(rom)}
-                    />
-                  );
-                })}
-              </div>
-            )}
-
-            {showPersonalizedSections && (recentRoms.length > 0 || favoriteRoms.length > 0) && (
-              <div className="flex items-center justify-between border-t border-border/70 pt-3">
-                <p className="text-xs font-medium text-foreground">다른 게임</p>
-                <span className="text-[11px] text-muted-foreground">{browseRoms.length}개</span>
-              </div>
-            )}
-
-            {/* 카테고리별 그룹 (검색/필터 없을 때) */}
-            {!isSearching &&
-              !categoryFilter &&
-              categoryGroups.map((group) => {
-                return (
-                  <div key={group.category} className="flex flex-col gap-2 pb-2">
-                    <div className="flex items-center gap-1.5 pt-2">
-                      <span className="text-xs">{group.icon}</span>
-                      <p className="text-xs font-medium text-foreground">{group.label}</p>
-                      <span className="text-[10px] text-muted-foreground">{group.roms.length}</span>
-                    </div>
-                    <VirtualGameCardList
-                      roms={group.roms}
-                      favoriteGames={favoriteGames}
-                      onToggleFavoriteGame={onToggleFavoriteGame}
-                      onSelectSolo={onStartSoloGame}
-                      previewActionLabel="혼자하기"
-                      recommendedRomPath={recommendedRomPath}
-                      disabled={isStarting}
-                      selectedRomPath={startingRomPath}
-                      tutorialPrefix="solo"
-                    />
-                  </div>
-                );
-              })}
-
-            {/* 카테고리 필터 또는 검색 결과 (플랫 리스트) */}
-            {(isSearching || categoryFilter) &&
-              <VirtualGameCardList
-                roms={filteredBrowseRoms}
-                favoriteGames={favoriteGames}
-                onToggleFavoriteGame={onToggleFavoriteGame}
-                onSelectSolo={onStartSoloGame}
-                previewActionLabel="혼자하기"
-                recommendedRomPath={recommendedRomPath}
-                disabled={isStarting}
-                selectedRomPath={startingRomPath}
-                tutorialPrefix="solo"
-              />
-            }
-
-            {(isSearching || categoryFilter ? filteredBrowseRoms : browseRoms).length === 0 && (
-              <p className="py-8 text-center text-xs text-muted-foreground">
-                {isSearching
-                  ? "검색 결과가 없습니다"
-                  : categoryFilter
-                    ? "해당 카테고리에 게임이 없습니다"
-                    : "표시할 다른 게임이 없습니다"}
-              </p>
-            )}
+        {/* 최근 플레이 / 즐겨찾기 — 항상 즉시 렌더링 (최대 각 3개) */}
+        {showPersonalizedSections && recentRoms.length > 0 && (
+          <div className="flex flex-col gap-2 pb-3 px-1">
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-medium text-foreground">최근 플레이</p>
+              <span className="text-[11px] text-muted-foreground">바로 다시 시작</span>
+            </div>
+            {recentRoms.map((rom) => {
+              const sys = SYSTEM_OPTIONS.find((system) => system.value === rom.core);
+              return (
+                <GameCard
+                  key={`recent-${rom.path}`}
+                  filename={rom.filename}
+                  core={rom.core}
+                  systemLabel={sys?.label || rom.core}
+                  displayName={rom.displayName}
+                  dataTutorial={
+                    rom.path === recommendedRomPath ? "solo-primary-game" : undefined
+                  }
+                  favorite={favoriteGames.includes(rom.path)}
+                  disabled={isStarting}
+                  selected={startingRomPath === rom.path}
+                  onToggleFavorite={() => onToggleFavoriteGame(rom.path)}
+                  onClick={() => onStartSoloGame(rom)}
+                />
+              );
+            })}
           </div>
-        </ScrollArea>
+        )}
+
+        {showPersonalizedSections && favoriteRoms.length > 0 && (
+          <div className="flex flex-col gap-2 border-t border-border/70 pb-3 pt-3 px-1">
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-medium text-foreground">즐겨찾기</p>
+              <span className="text-[11px] text-muted-foreground">자주 하는 게임</span>
+            </div>
+            {favoriteRoms.map((rom) => {
+              const sys = SYSTEM_OPTIONS.find((system) => system.value === rom.core);
+              return (
+                <GameCard
+                  key={`favorite-${rom.path}`}
+                  filename={rom.filename}
+                  core={rom.core}
+                  systemLabel={sys?.label || rom.core}
+                  dataTutorial={
+                    rom.path === recommendedRomPath ? "solo-primary-game" : undefined
+                  }
+                  disabled={isStarting}
+                  selected={startingRomPath === rom.path}
+                  favorite={true}
+                  onToggleFavorite={() => onToggleFavoriteGame(rom.path)}
+                  onClick={() => onStartSoloGame(rom)}
+                />
+              );
+            })}
+          </div>
+        )}
+
+        {/* 가상 스크롤 게임 목록 */}
+        <div className="flex-1 min-h-0 border-t border-border/70 pt-3">
+          {virtualListRoms.length > 0 ? (
+            <VirtualGameCardList
+              roms={virtualListRoms}
+              favoriteGames={favoriteGames}
+              onToggleFavoriteGame={onToggleFavoriteGame}
+              onSelectSolo={onStartSoloGame}
+              previewActionLabel="혼자하기"
+              recommendedRomPath={recommendedRomPath}
+              disabled={isStarting}
+              selectedRomPath={startingRomPath}
+              tutorialPrefix="solo"
+            />
+          ) : (
+            <p className="py-8 text-center text-xs text-muted-foreground">
+              {isSearching
+                ? "검색 결과가 없습니다"
+                : categoryFilter
+                  ? "해당 카테고리에 게임이 없습니다"
+                  : "표시할 다른 게임이 없습니다"}
+            </p>
+          )}
+        </div>
 
         {error && <p className="text-center text-xs text-destructive-foreground">{error}</p>}
       </CardContent>

@@ -1,6 +1,6 @@
 "use no memo";
 
-import { useRef } from "react";
+import { type ReactNode, useRef } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import type { RomInfo } from "@/stores/useNetplayLobbyStore";
 import { SYSTEM_OPTIONS } from "@/components/EmulatorPlayer";
@@ -12,17 +12,17 @@ interface VirtualGameCardListProps {
   onToggleFavoriteGame: (romPath: string) => void;
   previewActionLabel: string;
   recommendedRomPath?: string | null;
-  // Netplay mode
   onCreateRoom?: (rom: RomInfo) => void;
-  // Solo mode
   onSelectSolo?: (rom: RomInfo) => void;
   disabled?: boolean;
   selectedRomPath?: string | null;
-  /** tutorial prefix: "netplay" or "solo" */
   tutorialPrefix?: "netplay" | "solo";
+  /** 가상 스크롤 위쪽에 렌더링할 헤더 요소 (카테고리 칩, 검색창 등) */
+  header?: ReactNode;
+  /** 고정 높이 (기본: 부모 컨테이너 높이 자동 계산) */
+  height?: number;
 }
 
-/** 한 게임 카드의 예상 높이 (56px 카드 + 8px gap) */
 const CARD_HEIGHT = 64;
 
 export function VirtualGameCardList({
@@ -36,6 +36,8 @@ export function VirtualGameCardList({
   disabled = false,
   selectedRomPath,
   tutorialPrefix = "netplay",
+  header,
+  height,
 }: VirtualGameCardListProps) {
   const parentRef = useRef<HTMLDivElement>(null);
 
@@ -46,14 +48,13 @@ export function VirtualGameCardList({
     overscan: 5,
   });
 
-  if (roms.length === 0) return null;
-
   return (
     <div
       ref={parentRef}
-      className="h-full w-full overflow-auto"
-      style={{ contain: "strict" }}
+      className="w-full overflow-auto"
+      style={{ height: height ?? "100%", contain: "strict" }}
     >
+      {header}
       <div
         style={{
           height: `${virtualizer.getTotalSize()}px`,
@@ -83,7 +84,7 @@ export function VirtualGameCardList({
                 transform: `translateY(${virtualItem.start}px)`,
               }}
             >
-              <div className="pb-2">
+              <div className="pr-1" style={{ paddingBottom: 8 }}>
                 <GameCard
                   filename={rom.filename}
                   core={rom.core}
