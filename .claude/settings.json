@@ -1,0 +1,38 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm *)",
+      "Bash(npx *)",
+      "Bash(tsc *)",
+      "Bash(git *)",
+      "Bash(node *)",
+      "Read",
+      "Write",
+      "Edit",
+      "Glob",
+      "Grep",
+      "WebFetch",
+      "WebSearch"
+    ],
+    "deny": [
+      "Bash(git push --force *)",
+      "Bash(git reset --hard *)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash(git commit*)",
+        "command": "npx tsc --noEmit",
+        "description": "커밋 전 TypeScript 타입 체크 (실패 시 커밋 차단)"
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Bash(npm run build*)",
+        "command": "if (Test-Path dist/index.html) { Write-Output 'Build OK: dist/ verified' } else { Write-Output 'WARNING: dist/index.html missing after build' }",
+        "description": "빌드 후 dist/ 출력 검증"
+      }
+    ]
+  }
+}

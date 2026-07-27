@@ -1,0 +1,52 @@
+import { ArrowLeft } from "lucide-react";
+
+import { CodeInput } from "@/components/CodeInput";
+import { Button } from "@rtcade/ui";
+import { Card, CardContent, CardHeader, CardTitle } from "@rtcade/ui";
+
+interface NetplayJoinRoomScreenProps {
+  joinCode: string;
+  status: string;
+  error: string;
+  onBack: () => void;
+  onJoinCodeChange: (value: string) => void;
+  onJoinRoom: () => void;
+}
+
+export default function NetplayJoinRoomScreen({
+  joinCode,
+  status,
+  error,
+  onBack,
+  onJoinCodeChange,
+  onJoinRoom,
+}: NetplayJoinRoomScreenProps) {
+  return (
+    <Card
+      className="flex h-full w-full flex-col border-border/70 bg-card/95"
+      data-tutorial="netplay-join-input-panel"
+    >
+      <CardHeader className="flex flex-row items-center gap-3">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="size-8"
+          data-tutorial="join-input-back"
+          onClick={onBack}
+        >
+          <ArrowLeft className="size-4" />
+        </Button>
+        <CardTitle className="text-sm">방 참가</CardTitle>
+      </CardHeader>
+      <CardContent className="flex flex-col items-center gap-4">
+        <p className="text-xs text-muted-foreground">6자리 방 코드를 입력하세요</p>
+        <CodeInput value={joinCode} onChange={onJoinCodeChange} onSubmit={onJoinRoom} />
+        <Button className="w-full" onClick={onJoinRoom} disabled={joinCode.length !== 6}>
+          참가
+        </Button>
+        {status && <p className="text-xs text-muted-foreground">{status}</p>}
+        {error && <p className="text-xs text-destructive-foreground">{error}</p>}
+      </CardContent>
+    </Card>
+  );
+}

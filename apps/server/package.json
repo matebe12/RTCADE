@@ -1,0 +1,26 @@
+{
+  "name": "@rtcade/server",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx src/index.ts",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "@rtcade/shared": "workspace:*",
+    "@sentry/node": "^10.63.0",
+    "express": "^5.2.1",
+    "pg": "^8.20.0",
+    "ws": "^8.20.0"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.6",
+    "@types/node": "^24.12.2",
+    "@types/pg": "^8.20.0",
+    "@types/ws": "^8.18.1",
+    "tsx": "^4.21.0",
+    "typescript": "~6.0.2"
+  }
+}
