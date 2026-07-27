@@ -12,6 +12,9 @@
     "dev:all": "concurrently \"pnpm --filter @rtcade/web dev\" \"pnpm --filter @rtcade/server dev\""
   },
   "packageManager": "pnpm@9.15.4",
+  "dependencies": {
+    "tsx": "^4.21.0"
+  },
   "devDependencies": {
     "@eslint/js": "^9.39.4",
     "@playwright/mcp": "^0.0.78",
