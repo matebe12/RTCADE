@@ -5,7 +5,7 @@
  * http://localhost:5173/ggpo-test#guest=CODE → GUEST (비디오 수신 + 입력 전송)
  */
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import init from "@mantou/fbneo/fbneo-neogeo";
 import wasmURL from "@mantou/fbneo/fbneo-neogeo.wasm?url";
 import { ArcadeWrapper } from "@rtcade/emulator";
@@ -21,6 +21,19 @@ const BIOS_ROM = "neogeo";
 
 type Role = "solo" | "host" | "guest";
 
+function getInitialRole(): Role {
+  const hash = window.location.hash;
+  if (hash.startsWith("#host")) return "host";
+  if (hash.startsWith("#guest=")) return "guest";
+  return "solo";
+}
+
+function getInitialJoinCode(): string {
+  const hash = window.location.hash;
+  if (hash.startsWith("#guest=")) return hash.slice(7);
+  return "";
+}
+
 export default function GGPOTestPage() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -29,25 +42,19 @@ export default function GGPOTestPage() {
   const rafRef = useRef<number | null>(null);
   const localMaskRef = useRef(0);
 
-  const [role, setRole] = useState<Role>("solo");
+  const [role, setRole] = useState<Role>(getInitialRole);
   const [status, setStatus] = useState("idle");
   const [message, setMessage] = useState("FBNeo 비디오 스트리밍 테스트");
   const [, setGameInfo] = useState<ArcadeGameInfo | null>(null);
   const [frameCount, setFrameCount] = useState(0);
   const [roomCode, setRoomCode] = useState<string | null>(null);
-  const [joinCode, setJoinCode] = useState("");
+  const [joinCode, setJoinCode] = useState(getInitialJoinCode);
   const [nickname] = useState("Player");
   const [connected, setConnected] = useState(false);
   const [streamReady, setStreamReady] = useState(false);
   const [showJoinInput, setShowJoinInput] = useState(false);
 
   const frameCountRef = useRef(0);
-
-  useEffect(() => {
-    const hash = window.location.hash;
-    if (hash.startsWith("#host")) setRole("host");
-    else if (hash.startsWith("#guest=")) { setRole("guest"); setJoinCode(hash.slice(7)); }
-  }, []);
 
   // ───── HOST / SOLO 게임 루프 ─────
   const startSoloLoop = useCallback(() => {

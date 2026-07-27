@@ -1,5 +1,5 @@
 import type { MutableRefObject } from "react";
-import { useCallback, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 
 import type { SessionEndReason } from "@/components/NetplaySessionSummary";
 import { NETPLAY_COPY } from "@/netplay/netplayCopy";
@@ -139,7 +139,9 @@ export function useNetplayPeerRoomFlow({
     createPeer,
   });
 
-  spectatePublicRoomRef.current = handleSpectatePublicRoom;
+  useEffect(() => {
+    spectatePublicRoomRef.current = handleSpectatePublicRoom;
+  }, [handleSpectatePublicRoom]);
 
   const joinOrAutoSpectateWithCode = useCallback(
     async (code: string) => {

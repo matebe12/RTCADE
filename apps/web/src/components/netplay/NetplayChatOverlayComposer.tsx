@@ -35,10 +35,6 @@ export default function NetplayChatOverlayComposer({
   open,
   remoteUser,
 }: NetplayChatOverlayComposerProps) {
-  if (!open) {
-    return null;
-  }
-
   const remoteDisplay = remoteUser ?? { nickname: "상대방", avatar: "🎮" };
   const isChatReady = chatChannelState === "open";
 
@@ -59,6 +55,10 @@ export default function NetplayChatOverlayComposer({
       window.cancelAnimationFrame(frameId);
     };
   }, [inputRef, open]);
+
+  if (!open) {
+    return null;
+  }
 
   const placeholder = isPeerTyping
     ? `${remoteDisplay.nickname} 입력 중...`

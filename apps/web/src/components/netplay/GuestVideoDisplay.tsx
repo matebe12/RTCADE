@@ -23,11 +23,6 @@ const KEY_TO_BUTTON: Record<string, number> = {
   KeyE: 11,
 };
 
-type PlaybackStats = {
-  droppedFrames: number | null;
-  fps: number | null;
-};
-
 interface GuestVideoDisplayProps {
   videoStream: MediaStream | null;
   onLocalInput?: (button: number, down: boolean) => void;
@@ -66,10 +61,6 @@ const GuestVideoDisplay = forwardRef<HTMLDivElement, GuestVideoDisplayProps>(
     const [playbackState, setPlaybackState] = useState<
       "waiting-stream" | "waiting-playback" | "playing" | "stalled"
     >("waiting-stream");
-    const [_playbackStats, setPlaybackStats] = useState<PlaybackStats>({
-      droppedFrames: null,
-      fps: null,
-    });
 
     useImperativeHandle(ref, () => containerRef.current!, []);
 
@@ -164,87 +155,6 @@ const GuestVideoDisplay = forwardRef<HTMLDivElement, GuestVideoDisplayProps>(
       };
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [videoStream]); // intentionally not including isMuted to avoid re-attaching
-
-    useEffect(() => {
-      const video = videoRef.current;
-      if (!videoStream || !video) {
-        setPlaybackStats({ droppedFrames: null, fps: null });
-        return undefined;
-      }
-
-      let cancelled = false;
-      let lastFrames: number | null = null;
-      let lastSampleAt = performance.now();
-
-      const readVideoQuality = () => {
-        if ("getVideoPlaybackQuality" in video) {
-          return video.getVideoPlaybackQuality();
-        }
-
-        return null;
-      };
-
-      const publishStats = (frames: number | null, droppedFrames: number | null) => {
-        const now = performance.now();
-
-        if (frames === null) {
-          setPlaybackStats({ droppedFrames, fps: null });
-          return;
-        }
-
-        if (lastFrames === null) {
-          lastFrames = frames;
-          lastSampleAt = now;
-          setPlaybackStats({ droppedFrames, fps: null });
-          return;
-        }
-
-        const elapsedMs = now - lastSampleAt;
-
-        if (elapsedMs < 900) {
-          return;
-        }
-
-        const fps = Math.max(0, Math.round(((frames - lastFrames) * 1000) / elapsedMs));
-        lastFrames = frames;
-        lastSampleAt = now;
-        setPlaybackStats({ droppedFrames, fps });
-      };
-
-      if ("requestVideoFrameCallback" in video && "cancelVideoFrameCallback" in video) {
-        let frameCallbackId: number | null = null;
-
-        const handleFrame: VideoFrameRequestCallback = (_now, metadata) => {
-          if (cancelled) return;
-
-          const quality = readVideoQuality();
-          publishStats(
-            quality?.totalVideoFrames ?? metadata.presentedFrames,
-            quality?.droppedVideoFrames ?? null,
-          );
-          frameCallbackId = video.requestVideoFrameCallback(handleFrame);
-        };
-
-        frameCallbackId = video.requestVideoFrameCallback(handleFrame);
-
-        return () => {
-          cancelled = true;
-          if (frameCallbackId !== null) {
-            video.cancelVideoFrameCallback(frameCallbackId);
-          }
-        };
-      }
-
-      const interval = setInterval(() => {
-        const quality = readVideoQuality();
-        publishStats(quality?.totalVideoFrames ?? null, quality?.droppedVideoFrames ?? null);
-      }, 1000);
-
-      return () => {
-        cancelled = true;
-        clearInterval(interval);
-      };
-    }, [videoStream]);
 
     // Keyboard input capture
     useEffect(() => {

@@ -97,6 +97,35 @@ export function useGGPOSession({
     };
   }, [arcade, config]);
 
+  // ───── 게임 루프 ─────
+  const startGameLoop = useCallback(() => {
+    if (startedRef.current) return;
+    startedRef.current = true;
+
+    const engine = engineRef.current;
+    if (!engine) return;
+
+    engine.start();
+    setState("playing");
+
+    const loop = () => {
+      if (!startedRef.current) return;
+      engine.tick(localMaskRef.current);
+      rafRef.current = requestAnimationFrame(loop);
+    };
+
+    rafRef.current = requestAnimationFrame(loop);
+  }, []);
+
+  const stopGameLoop = useCallback(() => {
+    startedRef.current = false;
+    if (rafRef.current !== null) {
+      cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
+    }
+    engineRef.current?.stop();
+  }, []);
+
   // ───── WebRTC 피어 초기화 ─────
   useEffect(() => {
     const peerHandlers: GGPOPeerEventHandlers = {
@@ -142,8 +171,7 @@ export function useGGPOSession({
         setState("loading");
       },
       onGuestJoined: () => {
-        // GUEST가 입장하면 HOST가 세션 시작
-        // (실제로는 ROM 로딩 완료 후에 시작)
+        // Intentionally no-op: session start is handled by ROM loading completion
       },
       onError: (msg) => {
         console.error("[GGPO Session] error:", msg);
@@ -164,35 +192,6 @@ export function useGGPOSession({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [signalingUrl]);
-
-  // ───── 게임 루프 ─────
-  const startGameLoop = useCallback(() => {
-    if (startedRef.current) return;
-    startedRef.current = true;
-
-    const engine = engineRef.current;
-    if (!engine) return;
-
-    engine.start();
-    setState("playing");
-
-    const loop = () => {
-      if (!startedRef.current) return;
-      engine.tick(localMaskRef.current);
-      rafRef.current = requestAnimationFrame(loop);
-    };
-
-    rafRef.current = requestAnimationFrame(loop);
-  }, []);
-
-  const stopGameLoop = useCallback(() => {
-    startedRef.current = false;
-    if (rafRef.current !== null) {
-      cancelAnimationFrame(rafRef.current);
-      rafRef.current = null;
-    }
-    engineRef.current?.stop();
-  }, []);
 
   // ───── Public API ─────
   const createRoom = useCallback(

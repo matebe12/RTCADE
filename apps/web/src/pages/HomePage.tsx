@@ -8,10 +8,11 @@ import {
   Trophy,
   Users,
 } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 
 import { SYSTEM_OPTIONS } from "@/components/EmulatorPlayer";
+import { ThumbnailImg } from "@/components/ThumbnailImg";
 import { useOperationsNotices } from "@/hooks/useOperationsNotices";
 
 // 고퀄 조이스틱 — 받침대·소켓 고정, 레버+공이 좌우 흔들림
@@ -162,7 +163,6 @@ function PopularGameSpotlightItem({
 }) {
   const navigate = useNavigate();
   const resetLobby = useNetplayLobbyStore((store) => store.resetLobby);
-  const [imgError, setImgError] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
   const filename = getPopularGameFilename(game.romPath);
   const displayName = getPopularGameDisplayName(game);
@@ -170,8 +170,8 @@ function PopularGameSpotlightItem({
   const thumbnailUrl = filename && game.core ? getGameThumbnailUrl(filename, game.core) : null;
   const fallbackThumbnailUrl =
     filename && game.core ? getFallbackGameThumbnailUrl(filename, game.core) : null;
-  const displayThumbnailUrl = imgError || !thumbnailUrl ? fallbackThumbnailUrl : thumbnailUrl;
   const playHref = buildPopularGameEntryHref("create-room", game);
+  const thumbnailKey = thumbnailUrl ?? fallbackThumbnailUrl ?? "";
 
   const handleQuickCreateRoom = useCallback(() => {
     resetLobby();
@@ -184,10 +184,6 @@ function PopularGameSpotlightItem({
     navigate(playHref);
   }, [navigate, playHref, resetLobby]);
 
-  useEffect(() => {
-    setImgError(false);
-  }, [thumbnailUrl]);
-
   return (
     <>
       <div className="rounded-2xl border border-border/70 bg-background/55 px-3 py-3">
@@ -198,12 +194,12 @@ function PopularGameSpotlightItem({
             className="relative size-16 shrink-0 overflow-hidden rounded-2xl border border-primary/15 bg-background/70 shadow-sm shadow-primary/10"
             aria-label={`${displayName} 썸네일 크게 보기`}
           >
-            {displayThumbnailUrl ? (
-              <img
-                src={displayThumbnailUrl}
+            {thumbnailUrl || fallbackThumbnailUrl ? (
+              <ThumbnailImg
+                key={thumbnailKey}
+                src={thumbnailUrl}
+                fallback={fallbackThumbnailUrl}
                 alt={displayName}
-                loading="lazy"
-                onError={displayThumbnailUrl === thumbnailUrl ? () => setImgError(true) : undefined}
                 className="size-full object-cover"
               />
             ) : (
@@ -256,9 +252,11 @@ function PopularGameSpotlightItem({
         <DialogContent className="max-w-3xl overflow-hidden border-border/80 bg-card/95 p-0 shadow-2xl backdrop-blur-xl sm:rounded-2xl">
           <div className="border-b border-border/70 bg-[radial-gradient(circle_at_top_left,rgba(0,160,255,0.16),transparent_28%),radial-gradient(circle_at_bottom_right,rgba(255,135,61,0.12),transparent_28%)] p-4 sm:p-5">
             <div className="overflow-hidden rounded-2xl border border-primary/20 bg-black/40 shadow-lg shadow-primary/10">
-              {displayThumbnailUrl ? (
-                <img
-                  src={displayThumbnailUrl}
+              {thumbnailUrl || fallbackThumbnailUrl ? (
+                <ThumbnailImg
+                  key={thumbnailKey}
+                  src={thumbnailUrl}
+                  fallback={fallbackThumbnailUrl}
                   alt={displayName}
                   className="aspect-[4/3] w-full object-contain"
                 />

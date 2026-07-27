@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -31,14 +31,6 @@ export function NicknameSetup({
   const [avatar, setAvatar] = useState(profile?.avatar ?? AVATAR_OPTIONS[0]);
   const [error, setError] = useState("");
 
-  useEffect(() => {
-    if (!open) return;
-
-    setNickname(profile?.nickname ?? "");
-    setAvatar(profile?.avatar ?? AVATAR_OPTIONS[0]);
-    setError("");
-  }, [open, profile]);
-
   const handleSubmit = () => {
     const trimmed = nickname.trim();
     if (trimmed.length < 2 || trimmed.length > 10) {
@@ -61,6 +53,7 @@ export function NicknameSetup({
       }}
     >
       <DialogContent
+        key={String(open)}
         className="sm:max-w-md"
         onInteractOutside={(e) => e.preventDefault()}
         showCloseButton={allowClose}

@@ -11,6 +11,7 @@ import { AppTutorialProvider } from "@/tutorial/AppTutorialProvider";
 const AppShell = lazy(() => import("@/components/layout/AppShell"));
 const HomePage = lazy(() => import("@/pages/HomePage"));
 const NetplayPage = lazy(() => import("@/pages/NetplayPage"));
+const GameDetailPage = lazy(() => import("@/pages/GameDetailPage"));
 const NoticesPage = lazy(() => import("@/pages/NoticesPage"));
 const SettingsPage = lazy(() => import("@/pages/SettingsPage"));
 
@@ -53,6 +54,7 @@ function App() {
             >
               <Route index element={<HomePage hasProfile={!needsSetup} />} />
               <Route path="netplay" element={<NetplayPage hasProfile={!needsSetup} />} />
+              <Route path="game" element={<GameDetailPage />} />
               <Route path="notices" element={<NoticesPage />} />
               <Route
                 path="settings"

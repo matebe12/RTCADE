@@ -10,6 +10,8 @@ type PageSeoOptions = {
   description: string;
   /** `true`이면 `noindex,nofollow`로 검색엔진 수집을 차단한다. */
   noIndex?: boolean;
+  /** 커스텀 OG 이미지 URL (기본값: `/og_image.png`). 게임 썸네일 등에 사용. */
+  ogImage?: string;
 };
 
 const DEFAULT_OG_IMAGE = "/og_image.png";
@@ -58,26 +60,28 @@ function updateCanonical(url: string) {
  * `<title>`, `description`, `robots`, OG 태그, Twitter Card, canonical URL을 스열친다.
  * @param options - 페이지 SEO 옵션 ({@link PageSeoOptions})
  */
-export function usePageSeo({ title, description, noIndex = false }: PageSeoOptions) {
+export function usePageSeo({ title, description, noIndex = false, ogImage }: PageSeoOptions) {
   useEffect(() => {
     const fullTitle = `${title} | ${appEnvironment.siteName}`;
     const currentUrl = window.location.href;
     const robots = noIndex ? "noindex,nofollow" : "index,follow";
+    const imageUrl = ogImage ?? DEFAULT_OG_IMAGE;
+    const imageAlt = ogImage ? `${title} 게임 스크린샷` : DEFAULT_OG_IMAGE_ALT;
 
     document.title = fullTitle;
     updateMetaByName("description", description);
     updateMetaByName("robots", robots);
     updateMetaByName("twitter:title", fullTitle);
     updateMetaByName("twitter:description", description);
-    updateMetaByName("twitter:image", DEFAULT_OG_IMAGE);
-    updateMetaByName("twitter:image:alt", DEFAULT_OG_IMAGE_ALT);
+    updateMetaByName("twitter:image", imageUrl);
+    updateMetaByName("twitter:image:alt", imageAlt);
     updateMetaByProperty("og:title", fullTitle);
     updateMetaByProperty("og:description", description);
-    updateMetaByProperty("og:image", DEFAULT_OG_IMAGE);
+    updateMetaByProperty("og:image", imageUrl);
     updateMetaByProperty("og:image:width", DEFAULT_OG_IMAGE_WIDTH);
     updateMetaByProperty("og:image:height", DEFAULT_OG_IMAGE_HEIGHT);
-    updateMetaByProperty("og:image:alt", DEFAULT_OG_IMAGE_ALT);
+    updateMetaByProperty("og:image:alt", imageAlt);
     updateMetaByProperty("og:url", currentUrl);
     updateCanonical(currentUrl);
-  }, [description, noIndex, title]);
+  }, [description, noIndex, title, ogImage]);
 }

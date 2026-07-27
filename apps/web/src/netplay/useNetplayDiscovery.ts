@@ -145,6 +145,7 @@ export function useNetplayDiscovery({
       setMenuPublicRooms(rooms.slice(0, 2));
     // 메뉴 예고 파내역: 실패 시 조용히 무시
     } catch {
+      // Public room preview fetch 실패 시 조용히 무시 — 메뉴 기능에 영향 없음
     }
   }, [setMenuPublicRooms]);
 

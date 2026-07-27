@@ -16,7 +16,7 @@ const publishedAtFormatter = new Intl.DateTimeFormat("ko-KR", {
 export default function NoticesPage() {
   usePageSeo({
     title: "공지사항",
-    description: "RTCADE의 운영 공지, 업데이트 소식, 점검 안내를 한곳에서 확인하세요.",
+    description: "RTCADE의 운영 공지, 업데이트 소식, 신규 게임 추가 및 점검 안내를 확인하세요. 서비스 변경사항과 이벤트 소식을 가장 빠르게 알 수 있습니다.",
   });
 
   const { error, isLoading, notices } = useOperationsNotices();

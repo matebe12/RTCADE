@@ -293,7 +293,7 @@ export function AppTutorialProvider({ blocked = false, children }: AppTutorialPr
     }
 
     if (lobbyStep === "waiting" && waitingRoomRole === "host") {
-      advanceTo("waiting-room-solo");
+      queueMicrotask(() => advanceTo("waiting-room-solo"));
       return;
     }
 

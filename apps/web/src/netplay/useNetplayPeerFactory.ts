@@ -326,6 +326,7 @@ export function useNetplayPeerFactory({
       setError,
       setGameStarted,
       setOpponentProfile,
+      onRoomFull,
       setState,
       setStatus,
     ],

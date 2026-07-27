@@ -159,15 +159,22 @@ export default function NetplayLobby({ hasProfile = true }: { hasProfile?: boole
   // GUEST: video stream received from HOST via WebRTC
   const [guestVideoStream, setGuestVideoStream] = useState<MediaStream | null>(null);
   const [waitingRoomRoms, setWaitingRoomRoms] = useState<RomInfo[]>([]);
-  const [roomGamePickerOpen, setRoomGamePickerOpen] = useState(false);
-  const [roomGamePickerLoading, setRoomGamePickerLoading] = useState(false);
+  const [roomGamePickerOpenInternal, setRoomGamePickerOpenInternal] = useState(false);
+  const [roomGamePickerLoadingInternal, setRoomGamePickerLoadingInternal] = useState(false);
+
+  const isHostWaiting = state.step === "waiting" && waitingRoomRole === "host";
+  const roomGamePickerOpen = isHostWaiting ? roomGamePickerOpenInternal : false;
+  const roomGamePickerLoading = isHostWaiting ? roomGamePickerLoadingInternal : false;
   const handledEntryRequestRef = useRef<string | null>(null);
   const handledCodeRequestRef = useRef<string | null>(null);
   const pendingAutoJoinCodeRef = useRef<string | null>(null);
   const joinOrAutoSpectateRef = useRef(joinOrAutoSpectateWithCode);
-  joinOrAutoSpectateRef.current = joinOrAutoSpectateWithCode;
   const currentLobbyStepRef = useRef(state.step);
   const waitingRoomRole = state.step === "waiting" ? state.role : null;
+
+  useEffect(() => {
+    joinOrAutoSpectateRef.current = joinOrAutoSpectateWithCode;
+  });
 
   useEffect(() => {
     setVideoStreamCallbackRef.current = setGuestVideoStream;
@@ -179,15 +186,6 @@ export default function NetplayLobby({ hasProfile = true }: { hasProfile?: boole
   useEffect(() => {
     currentLobbyStepRef.current = state.step;
   }, [state.step]);
-
-  useEffect(() => {
-    if (state.step === "waiting" && waitingRoomRole === "host") {
-      return;
-    }
-
-    setRoomGamePickerOpen(false);
-    setRoomGamePickerLoading(false);
-  }, [state.step, waitingRoomRole]);
 
   useEffect(() => {
     const searchParams = new URLSearchParams(location.search);
@@ -380,11 +378,11 @@ export default function NetplayLobby({ hasProfile = true }: { hasProfile?: boole
     }
 
     if (waitingRoomRoms.length > 0) {
-      setRoomGamePickerOpen(true);
+      setRoomGamePickerOpenInternal(true);
       return;
     }
 
-    setRoomGamePickerLoading(true);
+    setRoomGamePickerLoadingInternal(true);
     setError("");
 
     try {
@@ -401,17 +399,17 @@ export default function NetplayLobby({ hasProfile = true }: { hasProfile?: boole
       }
 
       setWaitingRoomRoms(roms);
-      setRoomGamePickerOpen(true);
+      setRoomGamePickerOpenInternal(true);
     } catch {
       setError(NETPLAY_COPY.romsLoadFailed);
       toast.error(NETPLAY_COPY.romsLoadFailed);
     } finally {
-      setRoomGamePickerLoading(false);
+      setRoomGamePickerLoadingInternal(false);
     }
   }, [setError, state.step, waitingRoomRole, waitingRoomRoms.length]);
 
   const handleCloseRoomGamePicker = useCallback(() => {
-    setRoomGamePickerOpen(false);
+    setRoomGamePickerOpenInternal(false);
   }, []);
 
   const handleChangeWaitingRoomGame = useCallback(
@@ -420,7 +418,7 @@ export default function NetplayLobby({ hasProfile = true }: { hasProfile?: boole
         return;
       }
 
-      setRoomGamePickerOpen(false);
+      setRoomGamePickerOpenInternal(false);
 
       if (
         rom.path === state.romPath &&

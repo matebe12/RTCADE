@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type RefObject } from "react";
+import { useMemo, useState, type RefObject } from "react";
 import { ArrowLeft, Globe, Loader2, Lock, MessageSquare, Radio, Search, Users } from "lucide-react";
 
 import NetplayChatPanel, { type NetplayChatMessage } from "@/components/NetplayChatPanel";
@@ -31,6 +31,7 @@ import { CATEGORY_INFO, getRomCategory, parseRomName } from "@/lib/game-names";
 import { getFallbackGameThumbnailUrl, getGameThumbnailUrl } from "@/lib/game-thumbnails";
 import { ScrollArea } from "@rtcade/ui";
 import type { RomInfo, RoomLobbyParticipantInfo } from "@/stores/useNetplayLobbyStore";
+import { ThumbnailImg } from "@/components/ThumbnailImg";
 
 interface NetplayWaitingScreenProps {
   roomCode: string;
@@ -150,10 +151,9 @@ export default function NetplayWaitingScreen({
   const systemLabel = SYSTEM_OPTIONS.find((option) => option.value === core)?.label ?? core;
   const thumbnailUrl = getGameThumbnailUrl(romFilename, core);
   const fallbackThumbnailUrl = getFallbackGameThumbnailUrl(romFilename, core);
-  const [imgError, setImgError] = useState(false);
   const [roomGameQuery, setRoomGameQuery] = useState("");
   const [kickTarget, setKickTarget] = useState<RoomLobbyParticipantInfo | null>(null);
-  const displayThumbnailUrl = imgError || !thumbnailUrl ? fallbackThumbnailUrl : thumbnailUrl;
+  const thumbnailKey = thumbnailUrl ?? fallbackThumbnailUrl ?? "";
 
   const filteredRoomRoms = useMemo(() => {
     const normalizedQuery = roomGameQuery.trim().toLowerCase();
@@ -168,15 +168,10 @@ export default function NetplayWaitingScreen({
     });
   }, [availableRoomRoms, roomGameQuery]);
 
-  useEffect(() => {
-    setImgError(false);
-  }, [thumbnailUrl, romFilename, core]);
-
-  useEffect(() => {
-    if (!roomGamePickerOpen) {
-      setRoomGameQuery("");
-    }
-  }, [roomGamePickerOpen]);
+  const handleCloseRoomGamePicker = () => {
+    setRoomGameQuery("");
+    onCloseRoomGamePicker?.();
+  };
 
   const isLobbyChat = chatChannelState !== "open";
 
@@ -216,11 +211,11 @@ export default function NetplayWaitingScreen({
           <div className="overflow-hidden rounded-xl border border-border/70 bg-background/45">
             <div className="grid gap-0 sm:grid-cols-[180px_minmax(0,1fr)]">
               <div className="bg-black/30">
-                <img
-                  src={displayThumbnailUrl}
+                <ThumbnailImg
+                  key={thumbnailKey}
+                  src={thumbnailUrl}
+                  fallback={fallbackThumbnailUrl}
                   alt={displayName}
-                  loading="lazy"
-                  onError={displayThumbnailUrl === thumbnailUrl ? () => setImgError(true) : undefined}
                   className="aspect-[4/3] h-full w-full object-contain"
                 />
               </div>
@@ -364,7 +359,7 @@ export default function NetplayWaitingScreen({
         open={roomGamePickerOpen}
         onOpenChange={(open) => {
           if (!open) {
-            onCloseRoomGamePicker?.();
+            handleCloseRoomGamePicker();
           }
         }}
       >
@@ -463,7 +458,7 @@ export default function NetplayWaitingScreen({
           </div>
 
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={onCloseRoomGamePicker}>
+            <Button type="button" variant="outline" onClick={handleCloseRoomGamePicker}>
               닫기
             </Button>
           </DialogFooter>

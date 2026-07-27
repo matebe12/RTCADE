@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import { useEffect, forwardRef } from "react";
 
 import type { FBNeoVariant } from "@rtcade/shared";

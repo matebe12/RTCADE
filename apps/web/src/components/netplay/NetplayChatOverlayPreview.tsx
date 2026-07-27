@@ -35,8 +35,6 @@ export default function NetplayChatOverlayPreview({
       return undefined;
     }
 
-    setNow(Date.now());
-
     const intervalId = window.setInterval(() => {
       setNow(Date.now());
     }, 1000);

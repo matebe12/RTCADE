@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { Gamepad2, Star } from "lucide-react";
 
 import { Badge } from "@rtcade/ui";
@@ -14,6 +14,7 @@ import {
 import { parseRomName } from "@/lib/game-names";
 import { getFallbackGameThumbnailUrl, getGameThumbnailUrl } from "@/lib/game-thumbnails";
 import { cn } from "@rtcade/ui";
+import { ThumbnailImg } from "@/components/ThumbnailImg";
 
 interface GameCardProps {
   filename: string;
@@ -47,23 +48,18 @@ export function GameCard({
   const resolvedDisplayName = displayName ?? parseRomName(filename, core);
   const thumbnailUrl = getGameThumbnailUrl(filename, core);
   const fallbackThumbnailUrl = getFallbackGameThumbnailUrl(filename, core);
-  const [imgError, setImgError] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
-  const displayThumbnailUrl = imgError || !thumbnailUrl ? fallbackThumbnailUrl : thumbnailUrl;
   const previewDescription =
     previewActionLabel === "방 만들기"
       ? "썸네일을 크게 보고 선택하면 바로 새 방이 만들어집니다."
       : "썸네일을 크게 보고 바로 시작할 수 있습니다.";
 
-  const handleImgError = useCallback(() => setImgError(true), []);
   const handlePreviewAction = useCallback(() => {
     setPreviewOpen(false);
     onClick?.();
   }, [onClick]);
 
-  useEffect(() => {
-    setImgError(false);
-  }, [thumbnailUrl]);
+  const thumbnailKey = thumbnailUrl ?? fallbackThumbnailUrl ?? "";
 
   return (
     <>
@@ -83,12 +79,12 @@ export function GameCard({
           className="relative size-14 shrink-0 overflow-hidden rounded-md bg-muted"
           aria-label={`${resolvedDisplayName} 썸네일 크게 보기`}
         >
-          {displayThumbnailUrl ? (
-            <img
-              src={displayThumbnailUrl}
+          {thumbnailUrl || fallbackThumbnailUrl ? (
+            <ThumbnailImg
+              key={thumbnailKey}
+              src={thumbnailUrl}
+              fallback={fallbackThumbnailUrl}
               alt={resolvedDisplayName}
-              loading="lazy"
-              onError={displayThumbnailUrl === thumbnailUrl ? handleImgError : undefined}
               className="size-full object-cover"
             />
           ) : (
@@ -143,9 +139,11 @@ export function GameCard({
         <DialogContent className="max-w-3xl overflow-hidden border-border/80 bg-card/95 p-0 shadow-2xl backdrop-blur-xl sm:rounded-2xl">
           <div className="border-b border-border/70 bg-[radial-gradient(circle_at_top_left,rgba(0,160,255,0.16),transparent_28%),radial-gradient(circle_at_bottom_right,rgba(255,135,61,0.12),transparent_28%)] p-4 sm:p-5">
             <div className="overflow-hidden rounded-2xl border border-primary/20 bg-black/40 shadow-lg shadow-primary/10">
-              {displayThumbnailUrl ? (
-                <img
-                  src={displayThumbnailUrl}
+              {thumbnailUrl || fallbackThumbnailUrl ? (
+                <ThumbnailImg
+                  key={thumbnailKey}
+                  src={thumbnailUrl}
+                  fallback={fallbackThumbnailUrl}
                   alt={resolvedDisplayName}
                   className="aspect-[4/3] w-full object-contain"
                 />

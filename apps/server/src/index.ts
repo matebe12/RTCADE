@@ -10,6 +10,7 @@ import { registerNoticeRoutes } from "./noticeApi";
 import { createPlaySessionStore } from "./playSessionStore";
 import { registerPublicRoomRoutes } from "./publicRoomApi";
 import { registerRomRoutes } from "./romApi";
+import { registerSitemapRoutes } from "./sitemapApi";
 import { createRoomStore } from "./roomStore";
 import { attachSignalingServer } from "./signaling";
 import { registerStatsRoutes } from "./statsApi";
@@ -55,6 +56,7 @@ async function bootstrap() {
   });
   app.use(createVisitorTrackingMiddleware(operationsDatabase));
   registerRomRoutes(app, config.romsDir);
+  registerSitemapRoutes(app, config.romsDir);
   registerIceServerRoutes(app, config.iceServers);
   registerPublicRoomRoutes(app, roomStore);
   registerNoticeRoutes(app, operationsDatabase, config.noticeAdminToken);

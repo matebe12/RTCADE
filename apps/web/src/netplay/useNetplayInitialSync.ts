@@ -15,7 +15,7 @@ interface UseNetplayInitialSyncOptions {
   dcState: string;
   gameStarted: boolean;
   peerRef: MutableRefObject<NetplayPeer | null>;
-  emulatorRef: RefObject<HTMLDivElement | null>;  // kept for API compat, unused in hook
+  emulatorRef?: RefObject<HTMLDivElement | null>;  // kept for API compat, unused in hook (not destructured)
   roleRef: MutableRefObject<NetplaySessionRole | null>;
   gameStartedRef: MutableRefObject<boolean>;
   setGameStarted: (gameStarted: boolean) => void;
@@ -37,7 +37,6 @@ export function useNetplayInitialSync({
   dcState,
   gameStarted,
   peerRef,
-  emulatorRef: _emulatorRef,
   roleRef,
   gameStartedRef,
   setGameStarted,
