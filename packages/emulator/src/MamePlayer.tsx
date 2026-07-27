@@ -131,7 +131,7 @@ const MamePlayer = forwardRef<HTMLDivElement, Props>(function MamePlayer(
     if (typeof romSource === "string" && romSource.length > 0) { w.EJS_gameUrl = romSource; if (biosPath) w.EJS_biosUrl = biosPath; }
     else if (romSource instanceof File) { romSource.arrayBuffer().then(b=>{if(!aborted){objUrl=URL.createObjectURL(new Blob([b]));w.EJS_gameUrl=objUrl;}}); }
 
-    // onEmulatorReady when gameManager found + capture stream
+    // onEmulatorReady + capture stream (direct from EJS WebGL canvas)
     const doReady = () => {
       let n = 0;
       const iv = setInterval(() => { if(aborted||n++>30){clearInterval(iv);return}
@@ -139,7 +139,6 @@ const MamePlayer = forwardRef<HTMLDivElement, Props>(function MamePlayer(
         try {
           const st = (cv as HTMLCanvasElement).captureStream(60);
           for (const t of st.getVideoTracks()) t.contentHint = "motion";
-          // Add audio track if captured
           if (audioDestRef.current) { for (const t of audioDestRef.current.stream.getAudioTracks()) { t.contentHint = "music"; st.addTrack(t); } }
           sRef.current?.(st, true);
         } catch {}

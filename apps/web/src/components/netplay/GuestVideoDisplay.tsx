@@ -403,17 +403,6 @@ const GuestVideoDisplay = forwardRef<HTMLDivElement, GuestVideoDisplayProps>(
           </div>
         )}
 
-        {videoStream && playbackState === "playing" && playbackStats.fps !== null && (
-          <div className="absolute bottom-3 left-3 z-10">
-            <Badge
-              variant="outline"
-              className="border-border/60 bg-black/60 text-[10px] text-white tabular-nums backdrop-blur-sm"
-              title={`재생 FPS ${playbackStats.fps}${playbackStats.droppedFrames === null ? "" : ` / 드롭 ${playbackStats.droppedFrames}`}`}
-            >
-              재생 {playbackStats.fps}fps
-            </Badge>
-          </div>
-        )}
 
         {/* Disconnect severity overlay */}
         {showDisconnectOverlay && (
