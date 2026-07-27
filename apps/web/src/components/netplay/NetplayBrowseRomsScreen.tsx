@@ -3,6 +3,7 @@ import { ArrowLeft, Globe, Lock, Search } from "lucide-react";
 
 import { SYSTEM_OPTIONS } from "@/components/EmulatorPlayer";
 import { GameCard } from "@/components/GameCard";
+import { VirtualGameCardList } from "@/components/VirtualGameCardList";
 import { Input } from "@rtcade/ui";
 import { Button } from "@rtcade/ui";
 import { Card, CardContent, CardHeader, CardTitle } from "@rtcade/ui";
@@ -286,52 +287,29 @@ export default function NetplayBrowseRomsScreen({
                         {group.roms.length}
                       </span>
                     </div>
-                    {group.roms.map((rom) => {
-                      const sys = SYSTEM_OPTIONS.find(
-                        (system) => system.value === rom.core,
-                      );
-                      return (
-                        <GameCard
-                          key={rom.path}
-                          filename={rom.filename}
-                          core={rom.core}
-                          systemLabel={sys?.label || rom.core}
-                          previewActionLabel="방 만들기"
-                          actionDataTutorial={
-                            rom.path === recommendedRomPath ? "netplay-primary-game" : undefined
-                          }
-                          favorite={favoriteGames.includes(rom.path)}
-                          onToggleFavorite={() => onToggleFavoriteGame(rom.path)}
-                          onClick={() => onCreateRoom(rom)}
-                        />
-                      );
-                    })}
+                    <VirtualGameCardList
+                      roms={group.roms}
+                      favoriteGames={favoriteGames}
+                      onToggleFavoriteGame={onToggleFavoriteGame}
+                      onCreateRoom={onCreateRoom}
+                      previewActionLabel="방 만들기"
+                      recommendedRomPath={recommendedRomPath}
+                    />
                   </div>
                 );
               })}
 
             {/* 카테고리 필터 또는 검색 결과 (플랫 리스트) */}
             {(isSearching || categoryFilter) &&
-              filteredBrowseRoms.map((rom) => {
-                const sys = SYSTEM_OPTIONS.find(
-                  (system) => system.value === rom.core,
-                );
-                return (
-                  <GameCard
-                    key={rom.path}
-                    filename={rom.filename}
-                    core={rom.core}
-                    systemLabel={sys?.label || rom.core}
-                    previewActionLabel="방 만들기"
-                    actionDataTutorial={
-                      rom.path === recommendedRomPath ? "netplay-primary-game" : undefined
-                    }
-                    favorite={favoriteGames.includes(rom.path)}
-                    onToggleFavorite={() => onToggleFavoriteGame(rom.path)}
-                    onClick={() => onCreateRoom(rom)}
-                  />
-                );
-              })}
+              <VirtualGameCardList
+                roms={filteredBrowseRoms}
+                favoriteGames={favoriteGames}
+                onToggleFavoriteGame={onToggleFavoriteGame}
+                onCreateRoom={onCreateRoom}
+                previewActionLabel="방 만들기"
+                recommendedRomPath={recommendedRomPath}
+              />
+            }
             {(isSearching || categoryFilter ? filteredBrowseRoms : browseRoms).length === 0 && (
               <p className="py-8 text-center text-xs text-muted-foreground">
                 {isSearching ? "검색 결과가 없습니다" : categoryFilter ? "해당 카테고리에 게임이 없습니다" : "표시할 다른 게임이 없습니다"}

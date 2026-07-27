@@ -11,13 +11,14 @@
     "lint": "eslint ."
   },
   "dependencies": {
+    "@amplitude/analytics-browser": "^2.44.4",
+    "@rtcade/emulator": "workspace:*",
     "@rtcade/shared": "workspace:*",
     "@rtcade/ui": "workspace:*",
-    "@rtcade/emulator": "workspace:*",
-    "@amplitude/analytics-browser": "^2.44.4",
     "@sentry/react": "^10.63.0",
     "@sentry/vite-plugin": "^5.3.0",
     "@tailwindcss/vite": "^4.2.2",
+    "@tanstack/react-virtual": "^3.14.8",
     "driver.js": "^1.4.0",
     "lucide-react": "^1.8.0",
     "react": "^19.2.4",

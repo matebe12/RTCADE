@@ -3,6 +3,7 @@ import { ArrowLeft, Loader2, Search } from "lucide-react";
 
 import { SYSTEM_OPTIONS } from "@/components/EmulatorPlayer";
 import { GameCard } from "@/components/GameCard";
+import { VirtualGameCardList } from "@/components/VirtualGameCardList";
 import { Button } from "@rtcade/ui";
 import { Card, CardContent, CardHeader, CardTitle } from "@rtcade/ui";
 import { Input } from "@rtcade/ui";
@@ -280,48 +281,35 @@ export default function SoloBrowseRomsScreen({
                       <p className="text-xs font-medium text-foreground">{group.label}</p>
                       <span className="text-[10px] text-muted-foreground">{group.roms.length}</span>
                     </div>
-                    {group.roms.map((rom) => {
-                      const sys = SYSTEM_OPTIONS.find((system) => system.value === rom.core);
-                      return (
-                        <GameCard
-                          key={rom.path}
-                          filename={rom.filename}
-                          core={rom.core}
-                          systemLabel={sys?.label || rom.core}
-                          dataTutorial={
-                            rom.path === recommendedRomPath ? "solo-primary-game" : undefined
-                          }
-                          disabled={isStarting}
-                          selected={startingRomPath === rom.path}
-                          favorite={favoriteGames.includes(rom.path)}
-                          onToggleFavorite={() => onToggleFavoriteGame(rom.path)}
-                          onClick={() => onStartSoloGame(rom)}
-                        />
-                      );
-                    })}
+                    <VirtualGameCardList
+                      roms={group.roms}
+                      favoriteGames={favoriteGames}
+                      onToggleFavoriteGame={onToggleFavoriteGame}
+                      onSelectSolo={onStartSoloGame}
+                      previewActionLabel="혼자하기"
+                      recommendedRomPath={recommendedRomPath}
+                      disabled={isStarting}
+                      selectedRomPath={startingRomPath}
+                      tutorialPrefix="solo"
+                    />
                   </div>
                 );
               })}
 
             {/* 카테고리 필터 또는 검색 결과 (플랫 리스트) */}
             {(isSearching || categoryFilter) &&
-              filteredBrowseRoms.map((rom) => {
-                const sys = SYSTEM_OPTIONS.find((system) => system.value === rom.core);
-                return (
-                  <GameCard
-                    key={rom.path}
-                    filename={rom.filename}
-                    core={rom.core}
-                    systemLabel={sys?.label || rom.core}
-                    dataTutorial={rom.path === recommendedRomPath ? "solo-primary-game" : undefined}
-                    disabled={isStarting}
-                    selected={startingRomPath === rom.path}
-                    favorite={favoriteGames.includes(rom.path)}
-                    onToggleFavorite={() => onToggleFavoriteGame(rom.path)}
-                    onClick={() => onStartSoloGame(rom)}
-                  />
-                );
-              })}
+              <VirtualGameCardList
+                roms={filteredBrowseRoms}
+                favoriteGames={favoriteGames}
+                onToggleFavoriteGame={onToggleFavoriteGame}
+                onSelectSolo={onStartSoloGame}
+                previewActionLabel="혼자하기"
+                recommendedRomPath={recommendedRomPath}
+                disabled={isStarting}
+                selectedRomPath={startingRomPath}
+                tutorialPrefix="solo"
+              />
+            }
 
             {(isSearching || categoryFilter ? filteredBrowseRoms : browseRoms).length === 0 && (
               <p className="py-8 text-center text-xs text-muted-foreground">
