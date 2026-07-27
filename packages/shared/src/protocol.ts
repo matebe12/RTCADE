@@ -47,6 +47,43 @@ export const INP_B6     = 1 << 11;
 
 export const INP_DIRECTIONS = INP_LEFT | INP_RIGHT | INP_UP | INP_DOWN;
 
+/**
+ * EmulatorJS/libretro 버튼 인덱스 → FBNeo INP_* 비트마스크 변환 테이블.
+ *
+ * DataChannel wire protocol은 EmulatorJS/libretro 버튼 인덱스(0-11)를 사용한다.
+ * FBNeo 호스트에서 원격 입력을 받을 때, 이 테이블로 버튼 인덱스를
+ * FBNeo의 INP_* 비트마스크로 변환한다.
+ *
+ * Button / Key    | EJS Index | FBNeo INP_*     | Bit
+ * ----------------|-----------|-----------------|-----
+ * A               | 0         | INP_B1          | 6
+ * D               | 1         | INP_B3          | 8
+ * Select (5)      | 2         | INP_SELECT      | 5
+ * Start (1)       | 3         | INP_START       | 4
+ * UP              | 4         | INP_UP          | 2
+ * DOWN            | 5         | INP_DOWN        | 3
+ * LEFT            | 6         | INP_LEFT        | 0
+ * RIGHT           | 7         | INP_RIGHT       | 1
+ * S               | 8         | INP_B2          | 7
+ * F               | 9         | INP_B4          | 9
+ * Q               | 10        | INP_B5          | 10
+ * E               | 11        | INP_B6          | 11
+ */
+export const EJS_BUTTON_TO_FBNEO_BIT: Record<number, number> = {
+  0: INP_B1,
+  1: INP_B3,
+  2: INP_SELECT,
+  3: INP_START,
+  4: INP_UP,
+  5: INP_DOWN,
+  6: INP_LEFT,
+  7: INP_RIGHT,
+  8: INP_B2,
+  9: INP_B4,
+  10: INP_B5,
+  11: INP_B6,
+};
+
 /** FBNeo WASM 변형 */
 export type FBNeoVariant = "arcade" | "neogeo" | "konami";
 
@@ -72,31 +109,3 @@ export type DisconnectSeverity = "connected" | "warning" | "danger" | "disconnec
 
 export const MAX_SPECTATORS_PER_ROOM = 5;
 export type NetplaySessionRole = "host" | "guest" | "spectator";
-
-/* ---------- @deprecated EmulatorJS 전용 — FBNeo 교체 후 제거 ---------- */
-
-export interface EJSGameManager {
-  simulateInput(player: number, button: number, value: number): void;
-  getState(): Uint8Array;
-  loadState(state: Uint8Array): void;
-}
-
-export interface EJSEmulatorInstance {
-  gameManager: EJSGameManager;
-  play(): void;
-  pause(): void;
-}
-
-export const CORE_REMAP: Record<string, string> = {
-  mame2003: "mame2003_plus",
-  arcade: "fbneo",
-};
-
-export const EJS_BUTTONS_CONFIG: Record<string, boolean> = {
-  playPause: false, play: false, pause: false, restart: false,
-  mute: false, unmute: false, settings: false, fullscreen: false,
-  saveState: false, loadState: false, screenRecord: false,
-  gamepad: false, cheat: false, volume: true,
-  saveSavFiles: false, loadSavFiles: false, quickSave: false,
-  quickLoad: false, screenshot: false, cacheManager: false, exitEmulation: false,
-};

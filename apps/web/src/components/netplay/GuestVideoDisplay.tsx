@@ -1,6 +1,6 @@
 import { useEffect, useRef, forwardRef, useImperativeHandle, useState, useCallback } from "react";
 
-import { Loader2, WifiOff, Volume2, VolumeX } from "lucide-react";
+import { Loader2, WifiOff, Volume2, VolumeX, Maximize2, Minimize2 } from "lucide-react";
 import { Badge } from "@rtcade/ui";
 import { Button } from "@rtcade/ui";
 import type { DisconnectSeverity } from "@rtcade/shared";
@@ -61,6 +61,9 @@ const GuestVideoDisplay = forwardRef<HTMLDivElement, GuestVideoDisplayProps>(
     const videoRef = useRef<HTMLVideoElement>(null);
     const pressedButtonsRef = useRef(new Set<number>());
     const [isMuted, setIsMuted] = useState(true); // Start muted for autoplay policy
+    const [volume, setVolume] = useState(1);
+    const [isFullscreen, setIsFullscreen] = useState(false);
+    const [showControls, setShowControls] = useState(false);
     const [playbackState, setPlaybackState] = useState<
       "waiting-stream" | "waiting-playback" | "playing" | "stalled"
     >("waiting-stream");
@@ -82,6 +85,35 @@ const GuestVideoDisplay = forwardRef<HTMLDivElement, GuestVideoDisplayProps>(
         video.play().catch(() => {});
       }
     }, [isMuted]);
+
+    const handleVolumeChange = useCallback((v: number) => {
+      const video = videoRef.current;
+      if (!video) return;
+      video.volume = v;
+      setVolume(v);
+      if (v > 0 && isMuted) {
+        video.muted = false;
+        setIsMuted(false);
+      }
+    }, [isMuted]);
+
+    const toggleFullscreen = useCallback(() => {
+      const el = containerRef.current;
+      if (!el) return;
+      if (document.fullscreenElement) {
+        void document.exitFullscreen();
+      } else {
+        void el.requestFullscreen();
+      }
+    }, []);
+
+    useEffect(() => {
+      const el = containerRef.current;
+      if (!el) return;
+      const handler = () => setIsFullscreen(document.fullscreenElement === el);
+      el.addEventListener("fullscreenchange", handler);
+      return () => el.removeEventListener("fullscreenchange", handler);
+    }, []);
 
     // Attach MediaStream to video element
     useEffect(() => {
@@ -235,6 +267,13 @@ const GuestVideoDisplay = forwardRef<HTMLDivElement, GuestVideoDisplayProps>(
 
       const handleKeyDown = (e: KeyboardEvent) => {
         if (!e.isTrusted) return;
+
+        // 글로벌 키 캡처, input/textarea 타이핑 중엔 제외
+        const el = document.activeElement;
+        if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || (el as HTMLElement).isContentEditable)) {
+          return;
+        }
+
         // Chat shortcut (Enter)
         if (
           e.code === "Enter" &&
@@ -266,6 +305,12 @@ const GuestVideoDisplay = forwardRef<HTMLDivElement, GuestVideoDisplayProps>(
 
       const handleKeyUp = (e: KeyboardEvent) => {
         if (!e.isTrusted) return;
+
+        const el = document.activeElement;
+        if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || (el as HTMLElement).isContentEditable)) {
+          return;
+        }
+
         const btn = KEY_TO_BUTTON[e.code];
         if (btn !== undefined) {
           e.stopImmediatePropagation();
@@ -280,14 +325,14 @@ const GuestVideoDisplay = forwardRef<HTMLDivElement, GuestVideoDisplayProps>(
         }
       };
 
-      container.addEventListener("keydown", handleKeyDown, true);
-      container.addEventListener("keyup", handleKeyUp, true);
+      window.addEventListener("keydown", handleKeyDown, true);
+      window.addEventListener("keyup", handleKeyUp, true);
       window.addEventListener("blur", releasePressedButtons);
 
       return () => {
         releasePressedButtons();
-        container.removeEventListener("keydown", handleKeyDown, true);
-        container.removeEventListener("keyup", handleKeyUp, true);
+        window.removeEventListener("keydown", handleKeyDown, true);
+        window.removeEventListener("keyup", handleKeyUp, true);
         window.removeEventListener("blur", releasePressedButtons);
       };
     }, [captureInput, onLocalInput, onChatShortcut]);
@@ -310,8 +355,10 @@ const GuestVideoDisplay = forwardRef<HTMLDivElement, GuestVideoDisplayProps>(
         tabIndex={0}
         className="relative aspect-4/3 w-full overflow-hidden rounded-lg bg-neutral-900 outline-none focus:ring-2 focus:ring-primary/60"
         onContextMenu={(e) => e.preventDefault()}
+        onMouseEnter={() => setShowControls(true)}
+        onMouseLeave={() => setShowControls(false)}
       >
-        <video ref={videoRef} autoPlay playsInline className="h-full w-full object-contain" />
+        <video ref={videoRef} autoPlay playsInline disablePictureInPicture className="h-full w-full object-contain" />
 
         {showPlaybackOverlay && (
           <div className="absolute inset-0 z-10 flex h-full w-full flex-col items-center justify-center gap-3 bg-black/60 text-muted-foreground backdrop-blur-[1px]">
@@ -321,16 +368,38 @@ const GuestVideoDisplay = forwardRef<HTMLDivElement, GuestVideoDisplayProps>(
         )}
 
         {videoStream && (
-          <div className="absolute bottom-3 right-3 z-10">
-            <Button
-              variant="secondary"
-              size="sm"
-              className="h-8 w-8 rounded-full p-0 opacity-60 hover:opacity-100 transition-opacity"
-              onClick={toggleMute}
-              title={isMuted ? "소리 켜기" : "소리 끄기"}
-            >
-              {isMuted ? <VolumeX className="size-4" /> : <Volume2 className="size-4" />}
-            </Button>
+          <div className={`absolute bottom-0 left-0 right-0 z-10 transition-opacity duration-200 ${showControls ? "opacity-100" : "opacity-0"}`}>
+            <div className="flex items-center gap-2 bg-gradient-to-t from-black/70 to-transparent px-3 pb-3 pt-8">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 text-white hover:bg-white/20"
+                onClick={toggleMute}
+                title={isMuted ? "소리 켜기" : "소리 끄기"}
+              >
+                {isMuted ? <VolumeX className="size-4" /> : <Volume2 className="size-4" />}
+              </Button>
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.05"
+                value={isMuted ? 0 : volume}
+                onChange={(e) => handleVolumeChange(parseFloat(e.target.value))}
+                className="h-1 w-20 cursor-pointer accent-white"
+                title={`볼륨 ${Math.round((isMuted ? 0 : volume) * 100)}%`}
+              />
+              <div className="flex-1" />
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 text-white hover:bg-white/20"
+                onClick={toggleFullscreen}
+                title={isFullscreen ? "전체화면 종료" : "전체화면"}
+              >
+                {isFullscreen ? <Minimize2 className="size-4" /> : <Maximize2 className="size-4" />}
+              </Button>
+            </div>
           </div>
         )}
 

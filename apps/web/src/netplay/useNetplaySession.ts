@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { NetplayChatMessage } from "@/components/NetplayChatPanel";
-import { createEmulatorRuntimeBridge } from "@/lib/emulator-runtime-bridge";
 import { type RecentGame, type RecentOpponent } from "@/lib/user-profile";
 import {
   NetplayPeer,
@@ -19,6 +18,7 @@ import {
   type OpponentProfile,
   type RoomVisibility,
 } from "@/stores/useNetplayLobbyStore";
+import { sendRemoteInput } from "@rtcade/emulator";
 import {
   HEARTBEAT_INTERVAL_MS,
   HEARTBEAT_WARN_TIMEOUT_MS,
@@ -129,15 +129,6 @@ export function useNetplaySession({
   const heartbeatTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastHeartbeatRef = useRef(0);
   const disconnectTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const emulatorRuntimeRef = useRef<ReturnType<typeof createEmulatorRuntimeBridge> | null>(null);
-
-  const getEmulatorRuntime = useCallback(() => {
-    if (emulatorRuntimeRef.current === null) {
-      emulatorRuntimeRef.current = createEmulatorRuntimeBridge(emulatorRef);
-    }
-
-    return emulatorRuntimeRef.current;
-  }, []);
 
   // Disconnect detection state for GUEST UI
   const [disconnectSeverity, setDisconnectSeverity] = useState<DisconnectSeverity>("connected");
@@ -164,13 +155,13 @@ export function useNetplaySession({
         const isDown = (nextMask & bit) !== 0;
 
         if (wasDown !== isDown) {
-          getEmulatorRuntime().input.sendRemoteInput(button, isDown);
+          sendRemoteInput(emulatorRef, button, isDown);
         }
       }
 
       remoteHeldMaskRef.current = nextMask;
     },
-    [getEmulatorRuntime],
+    [],
   );
 
   // --- 하트비트 로직 (HOST 전송, GUEST 모니터링) ---
@@ -311,9 +302,9 @@ export function useNetplaySession({
   // --- 비디오 스트리밍 핸들러 ---
 
   /** HOST: 캔버스 스트림이 준비되면 Peer에 붙인다. */
-  const handleCanvasStreamReady = useCallback((stream: MediaStream) => {
-    console.log("[LOBBY] HOST canvas stream ready, attaching to peer");
-    peerRef.current?.startVideoStreaming(stream);
+  const handleCanvasStreamReady = useCallback((stream: MediaStream, pixelArt?: boolean) => {
+    console.log("[LOBBY] HOST canvas stream ready, attaching to peer", { pixelArt });
+    peerRef.current?.startVideoStreaming(stream, { pixelArt });
   }, []);
 
   /** GUEST: HOST로부터 WebRTC 비디오 스트림을 수신했다. */

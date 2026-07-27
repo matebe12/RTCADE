@@ -94,6 +94,7 @@ export class ArcadeWrapper implements IArcade {
   private _wasmURL = "";
   private _variant: "arcade" | "neogeo" | "konami";
   private _biosBuffer: { bytes: Uint8Array; filename: string } | null = null;
+  private _romFilename: string | null = null;
 
   constructor(options: ArcadeWrapperOptions = {}) {
     this._variant = options.variant ?? "arcade";
@@ -216,6 +217,7 @@ export class ArcadeWrapper implements IArcade {
       this._biosBuffer = null; // consume once
     }
     fbneo.FS.writeFile(`roms/${filename}.zip`, bytes);
+    this._romFilename = filename;
 
     // 에뮬레이터 시작 (startMain 호출)
     const startMain = fbneo.cwrap("startMain", "number", ["string"]);
@@ -338,8 +340,11 @@ export class ArcadeWrapper implements IArcade {
    * 에뮬레이터를 리셋한다.
    */
   reset(): void {
+    if (!this._fbneo || !this._romFilename) return;
     this._frameNum = 0;
-    this._fbneo?.start();
+    // Re-run the ROM from the beginning
+    const startMain = this._fbneo.cwrap("startMain", "number", ["string"]);
+    startMain(this._romFilename);
     this._controllers.reset();
   }
 

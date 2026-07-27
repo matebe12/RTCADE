@@ -4,14 +4,14 @@
  * 기존 EmulatorPlayer와 동일한 props 인터페이스를 제공하며,
  * 내부적으로 FBNeo WASM + Canvas 렌더링 + WebRTC 스트리밍을 처리한다.
  */
-import { useEffect, useRef, useState, forwardRef, useImperativeHandle } from "react";
-import { Maximize2, Minimize2 } from "lucide-react";
+import { useEffect, useRef, useState, forwardRef, useImperativeHandle, useCallback } from "react";
+import { Maximize2, Minimize2, Volume2, VolumeX } from "lucide-react";
 
 import { ArcadeWrapper } from "./ArcadeWrapper";
 import type { FBNeoInitFn } from "./types";
-import { renderFrameToCanvas, fitCanvasToContainer } from "./render";
+import { renderFrameToCanvas, fitCanvasToContainer, renderUpscaledFrame } from "./render";
 import { keyToButtonMask } from "./input";
-import { KEY_TO_BUTTON, BLOCKED_KEYS, type FBNeoVariant } from "@rtcade/shared";
+import { KEY_TO_BUTTON, BLOCKED_KEYS, EJS_BUTTON_TO_FBNEO_BIT, type FBNeoVariant } from "@rtcade/shared";
 
 // ── Props ──────────────────────────────────────────────
 
@@ -24,12 +24,19 @@ interface FBNeoPlayerProps {
   onLocalInput?: (button: number, down: boolean) => void;
   onEmulatorReady?: () => void;
   onChatShortcut?: () => void;
-  onCanvasStreamReady?: (stream: MediaStream) => void;
+  onCanvasStreamReady?: (stream: MediaStream, pixelArt?: boolean) => void;
 }
 
 // ── Constants ──────────────────────────────────────────
 
 const HOST_STREAM_CAPTURE_FPS = 60;
+
+/**
+ * captureStream()용 오프스크린 Canvas 업스케일 배율.
+ * Neo Geo 304x224 → 3x = 912x672 (H264 매크로블록 57x42개 vs 네이티브 19x14개)
+ * 정수 배율 사용으로 nearest-neighbor 업스케일 시 서브픽셀 아티팩트 없음.
+ */
+const HOST_STREAM_UPSCALE_FACTOR = 3;
 
 // ── WASM variant → init import 매핑 ────────────────────
 
@@ -39,6 +46,16 @@ type WasmVariantInit = {
 };
 
 const wasmCache = new Map<FBNeoVariant, WasmVariantInit>();
+
+/**
+ * 모듈레벨 원격 버튼 핸들러.
+ *
+ * 마운트된 FBNeoPlayer 인스턴스가 useEffect로 등록하고, 언마운트 시 해제한다.
+ * export된 `sendRemoteInput()`이 이 핸들러를 통해 React 컴포넌트 내부의
+ * `remoteMaskRef`에 접근할 수 있게 한다.
+ */
+let _fbneoRemoteButtonHandler: ((button: number, down: boolean) => void) | null = null;
+let _fbneoArcadeRef: ArcadeWrapper | null = null;
 
 function getWasmImports(variant: FBNeoVariant): WasmVariantInit {
   if (!wasmCache.has(variant)) {
@@ -123,6 +140,7 @@ const FBNeoPlayer = forwardRef<HTMLDivElement, FBNeoPlayerProps>(function FBNeoP
   const containerRef = useRef<HTMLDivElement>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const captureCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const arcadeRef = useRef<ArcadeWrapper | null>(null);
   const rafRef = useRef<number | null>(null);
   const streamReadyRef = useRef(false);
@@ -130,8 +148,14 @@ const FBNeoPlayer = forwardRef<HTMLDivElement, FBNeoPlayerProps>(function FBNeoP
   const pressedMaskRef = useRef(0);
   const audioCtxRef = useRef<AudioContext | null>(null);
   const audioDestRef = useRef<MediaStreamAudioDestinationNode | null>(null);
+  const audioGainRef = useRef<GainNode | null>(null);
+  const remoteMaskRef = useRef(0);
+  const canvasFittedRef = useRef(false);
 
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isMuted, setIsMuted] = useState(false);
+  const [volume, setVolumeState] = useState(1);
+  const [showControls, setShowControls] = useState(false);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
   const [errorMsg, setErrorMsg] = useState("");
 
@@ -145,6 +169,27 @@ const FBNeoPlayer = forwardRef<HTMLDivElement, FBNeoPlayerProps>(function FBNeoP
   onCanvasStreamReadyRef.current = onCanvasStreamReady;
 
   useImperativeHandle(ref, () => containerRef.current!, []);
+
+  // ── Remote input handler ────────────────────────────
+  const handleRemoteButton = useCallback((button: number, down: boolean) => {
+    const bit = EJS_BUTTON_TO_FBNEO_BIT[button];
+    if (bit === undefined) return;
+    if (down) {
+      remoteMaskRef.current |= bit;
+    } else {
+      remoteMaskRef.current &= ~bit;
+    }
+  }, []);
+
+  // Register/unregister the module-level handler so the exported
+  // sendRemoteInput() can reach this instance.
+  useEffect(() => {
+    _fbneoRemoteButtonHandler = handleRemoteButton;
+    return () => {
+      _fbneoRemoteButtonHandler = null;
+      remoteMaskRef.current = 0;
+    };
+  }, [handleRemoteButton]);
 
   // ── Main init effect ──────────────────────────────────
   useEffect(() => {
@@ -165,6 +210,7 @@ const FBNeoPlayer = forwardRef<HTMLDivElement, FBNeoPlayerProps>(function FBNeoP
         // 2. Create ArcadeWrapper
         const arcade = new ArcadeWrapper({ variant, onAudio: undefined });
         arcadeRef.current = arcade;
+        _fbneoArcadeRef = arcade;
 
         const initModule = await initFn();
         arcade.setInit(initModule.default, wasmURL);
@@ -211,9 +257,13 @@ const FBNeoPlayer = forwardRef<HTMLDivElement, FBNeoPlayerProps>(function FBNeoP
               written += toWrite;
             }
           };
-          scriptNode.connect(audioCtx.destination);
+          const gainNode = audioCtx.createGain();
+          gainNode.gain.value = 1;
+          audioGainRef.current = gainNode;
+          scriptNode.connect(gainNode);
+          gainNode.connect(audioCtx.destination);
           if (audioDest) {
-            scriptNode.connect(audioDest);
+            gainNode.connect(audioDest);
           }
           // AudioContext starts suspended, resume on first user interaction
           if (audioCtx.state === "suspended") {
@@ -280,6 +330,7 @@ const FBNeoPlayer = forwardRef<HTMLDivElement, FBNeoPlayerProps>(function FBNeoP
       gameReadyRef.current = false;
       arcadeRef.current?.destroy();
       arcadeRef.current = null;
+      _fbneoArcadeRef = null;
       audioCtxRef.current?.close().catch(() => {});
       audioCtxRef.current = null;
       audioDestRef.current = null;
@@ -295,15 +346,26 @@ const FBNeoPlayer = forwardRef<HTMLDivElement, FBNeoPlayerProps>(function FBNeoP
     if (!arc || !cvs) return;
 
     let aborted = false;
-    let canvasFitted = false;
+
+    // HOST: 캡처용 오프스크린 Canvas 생성 (네이티브 해상도의 3배 → H264 인코딩 품질 향상)
+    if (role === "host" && !captureCanvasRef.current) {
+      captureCanvasRef.current = document.createElement("canvas");
+    }
+    const capCvs = captureCanvasRef.current;
 
     const loop = () => {
       if (aborted) return;
-      if (!canvasFitted && canvasRef.current) {
+      if (!canvasFittedRef.current && canvasRef.current) {
         fitCanvasToContainer(canvasRef.current, arc.width, arc.height);
-        canvasFitted = true;
+        canvasFittedRef.current = true;
       }
-      arc.setInput(0, pressedMaskRef.current);
+      // Apply local input
+      arc.setInput(localPlayer, pressedMaskRef.current);
+      // Apply remote input (netplay only — guest's input via DataChannel)
+      if (isNetplay) {
+        const remotePlayer = localPlayer === 0 ? 1 : 0;
+        arc.setInput(remotePlayer, remoteMaskRef.current);
+      }
       arc.clockFrame();
       const buf = arc.getFrameBuffer();
       if (buf.length > 0 && canvasRef.current) {
@@ -311,13 +373,17 @@ const FBNeoPlayer = forwardRef<HTMLDivElement, FBNeoPlayerProps>(function FBNeoP
           smooth: false, autoResize: false,
         });
       }
+      // HOST: 업스케일된 프레임을 캡처 Canvas에 렌더링 (WebRTC 스트리밍 품질 향상)
+      if (capCvs && canvasRef.current) {
+        renderUpscaledFrame(capCvs, canvasRef.current, arc.width, arc.height, HOST_STREAM_UPSCALE_FACTOR);
+      }
       rafRef.current = requestAnimationFrame(loop);
     };
     rafRef.current = requestAnimationFrame(loop);
 
-    // HOST: 스트림 캡처 시작
+    // HOST: 스트림 캡처 시작 (offscreen capture canvas 사용)
     if (role === "host" && onCanvasStreamReadyRef.current) {
-      startCaptureStream(cvs);
+      startCaptureStream();
     }
 
     return () => {
@@ -330,17 +396,18 @@ const FBNeoPlayer = forwardRef<HTMLDivElement, FBNeoPlayerProps>(function FBNeoP
   }, [status, role]);
 
   // ── HOST: Canvas + Audio stream capture ───────────────
-  function startCaptureStream(canvas: HTMLCanvasElement) {
+  function startCaptureStream() {
     if (streamReadyRef.current) return;
 
     const interval = setInterval(() => {
       if (streamReadyRef.current) { clearInterval(interval); return; }
-      if (!canvasRef.current) return;
+      const capCvs = captureCanvasRef.current;
+      if (!capCvs) return;
 
       try {
-        const videoStream = canvas.captureStream(HOST_STREAM_CAPTURE_FPS);
+        const videoStream = capCvs.captureStream(HOST_STREAM_CAPTURE_FPS);
         for (const track of videoStream.getVideoTracks()) {
-          track.contentHint = "detail";
+          track.contentHint = "motion";
         }
         // Add audio track from FBNeo audio capture
         const audioStream = audioDestRef.current?.stream;
@@ -352,7 +419,7 @@ const FBNeoPlayer = forwardRef<HTMLDivElement, FBNeoPlayerProps>(function FBNeoP
         }
         streamReadyRef.current = true;
         clearInterval(interval);
-        onCanvasStreamReadyRef.current?.(videoStream);
+        onCanvasStreamReadyRef.current?.(videoStream, true);
         console.log("[FBNeoPlayer] Stream ready:", videoStream.getVideoTracks().length, "v +", videoStream.getAudioTracks().length, "a");
       } catch (e) {
         console.warn("[FBNeoPlayer] captureStream failed, retry:", e);
@@ -367,7 +434,16 @@ const FBNeoPlayer = forwardRef<HTMLDivElement, FBNeoPlayerProps>(function FBNeoP
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!e.isTrusted) return;
-      if (!container.contains(document.activeElement)) return;
+
+      // Netplay: 글로벌 키 캡처 (포커스 무관), 단 input/textarea 타이핑 중엔 제외
+      if (isNetplay) {
+        const el = document.activeElement;
+        if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || (el as HTMLElement).isContentEditable)) {
+          return;
+        }
+      } else {
+        if (!container.contains(document.activeElement)) return;
+      }
 
       // Chat shortcut
       if (
@@ -406,7 +482,15 @@ const FBNeoPlayer = forwardRef<HTMLDivElement, FBNeoPlayerProps>(function FBNeoP
 
     const handleKeyUp = (e: KeyboardEvent) => {
       if (!e.isTrusted) return;
-      if (!container.contains(document.activeElement)) return;
+
+      if (isNetplay) {
+        const el = document.activeElement;
+        if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || (el as HTMLElement).isContentEditable)) {
+          return;
+        }
+      } else {
+        if (!container.contains(document.activeElement)) return;
+      }
 
       const fbMask = keyToButtonMask(e.code);
       if (fbMask !== 0) {
@@ -454,7 +538,10 @@ const FBNeoPlayer = forwardRef<HTMLDivElement, FBNeoPlayerProps>(function FBNeoP
   useEffect(() => {
     const wrapper = wrapperRef.current;
     if (!wrapper) return undefined;
-    const handler = () => setIsFullscreen(document.fullscreenElement === wrapper);
+    const handler = () => {
+      setIsFullscreen(document.fullscreenElement === wrapper);
+      canvasFittedRef.current = false; // re-fit on next frame
+    };
     wrapper.addEventListener("fullscreenchange", handler);
     return () => wrapper.removeEventListener("fullscreenchange", handler);
   }, []);
@@ -468,9 +555,27 @@ const FBNeoPlayer = forwardRef<HTMLDivElement, FBNeoPlayerProps>(function FBNeoP
     }
   };
 
+  const handleHostMute = useCallback(() => {
+    const gn = audioGainRef.current;
+    if (!gn) return;
+    const next = !isMuted;
+    gn.gain.value = next ? 0 : volume;
+    setIsMuted(next);
+  }, [isMuted, volume]);
+
+  const handleHostVolume = useCallback((v: number) => {
+    const gn = audioGainRef.current;
+    if (!gn) return;
+    gn.gain.value = v;
+    setVolumeState(v);
+    if (v > 0 && isMuted) {
+      setIsMuted(false);
+    }
+  }, [isMuted]);
+
   // ── Render ────────────────────────────────────────────
   return (
-    <div ref={wrapperRef} className="relative w-full">
+    <div ref={wrapperRef} className="relative w-full" onMouseEnter={() => setShowControls(true)} onMouseLeave={() => setShowControls(false)}>
       {status === "loading" && (
         <div className="flex aspect-4/3 w-full items-center justify-center rounded-lg bg-neutral-900 text-sm text-muted-foreground">
           FBNeo WASM 로딩 중...
@@ -499,15 +604,38 @@ const FBNeoPlayer = forwardRef<HTMLDivElement, FBNeoPlayerProps>(function FBNeoP
         />
       </div>
       {status === "ready" && (
-        <button
-          type="button"
-          onClick={toggleFullscreen}
-          title={isFullscreen ? "전체화면 종료" : "전체화면"}
-          className="absolute bottom-2 right-2 flex size-7 items-center justify-center rounded-md bg-black/50 text-white opacity-0 transition-opacity hover:bg-black/80 hover:opacity-100 focus:opacity-100 [div:fullscreen_&]:opacity-100"
-          aria-label={isFullscreen ? "전체화면 종료" : "전체화면"}
-        >
-          {isFullscreen ? <Minimize2 className="size-4" /> : <Maximize2 className="size-4" />}
-        </button>
+        <div className={`absolute bottom-0 left-0 right-0 z-10 transition-opacity duration-200 ${showControls ? "opacity-100" : "opacity-0"}`}>
+          <div className="flex items-center gap-2 bg-gradient-to-t from-black/70 to-transparent px-3 pb-3 pt-8">
+            <button
+              type="button"
+              onClick={handleHostMute}
+              title={isMuted ? "소리 켜기" : "소리 끄기"}
+              className="flex h-7 w-7 items-center justify-center rounded-md text-white hover:bg-white/20"
+            >
+              {isMuted ? <VolumeX className="size-4" /> : <Volume2 className="size-4" />}
+            </button>
+            <input
+              type="range"
+              min="0"
+              max="1"
+              step="0.05"
+              value={isMuted ? 0 : volume}
+              onChange={(e) => handleHostVolume(parseFloat(e.target.value))}
+              className="h-1 w-20 cursor-pointer accent-white"
+              title={`볼륨 ${Math.round((isMuted ? 0 : volume) * 100)}%`}
+            />
+            <div className="flex-1" />
+            <button
+              type="button"
+              onClick={toggleFullscreen}
+              title={isFullscreen ? "전체화면 종료" : "전체화면"}
+              className="flex h-7 w-7 items-center justify-center rounded-md text-white hover:bg-white/20"
+              aria-label={isFullscreen ? "전체화면 종료" : "전체화면"}
+            >
+              {isFullscreen ? <Minimize2 className="size-4" /> : <Maximize2 className="size-4" />}
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );
@@ -525,20 +653,32 @@ export function focusEmulator(ref: React.RefObject<HTMLDivElement | null>) {
   ref.current?.focus();
 }
 
-/** Send remote input (for EmulatorJS compat — per-button) */
+/**
+ * 원격 플레이어의 버튼 입력을 FBNeoPlayer 인스턴스에 전달한다.
+ *
+ * 호스트의 `reconcileRemoteHeldMask`에서 버튼 단위로 호출된다.
+ * `ref` 파라미터는 API 호환성을 위해 유지되지만 실제 dispatch는
+ * 모듈레벨 `_fbneoRemoteButtonHandler`를 통해 이루어진다.
+ *
+ * FBNeoPlayer가 마운트되지 않은 상태에서는 호출이 무시된다.
+ */
 export function sendRemoteInput(
   ref: React.RefObject<HTMLDivElement | null>,
-  _button: number,
-  _down: boolean,
+  button: number,
+  down: boolean,
 ) {
-  // FBNeoPlayer uses bitmask through its own mechanism
-  // The old per-button API is forwarded through onLocalInput
   void ref;
+  _fbneoRemoteButtonHandler?.(button, down);
 }
 
 /** Mark game as running */
 export function markGameRunning() {
   (window as unknown as Record<string, unknown>).__rtcade_game_running = true;
+}
+
+/** 호스트 전용: FBNeo 게임을 초기 상태로 리셋 */
+export function resetGame() {
+  _fbneoArcadeRef?.reset();
 }
 
 export default FBNeoPlayer;

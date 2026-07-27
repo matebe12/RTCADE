@@ -89,6 +89,8 @@ export type SignalingMessage =
   | RoomSessionStartedMessage
   | { type: "peer-disconnected" }
   | { type: "error"; message: string }
+  | { type: "chat-message"; id: string; text: string; sentAt: number; authorName?: string; authorAvatar?: string; authorRole?: "host" | "guest" | "spectator" }
+  | { type: "chat-typing"; isTyping: boolean }
   | { type: "offer"; sdp: RTCSessionDescriptionInit; spectatorId?: string }
   | { type: "answer"; sdp: RTCSessionDescriptionInit; spectatorId?: string }
   | { type: "ice-candidate"; candidate: RTCIceCandidateInit; spectatorId?: string };

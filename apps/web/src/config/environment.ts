@@ -1,6 +1,5 @@
 const defaultApiUrl = `${window.location.protocol}//${window.location.hostname}:3001`;
 const defaultWsUrl = `${window.location.protocol === "https:" ? "wss:" : "ws:"}//${window.location.hostname}:3001`;
-const defaultEmulatorJsDataUrl = "https://cdn.emulatorjs.org/stable/data/";
 
 export type AdProvider = "none" | "placeholder" | "coupang" | "adsense";
 
@@ -26,15 +25,8 @@ function normalizeOptionalEnv(value: string | undefined) {
   return trimmed && trimmed.length > 0 ? trimmed : undefined;
 }
 
-function normalizeEmulatorJsDataUrl(url: string) {
-  return url.endsWith("/") ? url : `${url}/`;
-}
-
 const apiBaseUrl = import.meta.env.VITE_API_URL || defaultApiUrl;
 const wsUrl = import.meta.env.VITE_WS_URL || defaultWsUrl;
-const emulatorJsDataUrl = normalizeEmulatorJsDataUrl(
-  import.meta.env.VITE_EMULATORJS_DATA_URL || defaultEmulatorJsDataUrl,
-);
 const adProvider: AdProvider = "none";
 
 export const appEnvironment = {
@@ -42,8 +34,6 @@ export const appEnvironment = {
   siteTagline: "추억의 게임을 다시 연결하는 공간",
   apiBaseUrl,
   wsUrl,
-  emulatorJsDataUrl,
-  emulatorJsLoaderUrl: new URL("loader.js", emulatorJsDataUrl).toString(),
   sideAds: {
     enabled: false,
     provider: adProvider,

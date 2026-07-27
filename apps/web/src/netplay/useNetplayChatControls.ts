@@ -1,14 +1,12 @@
 import {
   useCallback,
   useEffect,
-  useMemo,
   useRef,
   type MutableRefObject,
   type RefObject,
 } from "react";
 
 import type { NetplayChatMessage } from "@/components/NetplayChatPanel";
-import { createEmulatorRuntimeBridge } from "@/lib/emulator-runtime-bridge";
 import type { ChatMessage as PeerChatMessage, NetplayPeer } from "@/netplay/peer";
 import { NETPLAY_COPY } from "@/netplay/netplayCopy";
 import { toast } from "sonner";
@@ -60,14 +58,13 @@ export function useNetplayChatControls({
   setIsPeerTyping,
   resetStoredChatState,
 }: UseNetplayChatControlsOptions) {
+  const isLobbyChat = chatChannelState !== "open" && currentStep === "waiting";
   const chatOpenRef = useRef(false);
   const localTypingActiveRef = useRef(false);
   const localTypingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const peerTypingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const chatInputRef = useRef<HTMLInputElement>(null);
   const pendingChatFocusRef = useRef(false);
-  const emulatorRuntime = useMemo(() => createEmulatorRuntimeBridge(emulatorRef), [emulatorRef]);
-
   useEffect(() => {
     return () => {
       if (localTypingTimeoutRef.current) clearTimeout(localTypingTimeoutRef.current);
@@ -94,8 +91,8 @@ export function useNetplayChatControls({
   );
 
   const focusEmulatorPlayer = useCallback(() => {
-    emulatorRuntime.ui.focus();
-  }, [emulatorRuntime]);
+    emulatorRef.current?.focus();
+  }, [emulatorRef]);
 
   const focusChatComposer = useCallback(() => {
     pendingChatFocusRef.current = true;
@@ -149,7 +146,7 @@ export function useNetplayChatControls({
   }, [chatChannelState, chatOpen]);
 
   useEffect(() => {
-    if (currentStep !== "playing" && currentStep !== "watching") return undefined;
+    if (currentStep !== "playing" && currentStep !== "watching" && currentStep !== "waiting") return undefined;
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (
@@ -185,7 +182,7 @@ export function useNetplayChatControls({
       const nextDraft = value.slice(0, 300);
       setChatDraft(nextDraft);
 
-      if (chatChannelState !== "open") return;
+      if (!isLobbyChat && chatChannelState !== "open") return;
 
       if (!nextDraft.trim()) {
         stopLocalTyping();
@@ -193,7 +190,11 @@ export function useNetplayChatControls({
       }
 
       if (!localTypingActiveRef.current) {
-        peerRef.current?.sendTypingState(true);
+        if (isLobbyChat) {
+          peerRef.current?.sendLobbyTypingState(true);
+        } else {
+          peerRef.current?.sendTypingState(true);
+        }
         localTypingActiveRef.current = true;
       }
 
@@ -203,20 +204,26 @@ export function useNetplayChatControls({
 
       localTypingTimeoutRef.current = setTimeout(() => {
         if (localTypingActiveRef.current) {
-          peerRef.current?.sendTypingState(false);
+          if (isLobbyChat) {
+            peerRef.current?.sendLobbyTypingState(false);
+          } else {
+            peerRef.current?.sendTypingState(false);
+          }
           localTypingActiveRef.current = false;
         }
         localTypingTimeoutRef.current = null;
       }, CHAT_TYPING_TIMEOUT_MS);
     },
-    [chatChannelState, peerRef, setChatDraft, stopLocalTyping],
+    [chatChannelState, isLobbyChat, peerRef, setChatDraft, stopLocalTyping],
   );
 
   const handleSendChat = useCallback(() => {
     const trimmed = chatDraft.trim();
     if (!trimmed) return false;
 
-    const sentMessage = peerRef.current?.sendChatMessage(trimmed);
+    const sentMessage = isLobbyChat
+      ? peerRef.current?.sendLobbyChatMessage(trimmed)
+      : peerRef.current?.sendChatMessage(trimmed);
     if (!sentMessage) {
       toast.error(NETPLAY_COPY.chatNotReady);
       return false;
@@ -227,7 +234,7 @@ export function useNetplayChatControls({
     stopLocalTyping();
     focusEmulatorPlayer();
     return true;
-  }, [appendChatMessage, chatDraft, focusEmulatorPlayer, peerRef, setChatDraft, stopLocalTyping]);
+  }, [appendChatMessage, chatDraft, focusEmulatorPlayer, isLobbyChat, peerRef, setChatDraft, stopLocalTyping]);
 
   const handleChatCancel = useCallback(() => {
     stopLocalTyping();
@@ -246,7 +253,7 @@ export function useNetplayChatControls({
   }, [chatOpen, handleChatCancel, focusChatComposer]);
 
   const handleChatShortcut = useCallback(() => {
-    if (currentStep !== "playing" && currentStep !== "watching") return;
+    if (currentStep !== "playing" && currentStep !== "watching" && currentStep !== "waiting") return;
     focusChatComposer();
   }, [currentStep, focusChatComposer]);
 

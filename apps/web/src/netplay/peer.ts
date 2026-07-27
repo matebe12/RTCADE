@@ -189,7 +189,7 @@ const REPAIR_SYNC_ZERO_FLUSH_COUNT = 3;
 const VIDEO_STREAM_MAX_BITRATE = 2_500_000;
 const VIDEO_STREAM_MAX_FRAMERATE = 60;
 const VIDEO_STREAM_SCALE_DOWN = 2.0;
-const VIDEO_STREAM_PLAYOUT_DELAY_SEC = 0;
+const VIDEO_STREAM_PLAYOUT_DELAY_SEC = 0.016;
 const GAMEPLAY_DISCONNECT_GRACE_MS = 4_000;
 
 const RTC_CONFIG: RTCConfiguration = {
@@ -321,6 +321,7 @@ export class NetplayPeer {
   private _spectatorVideoReady = false;
   private _sessionStarted = false;
   private _stream: MediaStream | null = null;
+  private _pixelArt = false;
   private _rtcConfig: RTCConfiguration;
   private _disconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private _disconnectReason: string | null = null;
@@ -565,13 +566,45 @@ export class NetplayPeer {
     this.chatDc.send(JSON.stringify({ type: "chat-typing", isTyping }));
   }
 
+  /** 로비(대기실)에서 시그널링 WebSocket으로 채팅 메시지 전송 */
+  sendLobbyChatMessage(text: string): ChatMessage | null {
+    const trimmed = text.trim().slice(0, 300);
+    if (!trimmed) return null;
+
+    const message: ChatMessage = {
+      id: `lobby-chat-${Date.now()}-${++this._chatSeq}`,
+      text: trimmed,
+      sentAt: Date.now(),
+      authorName: this._localProfile.nickname,
+      authorAvatar: this._localProfile.avatar,
+      authorRole:
+        this._connectionMode === "spectator"
+          ? "spectator"
+          : this._connectionMode === "guest"
+            ? "guest"
+            : "host",
+    };
+
+    this.signaling.send({ type: "chat-message", ...message });
+    return message;
+  }
+
+  /** 로비(대기실)에서 시그널링 WebSocket으로 타이핑 상태 전송 */
+  sendLobbyTypingState(isTyping: boolean) {
+    if (this._lastTypingState === isTyping) return;
+    this._lastTypingState = isTyping;
+    this.signaling.send({ type: "chat-typing", isTyping });
+  }
+
   /** Add video+audio tracks from a MediaStream to the peer connection and trigger renegotiation */
   /**
    * HOST의 canvas/오디오 MediaStream을 모든 Peer (GUEST, 관전자)에게 스트리밍으로 전송한다.
    * @param stream - 캔버스를 `captureStream()`한 MediaStream
    */
-  startVideoStreaming(stream: MediaStream) {
+  startVideoStreaming(stream: MediaStream, opts?: { pixelArt?: boolean }) {
     this._stream = stream;
+    const pixelArt = opts?.pixelArt ?? false;
+    this._pixelArt = pixelArt;
 
     if (!this.pc) {
       if (this._connectionMode === "host" && this._sessionStarted) {
@@ -583,7 +616,7 @@ export class NetplayPeer {
         console.warn("[PEER] startVideoStreaming: no peer connection");
       }
     } else {
-      this.replaceStreamTracks(this.pc, this._videoSenders, stream);
+      this.replaceStreamTracks(this.pc, this._videoSenders, stream, pixelArt);
     }
 
     if (this._connectionMode === "host" && this._sessionStarted) {
@@ -593,7 +626,7 @@ export class NetplayPeer {
     }
 
     for (const spectator of this._spectatorPeers.values()) {
-      this.replaceStreamTracks(spectator.pc, spectator.senders, stream);
+      this.replaceStreamTracks(spectator.pc, spectator.senders, stream, pixelArt);
       void this.requestSpectatorNegotiation(spectator);
     }
 
@@ -605,6 +638,7 @@ export class NetplayPeer {
   /** Stop sending video tracks */
   stopVideoStreaming() {
     this._stream = null;
+    this._pixelArt = false;
     this.removeStreamTracks(this.pc, this._videoSenders);
 
     for (const spectator of this._spectatorPeers.values()) {
@@ -657,6 +691,7 @@ export class NetplayPeer {
     this._spectatorVideoReady = false;
     this._spectatorPeers.clear();
     this._stream = null;
+    this._pixelArt = false;
   }
 
   private clearPendingDisconnect() {
@@ -749,6 +784,21 @@ export class NetplayPeer {
         }
         break;
 
+      case "chat-message":
+        this.handler.onChatMessage?.({
+          id: msg.id,
+          text: msg.text,
+          sentAt: msg.sentAt,
+          authorName: msg.authorName,
+          authorAvatar: msg.authorAvatar,
+          authorRole: msg.authorRole,
+        });
+        break;
+
+      case "chat-typing":
+        this.handler.onChatTyping?.(!!msg.isTyping);
+        break;
+
       case "room-session-started":
         this._sessionStarted = true;
 
@@ -825,6 +875,7 @@ export class NetplayPeer {
   private setupPeerConnection(): RTCPeerConnection {
     const pc = new RTCPeerConnection(this._rtcConfig);
     this.pc = pc;
+    this.applyPreferredVideoCodecs(pc);
     this.resetRemoteInputDiagnostics();
     this.startNetworkStatsPolling(pc);
 
@@ -1514,7 +1565,7 @@ export class NetplayPeer {
       this.setupChatDataChannel(chatDc);
 
       if (this._stream) {
-        this.replaceStreamTracks(pc, this._videoSenders, this._stream);
+        this.replaceStreamTracks(pc, this._videoSenders, this._stream, this._pixelArt);
       }
 
       if (this.pc !== pc || this._closing) {
@@ -1714,7 +1765,7 @@ export class NetplayPeer {
     };
 
     if (this._stream) {
-      this.replaceStreamTracks(pc, spectator.senders, this._stream);
+      this.replaceStreamTracks(pc, spectator.senders, this._stream, this._pixelArt);
     }
 
     void this.requestSpectatorNegotiation(spectator);
@@ -1823,6 +1874,16 @@ export class NetplayPeer {
       if ("playoutDelayHint" in receiverWithDelayHint) {
         receiverWithDelayHint.playoutDelayHint = VIDEO_STREAM_PLAYOUT_DELAY_SEC;
       }
+
+      // Chrome 113+ jitter buffer target — ~2 frames at 60fps
+      try {
+        const receiverWithJitter = receiver as RTCRtpReceiver & { jitterBufferTarget?: number };
+        if ("jitterBufferTarget" in receiverWithJitter) {
+          receiverWithJitter.jitterBufferTarget = 33;
+        }
+      } catch {
+        /* ignore */
+      }
     } catch {
       /* ignore */
     }
@@ -1832,6 +1893,7 @@ export class NetplayPeer {
     pc: RTCPeerConnection | null,
     senders: RTCRtpSender[],
     stream: MediaStream,
+    pixelArt = false,
   ) {
     if (!pc) {
       return;
@@ -1854,7 +1916,7 @@ export class NetplayPeer {
         };
         encoding.maxBitrate = VIDEO_STREAM_MAX_BITRATE;
         encoding.maxFramerate = VIDEO_STREAM_MAX_FRAMERATE;
-        encoding.scaleResolutionDownBy = VIDEO_STREAM_SCALE_DOWN;
+        encoding.scaleResolutionDownBy = pixelArt ? 1.0 : VIDEO_STREAM_SCALE_DOWN;
         encoding.priority = "high";
         encoding.networkPriority = "high";
         params.degradationPreference = "maintain-framerate";

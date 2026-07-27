@@ -319,6 +319,23 @@ export function attachSignalingServer(wss: WebSocketServer, roomStore: RoomStore
           break;
         }
 
+        case "chat-message":
+        case "chat-typing": {
+          if (!myRoom) return;
+          // Relay to all room participants except sender
+          if (role !== "host" && myRoom.host) {
+            send(myRoom.host, message);
+          }
+          if (role !== "guest" && myRoom.guest) {
+            send(myRoom.guest.socket, message);
+          }
+          for (const spectator of myRoom.spectators.values()) {
+            if (role === "spectator" && spectatorId === spectator.id) continue;
+            send(spectator.socket, message);
+          }
+          break;
+        }
+
         case "offer":
         case "answer":
         case "ice-candidate": {

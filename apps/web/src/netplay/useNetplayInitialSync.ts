@@ -1,13 +1,11 @@
 import {
   useCallback,
   useEffect,
-  useMemo,
   useRef,
   type MutableRefObject,
   type RefObject,
 } from "react";
 
-import { createEmulatorRuntimeBridge } from "@/lib/emulator-runtime-bridge";
 import { NETPLAY_COPY } from "@/netplay/netplayCopy";
 import type { NetplayPeer } from "@/netplay/peer";
 import type { NetplaySessionRole } from "@rtcade/shared";
@@ -17,7 +15,7 @@ interface UseNetplayInitialSyncOptions {
   dcState: string;
   gameStarted: boolean;
   peerRef: MutableRefObject<NetplayPeer | null>;
-  emulatorRef: RefObject<HTMLDivElement | null>;
+  emulatorRef: RefObject<HTMLDivElement | null>;  // kept for API compat, unused in hook
   roleRef: MutableRefObject<NetplaySessionRole | null>;
   gameStartedRef: MutableRefObject<boolean>;
   setGameStarted: (gameStarted: boolean) => void;
@@ -39,7 +37,7 @@ export function useNetplayInitialSync({
   dcState,
   gameStarted,
   peerRef,
-  emulatorRef,
+  emulatorRef: _emulatorRef,
   roleRef,
   gameStartedRef,
   setGameStarted,
@@ -51,7 +49,6 @@ export function useNetplayInitialSync({
   const localReadyRef = useRef(false);
   const remoteReadyRef = useRef(false);
   const startGameTimerRef = useRef<number | null>(null);
-  const emulatorRuntime = useMemo(() => createEmulatorRuntimeBridge(emulatorRef), [emulatorRef]);
 
   const startGame = useCallback(
     (message: string, notifyPeer: boolean) => {
@@ -74,7 +71,8 @@ export function useNetplayInitialSync({
           if (currentRole === "host") {
             console.log("[LOBBY] HOST 게임 시작 (에뮬레이터 재실행 없음)");
           } else {
-            emulatorRuntime.sync.startGame();
+            // GUEST: game starts when video stream arrives — no explicit emulator start needed
+            console.log("[LOBBY] GUEST 게임 시작");
           }
 
           // 키보드 핸들러가 입력을 처리할 수 있도록 글로벌 플래그 설정
@@ -96,7 +94,6 @@ export function useNetplayInitialSync({
       }, 0);
     },
     [
-      emulatorRuntime,
       gameStartedRef,
       markSessionStarted,
       onHostGameStarted,

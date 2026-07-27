@@ -8,7 +8,6 @@ export interface ServerConfig {
   allowedOrigins: string[];
   databaseUrl: string | null;
   noticeAdminToken: string | null;
-  emulatorJsDataUrl: string;
   iceServers: IceServerDefinition[];
   sentryDsn: string | null;
 }
@@ -21,11 +20,6 @@ export interface IceServerDefinition {
 }
 
 const DEFAULT_STUN_SERVER_URLS = ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"];
-
-/** EmulatorJS data URL 끝에 '/'가 없으면 추가한다. */
-function normalizeEmulatorJsDataUrl(url: string) {
-  return url.endsWith("/") ? url : `${url}/`;
-}
 
 /**
  * 환경변수에서 PostgreSQL 연결 URL을 구성한다.
@@ -118,9 +112,6 @@ export function getServerConfig(): ServerConfig {
     allowedOrigins: process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(",") : ["*"],
     databaseUrl: buildDatabaseUrlFromEnv(),
     noticeAdminToken: process.env.NOTICE_ADMIN_TOKEN || null,
-    emulatorJsDataUrl: normalizeEmulatorJsDataUrl(
-      process.env.EMULATORJS_DATA_URL || "https://cdn.emulatorjs.org/stable/data/",
-    ),
     iceServers: getIceServersFromEnv(),
     sentryDsn: normalizeOptionalEnv(process.env.SENTRY_DSN) ?? null,
   };

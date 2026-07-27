@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, Globe, Loader2, Lock, Radio, Search, Users } from "lucide-react";
+import { useEffect, useMemo, useState, type RefObject } from "react";
+import { ArrowLeft, Globe, Loader2, Lock, MessageSquare, Radio, Search, Users } from "lucide-react";
 
+import NetplayChatPanel, { type NetplayChatMessage } from "@/components/NetplayChatPanel";
 import { SYSTEM_OPTIONS } from "@/components/EmulatorPlayer";
 import { UserBadge } from "@/components/UserBadge";
 import { Badge } from "@rtcade/ui";
@@ -55,6 +56,20 @@ interface NetplayWaitingScreenProps {
   onChangeRoomGame?: (rom: RomInfo) => void;
   onKickParticipant?: (participantId: string) => void;
   onStart: () => void;
+  // Chat
+  chatOpen: boolean;
+  unreadChatCount: number;
+  chatMessages: NetplayChatMessage[];
+  chatDraft: string;
+  isPeerTyping: boolean;
+  chatChannelState: string;
+  inputRef: RefObject<HTMLInputElement | null>;
+  onChatToggle: () => void;
+  onChatCancel: () => void;
+  onChatDraftChange: (value: string) => void;
+  onSendChat: () => boolean;
+  myProfile: { nickname: string; avatar: string };
+  opponentProfile: { nickname: string; avatar: string } | null;
 }
 
 function getWaitingTitle(role: NetplayWaitingScreenProps["role"]) {
@@ -114,6 +129,19 @@ export default function NetplayWaitingScreen({
   onChangeRoomGame,
   onKickParticipant,
   onStart,
+  chatOpen,
+  unreadChatCount,
+  chatMessages,
+  chatDraft,
+  isPeerTyping,
+  chatChannelState,
+  inputRef,
+  onChatToggle,
+  onChatCancel,
+  onChatDraftChange,
+  onSendChat,
+  myProfile,
+  opponentProfile,
 }: NetplayWaitingScreenProps) {
   const canPressStart = canStart || canStartSolo;
   const canManageRoom = role === "host";
@@ -150,8 +178,10 @@ export default function NetplayWaitingScreen({
     }
   }, [roomGamePickerOpen]);
 
+  const isLobbyChat = chatChannelState !== "open";
+
   return (
-    <>
+    <div className="flex h-full w-full gap-3">
       <Card
         className="flex h-full w-full flex-col border-border/70 bg-card/95"
         data-tutorial="waiting-room-panel"
@@ -161,6 +191,23 @@ export default function NetplayWaitingScreen({
             <ArrowLeft className="size-4" />
           </Button>
           <CardTitle className="text-sm">{getWaitingTitle(role)}</CardTitle>
+          <div className="ml-auto flex items-center gap-1">
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="relative size-8"
+              onClick={onChatToggle}
+              title="채팅"
+            >
+              <MessageSquare className="size-4" />
+              {unreadChatCount > 0 && (
+                <Badge variant="destructive" className="absolute -right-0.5 -top-0.5 px-1 py-0 text-[9px]">
+                  {unreadChatCount}
+                </Badge>
+              )}
+            </Button>
+          </div>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
           <p className="text-xs text-muted-foreground">{getRoleHint(role)}</p>
@@ -456,6 +503,25 @@ export default function NetplayWaitingScreen({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </>
+
+      {chatOpen && (
+        <div className="w-80 shrink-0">
+          <NetplayChatPanel
+            open
+            messages={chatMessages}
+            draft={chatDraft}
+            onDraftChange={onChatDraftChange}
+            onSend={onSendChat}
+            chatChannelState={isLobbyChat ? "open" : chatChannelState}
+            localUser={myProfile}
+            remoteUser={opponentProfile ?? null}
+            inputRef={inputRef}
+            onCancel={onChatCancel}
+            isPeerTyping={isPeerTyping}
+            unreadCount={unreadChatCount}
+          />
+        </div>
+      )}
+    </div>
   );
 }

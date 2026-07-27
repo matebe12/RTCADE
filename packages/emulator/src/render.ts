@@ -91,6 +91,37 @@ export function fitCanvasToContainer(
 }
 
 /**
+ * 소스 Canvas를 타겟(오프스크린) Canvas에 nearest-neighbor 정수 배율로 업스케일한다.
+ * WebRTC 스트리밍용 — captureStream()이 더 높은 내부 해상도로 캡처할 수 있도록 한다.
+ *
+ * Neo Geo 304x224 → 3x = 912x672 (H264 매크로블록 57x42개 vs 네이티브 19x14개)
+ *
+ * @param target   업스케일된 결과를 그릴 타겟 Canvas (첫 호출 시 크기 설정)
+ * @param source   네이티브 해상도로 렌더링된 소스 Canvas
+ * @param srcWidth   소스 너비
+ * @param srcHeight  소스 높이
+ * @param scale      정수 배율 (예: 3 → 3배)
+ */
+export function renderUpscaledFrame(
+  target: HTMLCanvasElement,
+  source: HTMLCanvasElement,
+  srcWidth: number,
+  srcHeight: number,
+  scale: number,
+): void {
+  const upWidth = srcWidth * scale;
+  const upHeight = srcHeight * scale;
+  if (target.width !== upWidth || target.height !== upHeight) {
+    target.width = upWidth;
+    target.height = upHeight;
+  }
+  const ctx = target.getContext("2d");
+  if (!ctx) return;
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(source, 0, 0, upWidth, upHeight);
+}
+
+/**
  * 빈 Canvas 초기화 (검은색으로 채움)
  */
 export function clearCanvas(canvas: HTMLCanvasElement): void {

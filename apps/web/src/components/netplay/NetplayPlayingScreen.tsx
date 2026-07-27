@@ -32,6 +32,7 @@ import {
   Maximize2,
   MessageSquare,
   Minimize2,
+  RotateCcw,
   Wifi,
   WifiOff,
 } from "lucide-react";
@@ -72,6 +73,7 @@ interface NetplayPlayingScreenProps {
   disconnectSeverity?: DisconnectSeverity;
   disconnectCountdown?: number;
   networkStats: NetplayNetworkStats | null;
+  onResetGame?: () => void;
 }
 
 export default function NetplayPlayingScreen({
@@ -102,6 +104,7 @@ export default function NetplayPlayingScreen({
   disconnectSeverity,
   disconnectCountdown,
   networkStats,
+  onResetGame,
 }: NetplayPlayingScreenProps) {
   const localChatUser = myProfile ?? { nickname: "나", avatar: "🎮" };
   const gameAreaRef = useRef<HTMLDivElement>(null);
@@ -195,6 +198,29 @@ export default function NetplayPlayingScreen({
 
         <NetplayNetworkStatsBadge stats={networkStats} />
 
+        {session.role === "host" && (
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button type="button" variant="outline" size="sm" className="gap-1 text-xs">
+                <RotateCcw className="size-3" />
+                리셋
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>게임 리셋</AlertDialogTitle>
+                <AlertDialogDescription>
+                  게임을 처음부터 다시 시작합니다.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>취소</AlertDialogCancel>
+                <AlertDialogAction onClick={onResetGame}>리셋</AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        )}
+
         <Button
           type="button"
           variant="outline"
@@ -267,6 +293,19 @@ export default function NetplayPlayingScreen({
           {isFullscreen && (
             <div className="absolute right-3 top-3 z-50 flex items-center gap-2">
               <NetplayNetworkStatsBadge stats={networkStats} compact className="bg-black/60" />
+              {session.role === "host" && (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  className="h-8 gap-1.5 rounded-full bg-black/60 text-xs text-white backdrop-blur-sm hover:bg-black/80"
+                  onClick={onResetGame}
+                  title="게임 리셋"
+                >
+                  <RotateCcw className="size-3.5" />
+                  리셋
+                </Button>
+              )}
               <Button
                 type="button"
                 variant="secondary"

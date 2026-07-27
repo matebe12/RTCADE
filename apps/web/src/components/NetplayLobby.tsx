@@ -13,6 +13,7 @@ import NetplayWatchingRoomsScreen from "@/components/netplay/NetplayWatchingRoom
 import NetplayWatchingScreen from "@/components/netplay/NetplayWatchingScreen";
 import SoloBrowseRomsScreen from "@/components/netplay/SoloBrowseRomsScreen";
 import SoloPlayingScreen from "@/components/netplay/SoloPlayingScreen";
+import { resetGame } from "@rtcade/emulator";
 import { buildBackendUrl } from "@/lib/backend-url";
 import { getUserProfile, toggleFavoriteGame } from "@/lib/user-profile";
 import { NETPLAY_COPY } from "@/netplay/netplayCopy";
@@ -613,6 +614,19 @@ export default function NetplayLobby({ hasProfile = true }: { hasProfile?: boole
         onChangeRoomGame={handleChangeWaitingRoomGame}
         onKickParticipant={handleKickWaitingRoomParticipant}
         onStart={handleWaitingRoomStart}
+        chatOpen={chatOpen}
+        unreadChatCount={unreadChatCount}
+        chatMessages={chatMessages}
+        chatDraft={chatDraft}
+        isPeerTyping={isPeerTyping}
+        chatChannelState={chatChannelState}
+        inputRef={chatInputRef}
+        onChatToggle={handleChatToggle}
+        onChatCancel={handleChatCancel}
+        onChatDraftChange={handleChatDraftChange}
+        onSendChat={handleSendChat}
+        myProfile={myProfile ?? { nickname: "나", avatar: "🎮" }}
+        opponentProfile={opponentProfile}
       />
     );
   }
@@ -694,6 +708,7 @@ export default function NetplayLobby({ hasProfile = true }: { hasProfile?: boole
         disconnectSeverity={disconnectSeverity}
         disconnectCountdown={disconnectCountdown}
         networkStats={networkStats}
+        onResetGame={() => resetGame()}
       />
     );
   }
