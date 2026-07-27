@@ -1,7 +1,6 @@
 import { useEffect, useRef, forwardRef, useImperativeHandle, useState, useCallback } from "react";
 
 import { Loader2, WifiOff, Volume2, VolumeX, Maximize2, Minimize2 } from "lucide-react";
-import { Badge } from "@rtcade/ui";
 import { Button } from "@rtcade/ui";
 import type { DisconnectSeverity } from "@rtcade/shared";
 
@@ -67,7 +66,7 @@ const GuestVideoDisplay = forwardRef<HTMLDivElement, GuestVideoDisplayProps>(
     const [playbackState, setPlaybackState] = useState<
       "waiting-stream" | "waiting-playback" | "playing" | "stalled"
     >("waiting-stream");
-    const [playbackStats, setPlaybackStats] = useState<PlaybackStats>({
+    const [_playbackStats, setPlaybackStats] = useState<PlaybackStats>({
       droppedFrames: null,
       fps: null,
     });

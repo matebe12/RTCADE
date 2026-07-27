@@ -151,12 +151,12 @@ const MamePlayer = forwardRef<HTMLDivElement, Props>(function MamePlayer(
       let ready = false; let attempt = 0;
       function tryReady() { if(aborted||ready)return;attempt++;
         const ejs = w.EJS_emulator as { gameManager?:unknown }|undefined;
-        if(ejs?.gameManager){ready=true;c.focus();doReady();return;}
+        if(ejs?.gameManager){ready=true;c?.focus();doReady();return;}
         if(attempt<30)setTimeout(tryReady,200);else{ready=true;doReady();}
       }
       setTimeout(tryReady, 500);
     } else {
-      w.EJS_onGameStart = () => { if(!aborted){ w.__rtcade_game_running = true; c.focus(); doReady(); } };
+      w.EJS_onGameStart = () => { if(!aborted){ w.__rtcade_game_running = true; c?.focus(); doReady(); } };
     }
 
     function loadScript() {
@@ -232,9 +232,11 @@ const MamePlayer = forwardRef<HTMLDivElement, Props>(function MamePlayer(
       if (isNetplay) onLocalInput?.(btn, false);
     };
 
-    listenerTarget.addEventListener("keydown", kd, true); listenerTarget.addEventListener("keyup", ku, true);
+    const kdw: EventListener = (e) => kd(e as KeyboardEvent);
+    const kuw: EventListener = (e) => ku(e as KeyboardEvent);
+    listenerTarget.addEventListener("keydown", kdw, true); listenerTarget.addEventListener("keyup", kuw, true);
     window.addEventListener("blur", release);
-    return () => { listenerTarget.removeEventListener("keydown",kd,true);listenerTarget.removeEventListener("keyup",ku,true);window.removeEventListener("blur",release);release(); };
+    return () => { listenerTarget.removeEventListener("keydown",kdw,true);listenerTarget.removeEventListener("keyup",kuw,true);window.removeEventListener("blur",release);release(); };
   }, [isNetplay, localPlayer, onLocalInput, onChatShortcut]);
 
   // ── Volume control (EJS_volume + GainNode fallback) ─────
