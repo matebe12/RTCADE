@@ -162,6 +162,7 @@ export default function NetplayLobby({ hasProfile = true }: { hasProfile?: boole
   const [roomGamePickerOpenInternal, setRoomGamePickerOpenInternal] = useState(false);
   const [roomGamePickerLoadingInternal, setRoomGamePickerLoadingInternal] = useState(false);
 
+  const waitingRoomRole = state.step === "waiting" ? state.role : null;
   const isHostWaiting = state.step === "waiting" && waitingRoomRole === "host";
   const roomGamePickerOpen = isHostWaiting ? roomGamePickerOpenInternal : false;
   const roomGamePickerLoading = isHostWaiting ? roomGamePickerLoadingInternal : false;
@@ -170,7 +171,6 @@ export default function NetplayLobby({ hasProfile = true }: { hasProfile?: boole
   const pendingAutoJoinCodeRef = useRef<string | null>(null);
   const joinOrAutoSpectateRef = useRef(joinOrAutoSpectateWithCode);
   const currentLobbyStepRef = useRef(state.step);
-  const waitingRoomRole = state.step === "waiting" ? state.role : null;
 
   useEffect(() => {
     joinOrAutoSpectateRef.current = joinOrAutoSpectateWithCode;

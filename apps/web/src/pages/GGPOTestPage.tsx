@@ -5,7 +5,7 @@
  * http://localhost:5173/ggpo-test#guest=CODE → GUEST (비디오 수신 + 입력 전송)
  */
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import init from "@mantou/fbneo/fbneo-neogeo";
 import wasmURL from "@mantou/fbneo/fbneo-neogeo.wasm?url";
 import { ArcadeWrapper } from "@rtcade/emulator";

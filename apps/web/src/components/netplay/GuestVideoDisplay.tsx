@@ -113,7 +113,6 @@ const GuestVideoDisplay = forwardRef<HTMLDivElement, GuestVideoDisplayProps>(
       if (!videoStream) {
         video.srcObject = null;
         setPlaybackState("waiting-stream");
-        setPlaybackStats({ droppedFrames: null, fps: null });
         return undefined;
       }
 
