@@ -18,7 +18,7 @@ import {
   type OpponentProfile,
   type RoomVisibility,
 } from "@/stores/useNetplayLobbyStore";
-import { sendRemoteInput } from "@rtcade/emulator";
+import { sendRemoteInput, sendRemoteInputMame } from "@rtcade/emulator";
 import {
   HEARTBEAT_INTERVAL_MS,
   HEARTBEAT_WARN_TIMEOUT_MS,
@@ -156,6 +156,7 @@ export function useNetplaySession({
 
         if (wasDown !== isDown) {
           sendRemoteInput(emulatorRef, button, isDown);
+          sendRemoteInputMame(emulatorRef, button, isDown);
         }
       }
 

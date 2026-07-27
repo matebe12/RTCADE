@@ -7,3 +7,4 @@ export { keyToButtonMask, Controllers, InputHandler, DEFAULT_KEY_MAP_P1, DEFAULT
 export { renderFrameToCanvas, fitCanvasToContainer, clearCanvas, renderUpscaledFrame } from "./render";
 export type { ArcadeGameInfo, FBNeoModule } from "./types";
 export { default as FBNeoPlayer, preloadWasmVariant, sendStartGame, focusEmulator, sendRemoteInput, markGameRunning, resetGame } from "./FBNeoPlayer";
+export { default as MamePlayer, resetMameGame, sendRemoteInputMame } from "./MamePlayer";

@@ -13,7 +13,7 @@ import NetplayWatchingRoomsScreen from "@/components/netplay/NetplayWatchingRoom
 import NetplayWatchingScreen from "@/components/netplay/NetplayWatchingScreen";
 import SoloBrowseRomsScreen from "@/components/netplay/SoloBrowseRomsScreen";
 import SoloPlayingScreen from "@/components/netplay/SoloPlayingScreen";
-import { resetGame } from "@rtcade/emulator";
+import { resetGame, resetMameGame } from "@rtcade/emulator";
 import { buildBackendUrl } from "@/lib/backend-url";
 import { getUserProfile, toggleFavoriteGame } from "@/lib/user-profile";
 import { NETPLAY_COPY } from "@/netplay/netplayCopy";
@@ -708,7 +708,7 @@ export default function NetplayLobby({ hasProfile = true }: { hasProfile?: boole
         disconnectSeverity={disconnectSeverity}
         disconnectCountdown={disconnectCountdown}
         networkStats={networkStats}
-        onResetGame={() => resetGame()}
+        onResetGame={() => state.core === "mame2003" ? resetMameGame() : resetGame()}
       />
     );
   }
