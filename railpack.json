@@ -3,6 +3,6 @@
     "appRoot": "apps/server"
   },
   "deploy": {
-    "startCommand": "node --import tsx index.ts"
+    "startCommand": "node --import tsx src/index.ts"
   }
 }
