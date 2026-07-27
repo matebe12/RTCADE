@@ -18,11 +18,8 @@ dist-ssr
 .env.*.local
 
 # ROMs (do not commit copyrighted files)
-server/roms/**/*.zip
-server/roms/**/*.nes
-server/roms/**/*.sfc
-server/roms/**/*.gba
-server/roms/**/*.bin
+apps/server/src/roms/**/*.zip
+apps/server/src/roms/**/*.bin
 
 # Editor directories and files
 .vscode/*
