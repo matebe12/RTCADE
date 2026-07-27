@@ -242,7 +242,7 @@ export default function NetplayBrowseRomsScreen({
         )}
 
         {/* 가상 스크롤 게임 목록 (카테고리 그룹 or 검색/필터 결과) */}
-        <div className="flex-1 min-h-0 border-t border-border/70 pt-3">
+        <div className="h-96 border-t border-border/70 pt-3">
           {virtualListRoms.length > 0 ? (
             <VirtualGameCardList
               roms={virtualListRoms}
