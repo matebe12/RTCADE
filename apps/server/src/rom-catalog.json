@@ -1,0 +1,307 @@
+{
+  "defaults": {
+    "bios": null
+  },
+  "roms": {
+    "2020bb.zip": {
+      "bios": "neogeo.zip"
+    },
+    "3countb.zip": {
+      "bios": "neogeo.zip"
+    },
+    "alpham2.zip": {
+      "bios": "neogeo.zip"
+    },
+    "androdun.zip": {
+      "bios": "neogeo.zip"
+    },
+    "aof.zip": {
+      "bios": "neogeo.zip"
+    },
+    "aof2.zip": {
+      "bios": "neogeo.zip"
+    },
+    "aof3.zip": {
+      "bios": "neogeo.zip"
+    },
+    "bangbead.zip": {
+      "bios": "neogeo.zip"
+    },
+    "bjourney.zip": {
+      "bios": "neogeo.zip"
+    },
+    "blazstar.zip": {
+      "bios": "neogeo.zip"
+    },
+    "breakrev.zip": {
+      "bios": "neogeo.zip"
+    },
+    "bstars.zip": {
+      "bios": "neogeo.zip"
+    },
+    "bstars2.zip": {
+      "bios": "neogeo.zip"
+    },
+    "burningf.zip": {
+      "bios": "neogeo.zip"
+    },
+    "crswd2bl.zip": {
+      "bios": "neogeo.zip"
+    },
+    "crsword.zip": {
+      "bios": "neogeo.zip"
+    },
+    "doubledr.zip": {
+      "bios": "neogeo.zip"
+    },
+    "eightman.zip": {
+      "bios": "neogeo.zip"
+    },
+    "fatfursp.zip": {
+      "bios": "neogeo.zip"
+    },
+    "fatfury1.zip": {
+      "bios": "neogeo.zip"
+    },
+    "fatfury3.zip": {
+      "bios": "neogeo.zip"
+    },
+    "ganryu.zip": {
+      "bios": "neogeo.zip"
+    },
+    "garou.zip": {
+      "bios": "neogeo.zip"
+    },
+    "goalx3.zip": {
+      "bios": "neogeo.zip"
+    },
+    "gpilots.zip": {
+      "bios": "neogeo.zip"
+    },
+    "irrmaze.zip": {
+      "bios": "neogeo.zip"
+    },
+    "kabukikl.zip": {
+      "bios": "neogeo.zip"
+    },
+    "karnovr.zip": {
+      "bios": "neogeo.zip"
+    },
+    "kof2000.zip": {
+      "bios": "neogeo.zip"
+    },
+    "kof2001.zip": {
+      "bios": "neogeo.zip"
+    },
+    "kof2002.zip": {
+      "bios": "neogeo.zip"
+    },
+    "kof2003.zip": {
+      "bios": "neogeo.zip"
+    },
+    "kof94.zip": {
+      "bios": "neogeo.zip"
+    },
+    "kof95.zip": {
+      "bios": "neogeo.zip"
+    },
+    "kof96.zip": {
+      "bios": "neogeo.zip"
+    },
+    "kof97.zip": {
+      "bios": "neogeo.zip"
+    },
+    "kof98.zip": {
+      "bios": "neogeo.zip"
+    },
+    "kof99.zip": {
+      "bios": "neogeo.zip"
+    },
+    "kotm.zip": {
+      "bios": "neogeo.zip"
+    },
+    "kotm2.zip": {
+      "bios": "neogeo.zip"
+    },
+    "lastblad.zip": {
+      "bios": "neogeo.zip"
+    },
+    "lastbld2.zip": {
+      "bios": "neogeo.zip"
+    },
+    "lbowling.zip": {
+      "bios": "neogeo.zip"
+    },
+    "lresort.zip": {
+      "bios": "neogeo.zip"
+    },
+    "magdrop2.zip": {
+      "bios": "neogeo.zip"
+    },
+    "magdrop3.zip": {
+      "bios": "neogeo.zip"
+    },
+    "maglord.zip": {
+      "bios": "neogeo.zip"
+    },
+    "matrim.zip": {
+      "bios": "neogeo.zip"
+    },
+    "mslug.zip": {
+      "bios": "neogeo.zip"
+    },
+    "mslug3.zip": {
+      "bios": "neogeo.zip"
+    },
+    "mslug4.zip": {
+      "bios": "neogeo.zip"
+    },
+    "mslug5.zip": {
+      "bios": "neogeo.zip"
+    },
+    "mslugx.zip": {
+      "bios": "neogeo.zip"
+    },
+    "mutnat.zip": {
+      "bios": "neogeo.zip"
+    },
+    "nam1975.zip": {
+      "bios": "neogeo.zip"
+    },
+    "ncombat.zip": {
+      "bios": "neogeo.zip"
+    },
+    "ncommand.zip": {
+      "bios": "neogeo.zip"
+    },
+    "neobombe.zip": {
+      "bios": "neogeo.zip"
+    },
+    "neodrift.zip": {
+      "bios": "neogeo.zip"
+    },
+    "neomrdo.zip": {
+      "bios": "neogeo.zip"
+    },
+    "nitd.zip": {
+      "bios": "neogeo.zip"
+    },
+    "overtop.zip": {
+      "bios": "neogeo.zip"
+    },
+    "panicbom.zip": {
+      "bios": "neogeo.zip"
+    },
+    "pbobbl2n.zip": {
+      "bios": "neogeo.zip"
+    },
+    "pbobblen.zip": {
+      "bios": "neogeo.zip"
+    },
+    "preisle2.zip": {
+      "bios": "neogeo.zip"
+    },
+    "pulstar.zip": {
+      "bios": "neogeo.zip"
+    },
+    "rbff1.zip": {
+      "bios": "neogeo.zip"
+    },
+    "rbff2.zip": {
+      "bios": "neogeo.zip"
+    },
+    "rbffspec.zip": {
+      "bios": "neogeo.zip"
+    },
+    "roboarmy.zip": {
+      "bios": "neogeo.zip"
+    },
+    "rotd.zip": {
+      "bios": "neogeo.zip"
+    },
+    "samsh5fe.zip": {
+      "bios": "neogeo.zip"
+    },
+    "samsho.zip": {
+      "bios": "neogeo.zip"
+    },
+    "samsho2.zip": {
+      "bios": "neogeo.zip"
+    },
+    "samsho3.zip": {
+      "bios": "neogeo.zip"
+    },
+    "samsho4.zip": {
+      "bios": "neogeo.zip"
+    },
+    "sdodgeb.zip": {
+      "bios": "neogeo.zip"
+    },
+    "sengoku.zip": {
+      "bios": "neogeo.zip"
+    },
+    "sengoku2.zip": {
+      "bios": "neogeo.zip"
+    },
+    "sengoku3.zip": {
+      "bios": "neogeo.zip"
+    },
+    "shocktr2.zip": {
+      "bios": "neogeo.zip"
+    },
+    "shocktro.zip": {
+      "bios": "neogeo.zip"
+    },
+    "socbrawl.zip": {
+      "bios": "neogeo.zip"
+    },
+    "sonicwi2.zip": {
+      "bios": "neogeo.zip"
+    },
+    "sonicwi3.zip": {
+      "bios": "neogeo.zip"
+    },
+    "spinmast.zip": {
+      "bios": "neogeo.zip"
+    },
+    "ssideki4.zip": {
+      "bios": "neogeo.zip"
+    },
+    "strhoop.zip": {
+      "bios": "neogeo.zip"
+    },
+    "superspy.zip": {
+      "bios": "neogeo.zip"
+    },
+    "svc.zip": {
+      "bios": "neogeo.zip"
+    },
+    "tophuntr.zip": {
+      "bios": "neogeo.zip"
+    },
+    "trally.zip": {
+      "bios": "neogeo.zip"
+    },
+    "turfmast.zip": {
+      "bios": "neogeo.zip"
+    },
+    "twinspri.zip": {
+      "bios": "neogeo.zip"
+    },
+    "viewpoin.zip": {
+      "bios": "neogeo.zip"
+    },
+    "wakuwak7.zip": {
+      "bios": "neogeo.zip"
+    },
+    "wjammers.zip": {
+      "bios": "neogeo.zip"
+    },
+    "zedblade.zip": {
+      "bios": "neogeo.zip"
+    },
+    "zupapa.zip": {
+      "bios": "neogeo.zip"
+    }
+  }
+}

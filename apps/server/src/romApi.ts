@@ -4,6 +4,7 @@ import path from "path";
 
 const BIOS_FILES = new Set(["neogeo.zip", "pgm.zip", "skns.zip", "decocass.zip", "neocdz.zip", "stvbios.zip"]);
 const CORE_CATALOG_FILE_NAME = ".rtcade-roms.json";
+const SOURCE_CATALOG_PATH = path.join(import.meta.dirname, "rom-catalog.json");
 
 const VALID_CORES = new Set([
   "nes",
@@ -73,11 +74,14 @@ function parseCatalogEntry(value: unknown): RomCatalogEntry | null {
 }
 
 function readCoreCatalog(coreDir: string): CoreCatalog | null {
-  const catalogPath = path.join(coreDir, CORE_CATALOG_FILE_NAME);
+  // ROM directory catalog (volume-mounted, may not exist)
+  const localPath = path.join(coreDir, CORE_CATALOG_FILE_NAME);
+  // Source-committed catalog (always deployed)
+  const catalogPath = fs.existsSync(localPath) ? localPath
+    : fs.existsSync(SOURCE_CATALOG_PATH) ? SOURCE_CATALOG_PATH
+    : null;
 
-  if (!fs.existsSync(catalogPath)) {
-    return null;
-  }
+  if (!catalogPath) return null;
 
   try {
     const raw = JSON.parse(fs.readFileSync(catalogPath, "utf8")) as {
@@ -118,7 +122,8 @@ function resolveCatalogBios(catalog: CoreCatalog | null, filename: string) {
     return { hasCatalog: true, bios: catalog.defaults.bios ?? undefined };
   }
 
-  return { hasCatalog: true, bios: undefined as string | undefined };
+  // ROM not in catalog — allow fallback to auto-detected BIOS
+  return { hasCatalog: false, bios: undefined as string | undefined };
 }
 
 function toRomAssetPath(core: string, assetPath: string) {
