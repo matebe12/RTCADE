@@ -21,6 +21,7 @@
     "@tanstack/react-virtual": "^3.14.8",
     "driver.js": "^1.4.0",
     "lucide-react": "^1.8.0",
+    "nipplejs": "^1.0.4",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "react-router-dom": "^7.14.1",

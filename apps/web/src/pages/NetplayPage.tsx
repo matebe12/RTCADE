@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 
 import { Badge } from "@rtcade/ui";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@rtcade/ui";
@@ -6,18 +6,7 @@ import NetplayLobby from "@/components/NetplayLobby";
 import { usePageSeo } from "@/lib/seo";
 import { NETPLAY_HERO_COPY } from "@/netplay/netplayCopy";
 import { useNetplayLobbyStore } from "@/stores/useNetplayLobbyStore";
-
-function detectMobileAccess() {
-  if (typeof window === "undefined") return false;
-
-  const touchDevice = window.matchMedia("(pointer: coarse)").matches;
-  const narrowViewport = window.matchMedia("(max-width: 1023px)").matches;
-  const mobileUserAgent = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
-    navigator.userAgent,
-  );
-
-  return narrowViewport && (touchDevice || mobileUserAgent);
-}
+import { useMobileDetect } from "@/hooks/useMobileDetect";
 
 export default function NetplayPage({ hasProfile }: { hasProfile: boolean }) {
   usePageSeo({
@@ -30,60 +19,13 @@ export default function NetplayPage({ hasProfile }: { hasProfile: boolean }) {
   const mode = useNetplayLobbyStore((store) => store.mode);
   const resetLobby = useNetplayLobbyStore((store) => store.resetLobby);
   const showHeroCard = currentStep === "menu";
-  const [isMobileAccess, setIsMobileAccess] = useState(detectMobileAccess);
-
-  useEffect(() => {
-    const updateMobileAccess = () => {
-      setIsMobileAccess(detectMobileAccess());
-    };
-
-    const pointerQuery = window.matchMedia("(pointer: coarse)");
-    const widthQuery = window.matchMedia("(max-width: 1023px)");
-
-    updateMobileAccess();
-    pointerQuery.addEventListener("change", updateMobileAccess);
-    widthQuery.addEventListener("change", updateMobileAccess);
-
-    return () => {
-      pointerQuery.removeEventListener("change", updateMobileAccess);
-      widthQuery.removeEventListener("change", updateMobileAccess);
-    };
-  }, []);
+  const isMobile = useMobileDetect();
 
   useEffect(() => {
     return () => {
       resetLobby();
     };
   }, [resetLobby]);
-
-  if (isMobileAccess) {
-    return (
-      <div className="flex w-full justify-center">
-        <Card className="w-full max-w-2xl border-border/70 bg-card/95">
-          <CardHeader className="space-y-4">
-            <Badge variant="secondary" className="w-fit text-[10px]">
-              PC 전용
-            </Badge>
-            <div className="space-y-2">
-              <CardTitle className="text-2xl">넷플레이는 PC에서 접속해 주세요</CardTitle>
-              <CardDescription className="text-sm leading-6">
-                현재 같이하기와 혼자하기 모두 키보드와 게임패드 중심으로 설계되어 있어 모바일에서는
-                안정적인 플레이가 어렵습니다.
-              </CardDescription>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-3 text-sm text-muted-foreground">
-            <div className="rounded-lg border border-border/70 bg-background/40 p-4">
-              데스크톱 또는 노트북 브라우저에서 다시 접속해 주세요.
-            </div>
-            <div className="rounded-lg border border-border/70 bg-background/40 p-4">
-              가능하면 키보드 또는 게임패드를 연결한 환경을 권장합니다.
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
 
   return (
     <div className="flex w-full flex-col gap-6">
@@ -133,6 +75,13 @@ export default function NetplayPage({ hasProfile }: { hasProfile: boolean }) {
         )}
 
         <div className="min-w-0 w-full lg:h-full">
+          {/* 모바일 안내 — 게임 시작 전 메뉴 화면에서만 표시 */}
+          {isMobile && showHeroCard && (
+            <div className="mb-4 rounded-lg border border-border/70 bg-card/80 px-4 py-3 text-xs text-muted-foreground">
+              모바일에서는 화면 하단의 가상 조이스틱으로 플레이할 수 있습니다.
+              가로 모드로 전환하면 더 넓은 게임 화면을 볼 수 있습니다.
+            </div>
+          )}
           <NetplayLobby hasProfile={hasProfile} />
         </div>
       </div>

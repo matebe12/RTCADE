@@ -8,7 +8,7 @@ import { KEY_TO_BUTTON, BLOCKED_KEYS } from "@rtcade/shared";
 
 const EJS_CDN = "https://cdn.emulatorjs.org/stable/data/";
 const CORE_REMAP: Record<string, string> = { mame2003: "mame2003_plus" };
-const OUR_GLOBALS = ["EJS_player","EJS_core","EJS_pathtodata","EJS_color","EJS_startOnLoaded","EJS_language","EJS_gameID","EJS_Buttons","EJS_volume","EJS_noAutoFocus","EJS_ready","EJS_onGameStart","EJS_gameUrl","EJS_biosUrl"];
+const OUR_GLOBALS = ["EJS_player","EJS_core","EJS_pathtodata","EJS_color","EJS_startOnLoaded","EJS_language","EJS_gameID","EJS_Buttons","EJS_volume","EJS_noAutoFocus","EJS_ready","EJS_onGameStart","EJS_gameUrl","EJS_biosUrl","EJS_virtualGamepad","EJS_disableMenuBar"];
 
 // EJS 문서 기준 버튼 전부 숨김 (공식 옵션)
 const EJS_BUTTONS: Record<string, boolean> = { playPause:false,play:false,pause:false,restart:false,mute:false,unmute:false,saveState:false,loadState:false,settings:false,fullscreen:false,gamepad:false,cheat:false,volume:false,saveSavFiles:false,loadSavFiles:false,quickSave:false,quickLoad:false,screenshot:false,screenRecord:false,cacheManager:false,exitEmulation:false };
@@ -17,7 +17,9 @@ const MENU_HIDE_CSS = `.ejs_menu_bar{display:none!important}.ejs_start{display:n
 interface Props { romSource: File|string; variant?:string; role?:"host"|"guest"; romPath?:string; biosPath?:string; onLocalInput?:(b:number,d:boolean)=>void; onEmulatorReady?:()=>void; onChatShortcut?:()=>void; onCanvasStreamReady?:(s:MediaStream,p?:boolean)=>void; }
 
 let _mameRemoteHandler: ((btn:number,down:boolean)=>void)|null = null;
+let _mameLocalHandler: ((btn:number,down:boolean)=>void)|null = null;
 export function sendRemoteInputMame(_ref:any, btn:number, down:boolean) { _mameRemoteHandler?.(btn, down); }
+export function sendLocalMameInput(btn:number, down:boolean) { _mameLocalHandler?.(btn, down); }
 export function resetMameGame() { try { ((window as any).EJS_emulator as any)?.gameManager?.restart?.(); } catch {} }
 
 const MamePlayer = forwardRef<HTMLDivElement, Props>(function MamePlayer(
@@ -125,6 +127,8 @@ const MamePlayer = forwardRef<HTMLDivElement, Props>(function MamePlayer(
     w.EJS_color = "#00d4ff"; w.EJS_startOnLoaded = true; w.EJS_language = "en-US";
     w.EJS_gameID = 1; w.EJS_volume = 1;
     w.EJS_Buttons = { ...EJS_BUTTONS };
+    w.EJS_virtualGamepad = false; // 자체 가상 패드 비활성화 (우리 VirtualGamepad 사용)
+    w.EJS_disableMenuBar = true;  // 메뉴바도 숨김
     // RetroArch mouse→button 차단 (Emscripten 콜백 무효화)
     (w as any).Module = { preRun: [(mod:any)=>{try{mod.emscripten_set_mousedown_callback=()=>{};mod.emscripten_set_mouseup_callback=()=>{};mod.emscripten_set_mousemove_callback=()=>{};}catch{}}] };
 
@@ -192,6 +196,17 @@ const MamePlayer = forwardRef<HTMLDivElement, Props>(function MamePlayer(
     else { _mameRemoteHandler = null; }
     return () => { _mameRemoteHandler = null; };
   }, [role]);
+
+  // ── Local MAME input (virtual gamepad → simulateInput) ─
+  useEffect(() => {
+    _mameLocalHandler = (btn, down) => {
+      try {
+        ((window as any).EJS_emulator)?.gameManager?.simulateInput?.(localPlayer, btn, down ? 1 : 0);
+      } catch {}
+      if (isNetplay) onLocalInput?.(btn, down);
+    };
+    return () => { _mameLocalHandler = null; };
+  }, [isNetplay, localPlayer, onLocalInput]);
 
   // ── Keyboard (옛날 패턴: solo도 window 캡처) ──────────────
   useEffect(() => {

@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
 
 import EmulatorPlayer, { type SystemCore } from "@/components/EmulatorPlayer";
-import GuestVideoDisplay from "@/components/netplay/GuestVideoDisplay";
+import GuestVideoDisplay, { sendLocalGuestInput } from "@/components/netplay/GuestVideoDisplay";
 import NetplayChatOverlayComposer from "@/components/netplay/NetplayChatOverlayComposer";
 import type { NetplayChatMessage } from "@/components/NetplayChatPanel";
 import NetplayChatOverlayPreview from "@/components/netplay/NetplayChatOverlayPreview";
 import NetplayNetworkStatsBadge from "@/components/netplay/NetplayNetworkStatsBadge";
 import PlayControlsGuide from "@/components/netplay/PlayControlsGuide";
+import VirtualGamepad from "@/components/VirtualGamepad";
 import { UserBadge } from "@/components/UserBadge";
 import {
   AlertDialog,
@@ -29,7 +30,6 @@ import type { OpponentProfile } from "@/stores/useNetplayLobbyStore";
 import {
   ArrowLeft,
   Loader2,
-  Maximize2,
   MessageSquare,
   Minimize2,
   RotateCcw,
@@ -37,6 +37,8 @@ import {
   WifiOff,
 } from "lucide-react";
 import type { DisconnectSeverity } from "@rtcade/shared";
+import { sendLocalFBNeoInput, sendLocalMameInput } from "@rtcade/emulator";
+import { useMobileDetect } from "@/hooks/useMobileDetect";
 
 interface PlayingSession {
   core: SystemCore;
@@ -109,6 +111,22 @@ export default function NetplayPlayingScreen({
   const localChatUser = myProfile ?? { nickname: "나", avatar: "🎮" };
   const gameAreaRef = useRef<HTMLDivElement>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isMaximized, setIsMaximized] = useState(false); // 모바일 CSS 최대화
+  const isMobile = useMobileDetect();
+
+  // Virtual gamepad → emulator/peer input routing
+  const handleVirtualInput = useCallback(
+    (button: number, down: boolean) => {
+      if (session.role === "guest") {
+        sendLocalGuestInput(button, down);
+      } else if (session.core === "mame2003") {
+        sendLocalMameInput(button, down);
+      } else {
+        sendLocalFBNeoInput(button, down);
+      }
+    },
+    [session.role, session.core],
+  );
 
   const handleOverlaySend = useCallback(() => {
     if (onSendChat()) {
@@ -117,14 +135,23 @@ export default function NetplayPlayingScreen({
   }, [onChatCancel, onSendChat]);
 
   const toggleFullscreen = useCallback(() => {
-    const el = gameAreaRef.current;
-    if (!el) return;
-    if (document.fullscreenElement) {
-      document.exitFullscreen().catch(() => {});
+    if (isMobile) {
+      // 모바일: CSS 기반 최대화 (툴바 숨기고 캔버스+패드만)
+      setIsMaximized((prev) => !prev);
     } else {
-      el.requestFullscreen().catch(() => {});
+      // 데스크톱: 브라우저 전체화면 API
+      const el = gameAreaRef.current;
+      if (!el) return;
+      if (document.fullscreenElement) {
+        document.exitFullscreen().catch(() => {});
+      } else {
+        el.requestFullscreen().catch(() => {});
+      }
     }
-  }, []);
+  }, [isMobile]);
+
+  // 모바일 최대화 모드일 때도 isMaximized=true면 동일하게 처리하기 위한 통합 플래그
+  const isExpanded = isMobile ? isMaximized : isFullscreen;
 
   useEffect(() => {
     const handler = () => setIsFullscreen(!!document.fullscreenElement);
@@ -133,7 +160,9 @@ export default function NetplayPlayingScreen({
   }, []);
 
   return (
-    <div className="flex w-full flex-col gap-3">
+    <div className={cn("flex w-full flex-col", isExpanded ? "gap-5" : "gap-3")}>
+      {/* Toolbar — 모바일 최대화 시 숨김 */}
+      {!isExpanded && (
       <div className="flex w-full flex-wrap items-center gap-3">
         <AlertDialog>
           <AlertDialogTrigger asChild>
@@ -221,18 +250,8 @@ export default function NetplayPlayingScreen({
           </AlertDialog>
         )}
 
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="gap-1 text-xs"
-          onClick={toggleFullscreen}
-          title="전체화면"
-        >
-          <Maximize2 className="size-3" />
-          전체화면
-        </Button>
       </div>
+      )}
 
       {!gameStarted && (
         <div className="flex w-full items-center gap-2 px-1">
@@ -243,16 +262,20 @@ export default function NetplayPlayingScreen({
         </div>
       )}
 
-      {!isFullscreen && <PlayControlsGuide mode="netplay" />}
+      {!isMobile && !isFullscreen && <PlayControlsGuide mode="netplay" />}
 
-      {/* Game area — this div becomes fullscreen */}
+      {/* Game area — desktop: fullscreen div, mobile: flex layout */}
       <div
         ref={gameAreaRef}
         className={cn(
           "flex w-full",
           isFullscreen
             ? "h-screen bg-black items-stretch"
-            : "flex-col gap-3 xl:flex-row xl:items-start",
+            : isExpanded
+              ? "flex-1 min-h-0 flex-col items-center gap-1"
+              : isMobile
+                ? "flex-col items-center gap-2"
+                : "flex-col gap-3 xl:flex-row xl:items-start",
         )}
       >
         {/* Game wrapper */}
@@ -261,7 +284,11 @@ export default function NetplayPlayingScreen({
             "relative",
             isFullscreen
               ? "flex-1 min-w-0 flex items-center justify-center"
-              : "w-full xl:flex-1 xl:min-w-0",
+              : isExpanded
+                ? "w-full flex-[0_0_50%] min-h-0"
+                : isMobile
+                  ? "w-full flex-shrink-0"
+                  : "w-full xl:flex-1 xl:min-w-0",
           )}
         >
           {session.role === "guest" ? (
@@ -286,11 +313,13 @@ export default function NetplayPlayingScreen({
               onEmulatorReady={onEmulatorReady}
               onChatShortcut={onChatShortcut}
               onCanvasStreamReady={onCanvasStreamReady}
+              hideFullscreen={isMobile}
+              onMaximize={isMobile && !isMaximized ? () => setIsMaximized(true) : undefined}
             />
           )}
 
-          {/* Fullscreen top-right controls */}
-          {isFullscreen && (
+          {/* Expanded top-right controls (desktop fullscreen or mobile maximized) */}
+          {isExpanded && (
             <div className="absolute right-3 top-3 z-50 flex items-center gap-2">
               <NetplayNetworkStatsBadge stats={networkStats} compact className="bg-black/60" />
               {session.role === "host" && (
@@ -330,14 +359,14 @@ export default function NetplayPlayingScreen({
                 size="sm"
                 className="h-8 w-8 rounded-full bg-black/60 p-0 text-white backdrop-blur-sm hover:bg-black/80"
                 onClick={toggleFullscreen}
-                title="전체화면 나가기"
+                title={isMobile ? "최대화 종료" : "전체화면 나가기"}
               >
                 <Minimize2 className="size-3.5" />
               </Button>
             </div>
           )}
 
-          {!isFullscreen && (
+          {!isExpanded && (
             <div className="absolute right-3 top-3 z-20 xl:hidden">
               <Button
                 type="button"
@@ -384,6 +413,16 @@ export default function NetplayPlayingScreen({
             </div>
           )}
         </div>
+
+        {/* Virtual gamepad — mobile only, always visible */}
+        {isMobile && gameStarted && (
+          <div className={cn("virtual-gamepad w-full pb-safe flex items-center", isExpanded ? "flex-1 min-h-0" : "flex-shrink-0")}>
+            <VirtualGamepad
+              onLocalInput={handleVirtualInput}
+              active={gameStarted}
+            />
+          </div>
+        )}
       </div>
     </div>
   );

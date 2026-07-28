@@ -25,6 +25,8 @@ interface FBNeoPlayerProps {
   onEmulatorReady?: () => void;
   onChatShortcut?: () => void;
   onCanvasStreamReady?: (stream: MediaStream, pixelArt?: boolean) => void;
+  hideFullscreen?: boolean;
+  onMaximize?: () => void;
 }
 
 // ── Constants ──────────────────────────────────────────
@@ -55,6 +57,7 @@ const wasmCache = new Map<FBNeoVariant, WasmVariantInit>();
  * `remoteMaskRef`에 접근할 수 있게 한다.
  */
 let _fbneoRemoteButtonHandler: ((button: number, down: boolean) => void) | null = null;
+let _fbneoLocalButtonHandler: ((button: number, down: boolean) => void) | null = null;
 let _fbneoArcadeRef: ArcadeWrapper | null = null;
 
 function getWasmImports(variant: FBNeoVariant): WasmVariantInit {
@@ -134,6 +137,8 @@ const FBNeoPlayer = forwardRef<HTMLDivElement, FBNeoPlayerProps>(function FBNeoP
     onEmulatorReady,
     onChatShortcut,
     onCanvasStreamReady,
+    hideFullscreen,
+    onMaximize,
   },
   ref,
 ) {
@@ -190,6 +195,26 @@ const FBNeoPlayer = forwardRef<HTMLDivElement, FBNeoPlayerProps>(function FBNeoP
       remoteMaskRef.current = 0;
     };
   }, [handleRemoteButton]);
+
+  // ── Local input handler (virtual gamepad → pressedMaskRef) ─
+  const handleLocalButton = useCallback((button: number, down: boolean) => {
+    const bit = EJS_BUTTON_TO_FBNEO_BIT[button];
+    if (bit === undefined) return;
+    if (down) {
+      pressedMaskRef.current |= bit;
+    } else {
+      pressedMaskRef.current &= ~bit;
+    }
+    // 넷플레이 전송도 함께 처리 (solo 모드에서는 onLocalInput이 undefined)
+    onLocalInput?.(button, down);
+  }, [onLocalInput]);
+
+  useEffect(() => {
+    _fbneoLocalButtonHandler = handleLocalButton;
+    return () => {
+      _fbneoLocalButtonHandler = null;
+    };
+  }, [handleLocalButton]);
 
   // ── Main init effect ──────────────────────────────────
   useEffect(() => {
@@ -603,6 +628,17 @@ const FBNeoPlayer = forwardRef<HTMLDivElement, FBNeoPlayerProps>(function FBNeoP
           style={{ width: "100%", height: "100%", imageRendering: "pixelated" }}
         />
       </div>
+      {/* Mobile maximize button — inside canvas area */}
+      {onMaximize && (
+        <button
+          type="button"
+          className="absolute right-2 top-2 z-40 flex size-7 items-center justify-center rounded-full bg-black/50 text-white/70 backdrop-blur-sm active:bg-black/70"
+          onClick={onMaximize}
+          title="최대화"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
+        </button>
+      )}
       {status === "ready" && (
         <div className={`absolute bottom-0 left-0 right-0 z-10 transition-opacity duration-200 ${showControls ? "opacity-100" : "opacity-0"}`}>
           <div className="flex items-center gap-2 bg-gradient-to-t from-black/70 to-transparent px-3 pb-3 pt-8">
@@ -625,6 +661,7 @@ const FBNeoPlayer = forwardRef<HTMLDivElement, FBNeoPlayerProps>(function FBNeoP
               title={`볼륨 ${Math.round((isMuted ? 0 : volume) * 100)}%`}
             />
             <div className="flex-1" />
+            {!hideFullscreen && (
             <button
               type="button"
               onClick={toggleFullscreen}
@@ -634,6 +671,7 @@ const FBNeoPlayer = forwardRef<HTMLDivElement, FBNeoPlayerProps>(function FBNeoP
             >
               {isFullscreen ? <Minimize2 className="size-4" /> : <Maximize2 className="size-4" />}
             </button>
+            )}
           </div>
         </div>
       )}
@@ -669,6 +707,17 @@ export function sendRemoteInput(
 ) {
   void ref;
   _fbneoRemoteButtonHandler?.(button, down);
+}
+
+/**
+ * 가상 게임패드 등 외부 입력 소스에서 FBNeo 로컬 입력을 주입한다.
+ *
+ * 내부적으로 EJS_BUTTON_TO_FBNEO_BIT 변환을 거쳐 pressedMaskRef를 업데이트하고,
+ * 넷플레이 전송을 위해 onLocalInput도 함께 호출한다.
+ * FBNeoPlayer가 마운트되지 않은 상태에서는 호출이 무시된다.
+ */
+export function sendLocalFBNeoInput(button: number, down: boolean) {
+  _fbneoLocalButtonHandler?.(button, down);
 }
 
 /** Mark game as running */

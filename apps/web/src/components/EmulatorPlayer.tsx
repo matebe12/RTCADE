@@ -24,11 +24,13 @@ interface EmulatorPlayerProps {
   onEmulatorReady?: () => void;
   onChatShortcut?: () => void;
   onCanvasStreamReady?: (stream: MediaStream, pixelArt?: boolean) => void;
+  hideFullscreen?: boolean;
+  onMaximize?: () => void;
 }
 
 const EmulatorPlayer = forwardRef<HTMLDivElement, EmulatorPlayerProps>(
   function EmulatorPlayer(props, ref) {
-    const { romSource, core, role, romPath, biosPath, onLocalInput, onEmulatorReady, onChatShortcut, onCanvasStreamReady } = props;
+    const { romSource, core, role, romPath, biosPath, onLocalInput, onEmulatorReady, onChatShortcut, onCanvasStreamReady, hideFullscreen, onMaximize } = props;
     const variant = inferVariant(romPath);
     const useMame = core === "mame2003";
 
@@ -55,6 +57,8 @@ const EmulatorPlayer = forwardRef<HTMLDivElement, EmulatorPlayerProps>(
         romPath={romPath} biosPath={biosUrl}
         onLocalInput={onLocalInput} onEmulatorReady={onEmulatorReady}
         onChatShortcut={onChatShortcut} onCanvasStreamReady={onCanvasStreamReady}
+        hideFullscreen={hideFullscreen}
+        onMaximize={onMaximize}
       />
     );
   },

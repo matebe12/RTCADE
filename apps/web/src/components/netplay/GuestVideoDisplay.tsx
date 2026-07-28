@@ -33,12 +33,31 @@ interface GuestVideoDisplayProps {
 }
 
 /**
- * GUEST-side display for video-streaming netplay.
+ * GuestVideoDisplay — GUEST-side display for video-streaming netplay.
  *
  * Renders a `<video>` element that plays the HOST's canvas stream received
  * over WebRTC, including audio. Keyboard input is captured directly and
  * forwarded to the parent via `onLocalInput`.
  */
+
+/* ------------------------------------------------------------------ */
+/*  Module-level handler for external input (virtual gamepad)          */
+/* ------------------------------------------------------------------ */
+
+let _guestLocalHandler: ((button: number, down: boolean) => void) | null = null;
+
+/**
+ * 가상 게임패드 등 외부 입력 소스에서 Guest 입력을 주입한다.
+ *
+ * GuestVideoDisplay가 마운트되지 않은 상태에서는 호출이 무시된다.
+ */
+export function sendLocalGuestInput(button: number, down: boolean) {
+  _guestLocalHandler?.(button, down);
+}
+
+/* ------------------------------------------------------------------ */
+/*  Component                                                          */
+/* ------------------------------------------------------------------ */
 const GuestVideoDisplay = forwardRef<HTMLDivElement, GuestVideoDisplayProps>(
   function GuestVideoDisplay(
     {
@@ -245,6 +264,29 @@ const GuestVideoDisplay = forwardRef<HTMLDivElement, GuestVideoDisplayProps>(
       };
     }, [captureInput, onLocalInput, onChatShortcut]);
 
+    // ── Local input handler registration (virtual gamepad → onLocalInput) ─
+    useEffect(() => {
+      if (!captureInput) {
+        _guestLocalHandler = null;
+        return;
+      }
+      _guestLocalHandler = (btn, down) => {
+        // 채팅 입력 중이면 무시
+        const el = document.activeElement;
+        if (
+          el &&
+          (el.tagName === "INPUT" ||
+            el.tagName === "TEXTAREA" ||
+            (el as HTMLElement).isContentEditable)
+        ) {
+          return;
+        }
+        onLocalInput?.(btn, down);
+      };
+      return () => {
+        _guestLocalHandler = null;
+      };
+    }, [captureInput, onLocalInput]);
     const showDisconnectOverlay =
       disconnectSeverity === "warning" || disconnectSeverity === "danger";
     const showPlaybackOverlay = !videoStream || playbackState !== "playing";
