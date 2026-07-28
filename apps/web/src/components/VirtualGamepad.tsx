@@ -194,7 +194,7 @@ export default function VirtualGamepad({
       collection.destroy();
       nippleRef.current = null;
     };
-  }, [isDark]); // recreate D-Pad on theme change
+  }, [isDark, landscape]); // recreate D-Pad on theme change or landscape mode switch
 
   /* ---- Action buttons: native event binding (passive:false 필요) ---- */
   useEffect(() => {
@@ -262,7 +262,7 @@ export default function VirtualGamepad({
       el.removeEventListener("touchend", handleTouchEnd);
       el.removeEventListener("touchcancel", handleTouchEnd);
     };
-  }, []);
+  }, [landscape]); // re-attach listeners when landscape mode switches DOM element
 
   /* ---- Global blur/visibility release ---- */
   useEffect(() => {
