@@ -43,25 +43,30 @@ export default function SoloPlayingScreen({
   const isMobile = useMobileDetect();
   const [isMaximized, setIsMaximized] = useState(false);
 
-  // 모바일 최대화 시 AppShell 헤더/nav 숨김 + 가로모드 전환
+  // 모바일 최대화 시 AppShell 헤더/nav 숨김 + 브라우저 전체화면 + 가로모드 전환
   useEffect(() => {
     if (isMaximized) {
       document.body.classList.add("mobile-maximized");
-      // Screen Orientation API: 가로모드 요청
-      if (screen.orientation?.lock) {
-        screen.orientation.lock("landscape").catch(() => {});
+      // 브라우저 전체화면 먼저 요청 (orientation lock 전제조건)
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().then(() => {
+          // 전체화면 진입 성공 후 가로모드 고정
+          screen.orientation?.lock?.("landscape")?.catch(() => {});
+        }).catch(() => {});
       }
     } else {
       document.body.classList.remove("mobile-maximized");
-      if (screen.orientation?.unlock) {
-        screen.orientation.unlock();
+      if (document.fullscreenElement) {
+        document.exitFullscreen().catch(() => {});
       }
+      screen.orientation?.unlock?.();
     }
     return () => {
       document.body.classList.remove("mobile-maximized");
-      if (screen.orientation?.unlock) {
-        screen.orientation.unlock();
+      if (document.fullscreenElement) {
+        document.exitFullscreen().catch(() => {});
       }
+      screen.orientation?.unlock?.();
     };
   }, [isMaximized]);
 
