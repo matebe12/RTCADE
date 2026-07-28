@@ -134,6 +134,7 @@ export interface RoomStore {
   listPlayingPublicRooms: () => PlayingRoomSummary[];
   listPublicRooms: () => PublicRoomSummary[];
   markPlaying: (room: Room) => boolean;
+  reattachHost: (room: Room, host: WebSocket) => void;
   setParticipantReady: (room: Room, socket: WebSocket, ready: boolean) => boolean;
   updateRoomGame: (room: Room, options: { romPath: string; core: string; bios?: string }) => boolean;
 }
@@ -368,6 +369,9 @@ export function createRoomStore(): RoomStore {
       room.state = "playing";
       room.startedAt = room.startedAt ?? Date.now();
       return true;
+    },
+    reattachHost: (room, host) => {
+      room.host = host;
     },
     setParticipantReady: (room, socket, ready) => {
       if (room.guest?.socket === socket) {

@@ -40,6 +40,28 @@ export function RoomCodeDisplay({ code, className }: RoomCodeDisplayProps) {
 
   const handleShare = async () => {
     const link = `${window.location.origin}/netplay?code=${code}`;
+    const shareData = {
+      title: "RTCADE 친구 초대",
+      text: `RTCADE에서 ${code}번 방에 참가하세요!`,
+      url: link,
+    };
+
+    // 모바일: Web Share API (브라우저를 떠나지 않고 카카오톡 등으로 공유)
+    if (navigator.share && navigator.canShare?.(shareData)) {
+      try {
+        await navigator.share(shareData);
+        setShared(true);
+        setTimeout(() => setShared(false), 2000);
+        return;
+      } catch (err) {
+        if (err instanceof DOMException && err.name === "AbortError") {
+          return; // 사용자가 취소 — 클립보드 fallback 생략
+        }
+        // 그 외 오류는 클립보드 복사로 fallback
+      }
+    }
+
+    // 데스크탑 또는 미지원 환경: 클립보드 복사 (기존 동작)
     try {
       await copyToClipboard(link);
       setShared(true);

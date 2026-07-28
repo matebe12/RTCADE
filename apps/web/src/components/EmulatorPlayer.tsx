@@ -49,6 +49,7 @@ const EmulatorPlayer = forwardRef<HTMLDivElement, EmulatorPlayerProps>(
         romPath={romPath} biosPath={biosUrl}
         onLocalInput={onLocalInput} onEmulatorReady={onEmulatorReady}
         onChatShortcut={onChatShortcut} onCanvasStreamReady={onCanvasStreamReady}
+        hideFullscreen={hideFullscreen}
       />
     ) : (
       <FBNeoPlayer

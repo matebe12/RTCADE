@@ -31,6 +31,7 @@ import type { OpponentProfile } from "@/stores/useNetplayLobbyStore";
 import {
   ArrowLeft,
   Loader2,
+  Maximize2,
   MessageSquare,
   Minimize2,
   RotateCcw,
@@ -256,6 +257,21 @@ export default function NetplayPlayingScreen({
 
         <NetplayNetworkStatsBadge stats={networkStats} />
 
+        {/* 모바일 최대화 버튼 — 툴바에서 통합 관리하여 채팅 버튼과 겹치지 않도록 */}
+        {isMobile && (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="gap-1 text-xs"
+            onClick={() => setIsMaximized(true)}
+            title="전체화면"
+          >
+            <Maximize2 className="size-3" />
+            전체화면
+          </Button>
+        )}
+
         {session.role === "host" && (
           <AlertDialog>
             <AlertDialogTrigger asChild>
@@ -343,7 +359,6 @@ export default function NetplayPlayingScreen({
               onChatShortcut={onChatShortcut}
               onCanvasStreamReady={onCanvasStreamReady}
               hideFullscreen={isMobile}
-              onMaximize={isMobile && !isMaximized ? () => setIsMaximized(true) : undefined}
             />
           )}
 
@@ -396,7 +411,7 @@ export default function NetplayPlayingScreen({
           )}
 
           {!isExpanded && (
-            <div className="absolute right-3 top-3 z-20 xl:hidden">
+            <div className="absolute left-3 top-3 z-20 xl:hidden">
               <Button
                 type="button"
                 variant="secondary"

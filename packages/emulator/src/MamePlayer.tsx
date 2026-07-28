@@ -14,7 +14,7 @@ const OUR_GLOBALS = ["EJS_player","EJS_core","EJS_pathtodata","EJS_color","EJS_s
 const EJS_BUTTONS: Record<string, boolean> = { playPause:false,play:false,pause:false,restart:false,mute:false,unmute:false,saveState:false,loadState:false,settings:false,fullscreen:false,gamepad:false,cheat:false,volume:false,saveSavFiles:false,loadSavFiles:false,quickSave:false,quickLoad:false,screenshot:false,screenRecord:false,cacheManager:false,exitEmulation:false };
 const MENU_HIDE_CSS = `.ejs_menu_bar{display:none!important}.ejs_start{display:none!important}.ejs_start_button{display:none!important}canvas{pointer-events:none!important}`;
 
-interface Props { romSource: File|string; variant?:string; role?:"host"|"guest"; romPath?:string; biosPath?:string; onLocalInput?:(b:number,d:boolean)=>void; onEmulatorReady?:()=>void; onChatShortcut?:()=>void; onCanvasStreamReady?:(s:MediaStream,p?:boolean)=>void; }
+interface Props { romSource: File|string; variant?:string; role?:"host"|"guest"; romPath?:string; biosPath?:string; onLocalInput?:(b:number,d:boolean)=>void; onEmulatorReady?:()=>void; onChatShortcut?:()=>void; onCanvasStreamReady?:(s:MediaStream,p?:boolean)=>void; hideFullscreen?:boolean; }
 
 let _mameRemoteHandler: ((btn:number,down:boolean)=>void)|null = null;
 let _mameLocalHandler: ((btn:number,down:boolean)=>void)|null = null;
@@ -23,7 +23,7 @@ export function sendLocalMameInput(btn:number, down:boolean) { _mameLocalHandler
 export function resetMameGame() { try { ((window as any).EJS_emulator as any)?.gameManager?.restart?.(); } catch {} }
 
 const MamePlayer = forwardRef<HTMLDivElement, Props>(function MamePlayer(
-  { romSource, role, biosPath, onLocalInput, onEmulatorReady, onChatShortcut, onCanvasStreamReady }, ref
+  { romSource, role, biosPath, onLocalInput, onEmulatorReady, onChatShortcut, onCanvasStreamReady, hideFullscreen }, ref
 ) {
   const cRef = useRef<HTMLDivElement>(null); const wRef = useRef<HTMLDivElement>(null);
   const scriptRef = useRef<HTMLScriptElement|null>(null); const styleRef = useRef<HTMLStyleElement|null>(null);
@@ -271,7 +271,9 @@ const MamePlayer = forwardRef<HTMLDivElement, Props>(function MamePlayer(
           <input type="range" min="0" max="1" step="0.05" value={mu?0:vol} onChange={e=>tv(parseFloat(e.target.value))} className="h-1 w-20 cursor-pointer accent-white" title={`볼륨 ${Math.round((mu?0:vol)*100)}%`} />
           {(!role || isHost) && (<button type="button" onClick={()=>resetMameGame()} title="게임 리셋" className="flex h-7 w-7 items-center justify-center rounded-md text-white hover:bg-white/20"><RotateCcw className="size-4"/></button>)}
           <div className="flex-1" />
+          {!hideFullscreen && (
           <button type="button" onClick={tf} title={fs?"전체화면 종료":"전체화면"} className="flex h-7 w-7 items-center justify-center rounded-md text-white hover:bg-white/20" aria-label={fs?"전체화면 종료":"전체화면"}>{fs?<Minimize2 className="size-4"/>:<Maximize2 className="size-4"/>}</button>
+          )}
         </div>
       </div>
     </div>

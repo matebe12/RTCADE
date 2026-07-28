@@ -7,6 +7,12 @@ import type { Room, RoomStore } from "./roomStore";
 /** 서버 → 클라이언트 WebSocket 핑 주기 (ms). 연결 유지에 사용된다. */
 const WS_PING_INTERVAL_MS = 30_000;
 
+/** 호스트 연결 해제 후 방 삭제 유예 기간 (ms). 모바일 앱 전환 등을 커버한다. */
+const HOST_DISCONNECT_GRACE_MS = 30_000;
+
+/** 방 코드별 호스트 연결 해제 유예 타이머. 재접속 또는 참가자 입장 시 취소된다. */
+const pendingHostDisconnects = new Map<string, ReturnType<typeof setTimeout>>();
+
 type ClientRole = "host" | "guest" | "spectator" | null;
 
 function send(ws: WebSocket, data: unknown) {
@@ -25,6 +31,14 @@ function parseMessage(raw: RawData): Record<string, unknown> | null {
 
 function getRomFilename(romPath: string) {
   return romPath.split("/").pop() ?? romPath;
+}
+
+function cancelHostDisconnectGrace(code: string) {
+  const timeoutId = pendingHostDisconnects.get(code);
+  if (timeoutId) {
+    clearTimeout(timeoutId);
+    pendingHostDisconnects.delete(code);
+  }
 }
 
 function broadcastRoomLobby(room: Room, roomStore: RoomStore) {
@@ -124,6 +138,9 @@ export function attachSignalingServer(wss: WebSocketServer, roomStore: RoomStore
           myRoom = room;
           role = "guest";
 
+          // 호스트가 유예 기간 중이면 취소 — 참가자가 입장했으므로 방 유지
+          cancelHostDisconnectGrace(room.code);
+
           send(ws, {
             type: "room-joined",
             code: room.code,
@@ -167,6 +184,9 @@ export function attachSignalingServer(wss: WebSocketServer, roomStore: RoomStore
           myRoom = room;
           role = "spectator";
           spectatorId = attachedSpectator.id;
+
+          // 호스트가 유예 기간 중이면 취소 — 관전자가 입장했으므로 방 유지
+          cancelHostDisconnectGrace(room.code);
 
           send(ws, {
             type: "room-joined",
@@ -367,6 +387,40 @@ export function attachSignalingServer(wss: WebSocketServer, roomStore: RoomStore
           }
           break;
         }
+
+        case "reconnect": {
+          const code = String(message.code ?? "");
+          const existingTimeout = pendingHostDisconnects.get(code);
+
+          if (!existingTimeout) {
+            send(ws, { type: "error", message: "유예 기간이 만료되었거나 방을 찾을 수 없습니다." });
+            return;
+          }
+
+          clearTimeout(existingTimeout);
+          pendingHostDisconnects.delete(code);
+
+          const room = roomStore.findRoom(code);
+          if (!room) {
+            send(ws, { type: "error", message: "방을 찾을 수 없습니다." });
+            return;
+          }
+
+          roomStore.reattachHost(room, ws);
+          myRoom = room;
+          role = "host";
+
+          send(ws, { type: "reconnected", code });
+
+          if (room.guest) {
+            send(room.guest.socket, { type: "host-reconnected" });
+          }
+          for (const spec of room.spectators.values()) {
+            send(spec.socket, { type: "host-reconnected" });
+          }
+          broadcastRoomLobby(room, roomStore);
+          break;
+        }
       }
     });
 
@@ -383,13 +437,32 @@ export function attachSignalingServer(wss: WebSocketServer, roomStore: RoomStore
       }
 
       if (role === "host") {
+        // 호스트 연결 해제 시 30초 유예 기간 — 모바일 앱 전환 등 일시적 끊김을 커버
+        // 유예 기간 내 재접속(reconnect) 또는 참가자 입장 시 타이머 취소
+        const hostDisconnectData = { type: "host-disconnected", gracePeriodMs: HOST_DISCONNECT_GRACE_MS };
         if (myRoom.guest) {
-          send(myRoom.guest.socket, { type: "peer-disconnected" });
+          send(myRoom.guest.socket, hostDisconnectData);
         }
         for (const hostedSpectator of myRoom.spectators.values()) {
-          send(hostedSpectator.socket, { type: "peer-disconnected" });
+          send(hostedSpectator.socket, hostDisconnectData);
         }
-        roomStore.deleteRoom(myRoom.code);
+
+        const code = myRoom.code;
+        const timeoutId = setTimeout(() => {
+          const room = roomStore.findRoom(code);
+          if (room) {
+            if (room.guest) {
+              send(room.guest.socket, { type: "peer-disconnected" });
+            }
+            for (const hostedSpectator of room.spectators.values()) {
+              send(hostedSpectator.socket, { type: "peer-disconnected" });
+            }
+            roomStore.deleteRoom(code);
+          }
+          pendingHostDisconnects.delete(code);
+        }, HOST_DISCONNECT_GRACE_MS);
+
+        pendingHostDisconnects.set(code, timeoutId);
         return;
       }
 

@@ -10,6 +10,11 @@
   "background_color": "#0b1220",
   "theme_color": "#0b1220",
   "categories": ["games", "entertainment"],
+  "handle_links": "preferred",
+  "capture_links": "existing-client-navigate",
+  "launch_handler": {
+    "client_mode": ["focus-existing", "auto"]
+  },
   "icons": [
     {
       "src": "/pwa-icon-192.png",
