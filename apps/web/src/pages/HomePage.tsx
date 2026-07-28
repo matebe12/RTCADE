@@ -229,13 +229,13 @@ function PopularGameSpotlightItem({
               <div className="flex shrink-0 items-center gap-2">
                 <Button
                   size="sm"
-                  className="h-8 rounded-full px-3 text-[11px]"
+                  className="h-8 rounded-full px-2.5 text-[11px] sm:px-3"
                   aria-label={`${displayName} 공개방 만들기`}
                   title={`${displayName} 공개방 만들기`}
                   onClick={handleQuickCreateRoom}
                 >
                   <Gamepad2 className="size-4" />
-                  <span>방 만들기</span>
+                  <span className="hidden sm:inline">방 만들기</span>
                 </Button>
               </div>
             </div>

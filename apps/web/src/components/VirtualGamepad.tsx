@@ -122,7 +122,7 @@ export default function VirtualGamepad({
       mode: "static",
       position: { top: "50%", left: "50%" },
       size: 120,
-      threshold: 0.25,
+      threshold: 0.35,
       color: dpadColor,
       restJoystick: true,
       restOpacity: 0.5,

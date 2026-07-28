@@ -445,7 +445,7 @@ export default function NetplayPlayingScreen({
 
         {/* Virtual gamepad — mobile only, always visible */}
         {isMobile && gameStarted && (
-          <div className={cn("virtual-gamepad w-full pb-safe flex items-end", isExpanded ? "flex-1 min-h-0" : "flex-shrink-0")}>
+          <div className={cn("virtual-gamepad w-full pb-safe flex items-end pb-4", isExpanded ? "flex-1 min-h-0" : "flex-shrink-0")}>
             <VirtualGamepad
               onLocalInput={handleVirtualInput}
               active={gameStarted}
