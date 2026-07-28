@@ -314,7 +314,7 @@ export default function NetplayPlayingScreen({
             isFullscreen
               ? "flex-1 min-w-0 flex items-center justify-center"
               : isExpanded
-                ? "w-full"
+                ? "w-full flex-1 min-h-0 flex items-center justify-center"
                 : isMobile
                   ? "w-full flex-shrink-0"
                   : "w-full xl:flex-1 xl:min-w-0",

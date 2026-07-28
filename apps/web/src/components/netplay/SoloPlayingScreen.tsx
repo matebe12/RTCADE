@@ -121,7 +121,7 @@ export default function SoloPlayingScreen({
 
       <div
         data-tutorial="solo-emulator-stage"
-        className={cn(isMobile ? (isMaximized ? "relative w-full" : "flex-1 min-h-0 max-h-[55vh]") : "")}
+        className={cn(isMobile ? (isMaximized ? "relative w-full flex-1 min-h-0 flex items-center justify-center" : "flex-1 min-h-0 max-h-[55vh]") : "")}
       >
         {/* 최대화 모드 나가기 버튼 (캔버스 내) */}
         {isMaximized && (
