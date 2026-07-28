@@ -176,7 +176,7 @@ export default function NetplayWaitingScreen({
   const isLobbyChat = chatChannelState !== "open";
 
   return (
-    <div className="flex h-full w-full gap-3">
+    <div className="flex h-full w-full flex-col gap-3">
       <Card
         className="flex h-full w-full flex-col border-border/70 bg-card/95"
         data-tutorial="waiting-room-panel"
@@ -209,14 +209,14 @@ export default function NetplayWaitingScreen({
           <RoomCodeDisplay code={roomCode} />
 
           <div className="overflow-hidden rounded-xl border border-border/70 bg-background/45">
-            <div className="grid gap-0 sm:grid-cols-[180px_minmax(0,1fr)]">
+            <div className="flex flex-col">
               <div className="bg-black/30">
                 <ThumbnailImg
                   key={thumbnailKey}
                   src={thumbnailUrl}
                   fallback={fallbackThumbnailUrl}
                   alt={displayName}
-                  className="aspect-[4/3] h-full w-full object-contain"
+                  className="aspect-video w-full object-contain"
                 />
               </div>
 
@@ -500,21 +500,23 @@ export default function NetplayWaitingScreen({
       </AlertDialog>
 
       {chatOpen && (
-        <div className="w-80 shrink-0">
-          <NetplayChatPanel
-            open
-            messages={chatMessages}
-            draft={chatDraft}
-            onDraftChange={onChatDraftChange}
-            onSend={onSendChat}
-            chatChannelState={isLobbyChat ? "open" : chatChannelState}
-            localUser={myProfile}
-            remoteUser={opponentProfile ?? null}
-            inputRef={inputRef}
-            onCancel={onChatCancel}
-            isPeerTyping={isPeerTyping}
-            unreadCount={unreadChatCount}
-          />
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:relative sm:inset-auto sm:z-auto sm:bg-transparent sm:w-80 sm:shrink-0" onClick={(e) => { if (e.target === e.currentTarget) onChatCancel(); }}>
+          <div className="w-full max-h-[70vh] sm:max-h-none sm:w-80 rounded-t-2xl sm:rounded-none overflow-hidden shadow-2xl sm:shadow-none" onClick={(e) => e.stopPropagation()}>
+            <NetplayChatPanel
+              open
+              messages={chatMessages}
+              draft={chatDraft}
+              onDraftChange={onChatDraftChange}
+              onSend={onSendChat}
+              chatChannelState={isLobbyChat ? "open" : chatChannelState}
+              localUser={myProfile}
+              remoteUser={opponentProfile ?? null}
+              inputRef={inputRef}
+              onCancel={onChatCancel}
+              isPeerTyping={isPeerTyping}
+              unreadCount={unreadChatCount}
+            />
+          </div>
         </div>
       )}
     </div>

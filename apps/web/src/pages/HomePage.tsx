@@ -1,19 +1,17 @@
-import {
-  Activity,
-  ArrowRight,
-  Bell,
-  CalendarDays,
-  Gamepad2,
-  Radio,
-  Trophy,
-  Users,
-} from "lucide-react";
+import { Gamepad2, Play, Users, Zap } from "lucide-react";
 import { useCallback, useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 
 import { SYSTEM_OPTIONS } from "@/components/EmulatorPlayer";
 import { ThumbnailImg } from "@/components/ThumbnailImg";
-import { useOperationsNotices } from "@/hooks/useOperationsNotices";
+import { useOperationsStats } from "@/hooks/useOperationsStats";
+import { parseRomName } from "@/lib/game-names";
+import { getFallbackGameThumbnailUrl, getGameThumbnailUrl } from "@/lib/game-thumbnails";
+import type { PopularGameSummary } from "@/lib/operations-api";
+import { usePageSeo } from "@/lib/seo";
+import { getRecentGames, getUserProfile } from "@/lib/user-profile";
+import { useNetplayLobbyStore } from "@/stores/useNetplayLobbyStore";
+import { Badge, Button } from "@rtcade/ui";
 
 // 고퀄 조이스틱 — 받침대·소켓 고정, 레버+공이 좌우 흔들림
 function SpinningJoystick() {
@@ -63,30 +61,6 @@ function SpinningJoystick() {
     </svg>
   );
 }
-import { useOperationsStats } from "@/hooks/useOperationsStats";
-import { Badge } from "@rtcade/ui";
-import { Button } from "@rtcade/ui";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@rtcade/ui";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@rtcade/ui";
-import { ScrollArea } from "@rtcade/ui";
-import { parseRomName } from "@/lib/game-names";
-import { getFallbackGameThumbnailUrl, getGameThumbnailUrl } from "@/lib/game-thumbnails";
-import type { PopularGameSummary } from "@/lib/operations-api";
-import { usePageSeo } from "@/lib/seo";
-import {
-  getRecentGames,
-  getRecentOpponents,
-  getTotalPlayedCount,
-  getUserProfile,
-} from "@/lib/user-profile";
-import { useNetplayLobbyStore } from "@/stores/useNetplayLobbyStore";
 
 interface HomePageProps {
   hasProfile: boolean;
@@ -103,259 +77,67 @@ const relativeTimeFormatter = new Intl.DateTimeFormat("ko-KR", {
   day: "numeric",
 });
 
-interface PopularGamesCardProps {
-  emptyCopy: string;
-  games: PopularGameSummary[];
-  periodKey: PopularGamesPeriod;
-  title: string;
-}
-
-function buildPopularGameEntryHref(entry: "create-room" | "solo", game: PopularGameSummary) {
-  const searchParams = new URLSearchParams({ entry });
-
-  if (entry === "create-room") {
-    searchParams.set("visibility", "public");
-  }
-
-  if (game.romPath) {
-    searchParams.set("romPath", game.romPath);
-  }
-
-  if (game.core) {
-    searchParams.set("core", game.core);
-  }
-
-  return `/netplay?${searchParams.toString()}`;
-}
-
-function getPopularGameCoreLabel(core?: string) {
-  if (!core) {
-    return null;
-  }
-
-  return SYSTEM_OPTIONS.find((system) => system.value === core)?.label ?? core;
-}
-
-function getPopularGameFilename(romPath?: string) {
-  if (!romPath) {
-    return null;
-  }
-
+function getFilename(romPath?: string) {
+  if (!romPath) return null;
   return romPath.split("/").pop() ?? romPath;
 }
 
-function getPopularGameDisplayName(game: PopularGameSummary) {
-  const filename = getPopularGameFilename(game.romPath);
-
-  if (filename && game.core) {
-    return parseRomName(filename, game.core);
-  }
-
-  return game.gameName;
+function getCoreLabel(core?: string) {
+  if (!core) return null;
+  return SYSTEM_OPTIONS.find((system) => system.value === core)?.label ?? core;
 }
 
-function PopularGameSpotlightItem({
-  game,
-  index,
-}: {
-  game: PopularGameSummary;
-  index: number;
-}) {
+function PopularGameChip({ game }: { game: PopularGameSummary }) {
   const navigate = useNavigate();
   const resetLobby = useNetplayLobbyStore((store) => store.resetLobby);
-  const [previewOpen, setPreviewOpen] = useState(false);
-  const filename = getPopularGameFilename(game.romPath);
-  const displayName = getPopularGameDisplayName(game);
-  const coreLabel = getPopularGameCoreLabel(game.core);
+
+  const filename = getFilename(game.romPath);
+  const displayName = filename && game.core ? parseRomName(filename, game.core) : game.gameName;
+  const coreLabel = getCoreLabel(game.core);
   const thumbnailUrl = filename && game.core ? getGameThumbnailUrl(filename, game.core) : null;
-  const fallbackThumbnailUrl =
-    filename && game.core ? getFallbackGameThumbnailUrl(filename, game.core) : null;
-  const playHref = buildPopularGameEntryHref("create-room", game);
-  const thumbnailKey = thumbnailUrl ?? fallbackThumbnailUrl ?? "";
+  const fallbackUrl = filename && game.core ? getFallbackGameThumbnailUrl(filename, game.core) : null;
+  const thumbnailKey = thumbnailUrl ?? fallbackUrl ?? "";
 
-  const handleQuickCreateRoom = useCallback(() => {
-    resetLobby();
-    navigate(playHref);
-  }, [navigate, playHref, resetLobby]);
+  const href =
+    game.romPath && game.core
+      ? `/netplay?entry=create-room&visibility=public&romPath=${encodeURIComponent(game.romPath)}&core=${encodeURIComponent(game.core)}`
+      : "/netplay";
 
-  const handlePreviewQuickCreateRoom = useCallback(() => {
-    setPreviewOpen(false);
+  const handleClick = useCallback(() => {
     resetLobby();
-    navigate(playHref);
-  }, [navigate, playHref, resetLobby]);
+    navigate(href);
+  }, [navigate, href, resetLobby]);
 
   return (
-    <>
-      <div className="rounded-2xl border border-border/70 bg-background/55 px-2.5 py-2.5 sm:px-3 sm:py-3">
-        <div className="flex items-start gap-2.5 sm:gap-3">
-          <button
-            type="button"
-            onClick={() => setPreviewOpen(true)}
-            className="relative size-12 sm:size-16 shrink-0 overflow-hidden rounded-2xl border border-primary/15 bg-background/70 shadow-sm shadow-primary/10"
-            aria-label={`${displayName} 썸네일 크게 보기`}
-          >
-            {thumbnailUrl || fallbackThumbnailUrl ? (
-              <ThumbnailImg
-                key={thumbnailKey}
-                src={thumbnailUrl}
-                fallback={fallbackThumbnailUrl}
-                alt={displayName}
-                className="size-full object-cover"
-              />
-            ) : (
-              <div className="flex size-full items-center justify-center bg-gradient-to-br from-primary/15 via-background/40 to-background/80 text-primary/70">
-                <Gamepad2 className="size-6" />
-              </div>
-            )}
-            <div className="pointer-events-none absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-black/45 to-transparent" />
-            <span className="pointer-events-none absolute inset-x-0 bottom-1 text-center text-[9px] font-medium text-white hidden sm:block">
-              크게 보기
-            </span>
-          </button>
-
-          <div className="min-w-0 flex-1">
-            <div className="flex items-start justify-between gap-3">
-              <div className="flex min-w-0 flex-wrap items-center gap-2">
-                <span className="inline-flex size-6 shrink-0 items-center justify-center rounded-full border border-primary/20 bg-primary/10 text-[11px] font-semibold text-primary">
-                  {index + 1}
-                </span>
-                {coreLabel ? (
-                  <Badge variant="secondary" className="text-[10px]">
-                    {coreLabel}
-                  </Badge>
-                ) : null}
-              </div>
-
-              <div className="flex shrink-0 items-center gap-2">
-                <Button
-                  size="sm"
-                  className="h-8 rounded-full px-2.5 text-[11px] sm:px-3"
-                  aria-label={`${displayName} 공개방 만들기`}
-                  title={`${displayName} 공개방 만들기`}
-                  onClick={handleQuickCreateRoom}
-                >
-                  <Gamepad2 className="size-4" />
-                  <span className="hidden sm:inline">방 만들기</span>
-                </Button>
-              </div>
-            </div>
-
-            <div className="mt-2 truncate text-sm font-medium text-foreground">{displayName}</div>
-            <div className="mt-1 text-[11px] text-muted-foreground">
-              {numberFormatter.format(game.playCount)}회 플레이 · {formatPlayTime(game.totalPlayTimeMs)}
-            </div>
+    <button
+      type="button"
+      onClick={handleClick}
+      className="flex shrink-0 flex-col items-center gap-2 rounded-2xl border border-border/70 bg-card/80 p-3 transition-all active:scale-95 hover:border-primary/30 hover:bg-accent min-w-[100px] w-[100px]"
+    >
+      <div className="relative size-16 overflow-hidden rounded-xl border border-primary/15 bg-muted/50 shadow-sm">
+        {thumbnailUrl || fallbackUrl ? (
+          <ThumbnailImg
+            key={thumbnailKey}
+            src={thumbnailUrl}
+            fallback={fallbackUrl}
+            alt={displayName}
+            className="size-full object-cover"
+          />
+        ) : (
+          <div className="flex size-full items-center justify-center text-primary/50">
+            <Gamepad2 className="size-7" />
           </div>
-        </div>
+        )}
       </div>
-
-      <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
-        <DialogContent className="max-w-3xl overflow-hidden border-border/80 bg-card/95 p-0 shadow-2xl backdrop-blur-xl sm:rounded-2xl">
-          <div className="border-b border-border/70 bg-[radial-gradient(circle_at_top_left,rgba(0,160,255,0.16),transparent_28%),radial-gradient(circle_at_bottom_right,rgba(255,135,61,0.12),transparent_28%)] p-4 sm:p-5">
-            <div className="overflow-hidden rounded-2xl border border-primary/20 bg-black/40 shadow-lg shadow-primary/10">
-              {thumbnailUrl || fallbackThumbnailUrl ? (
-                <ThumbnailImg
-                  key={thumbnailKey}
-                  src={thumbnailUrl}
-                  fallback={fallbackThumbnailUrl}
-                  alt={displayName}
-                  className="aspect-[4/3] w-full object-contain"
-                />
-              ) : (
-                <div className="flex aspect-[4/3] w-full items-center justify-center text-muted-foreground">
-                  <Gamepad2 className="size-16" />
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div className="space-y-4 p-5">
-            <DialogHeader className="space-y-2 text-left">
-              <div className="flex flex-wrap items-center gap-2">
-                {coreLabel ? (
-                  <Badge variant="secondary" className="text-[10px]">
-                    {coreLabel}
-                  </Badge>
-                ) : null}
-                {filename ? <span className="text-xs text-muted-foreground">{filename}</span> : null}
-              </div>
-              <DialogTitle className="text-xl leading-tight text-foreground">{displayName}</DialogTitle>
-              <DialogDescription>
-                버튼을 누르면 이 게임으로 공개방이 즉시 만들어집니다.
-              </DialogDescription>
-            </DialogHeader>
-
-            <DialogFooter className="gap-2 border-t border-border/70 pt-4 sm:justify-between sm:space-x-0">
-              <Button type="button" variant="outline" onClick={() => setPreviewOpen(false)}>
-                닫기
-              </Button>
-              <Button
-                type="button"
-                title={`${displayName} 공개방 만들기`}
-                onClick={handlePreviewQuickCreateRoom}
-              >
-                <Gamepad2 className="size-4" />
-                <span>공개방 만들기</span>
-              </Button>
-            </DialogFooter>
-          </div>
-        </DialogContent>
-      </Dialog>
-    </>
-  );
-}
-
-function formatPlayTime(totalPlayTimeMs: number) {
-  const totalSeconds = Math.max(0, Math.floor(totalPlayTimeMs / 1000));
-  const hours = Math.floor(totalSeconds / 3600);
-  const minutes = Math.floor((totalSeconds % 3600) / 60);
-  const seconds = totalSeconds % 60;
-
-  if (hours > 0) {
-    return minutes > 0 ? `${hours}시간 ${minutes}분` : `${hours}시간`;
-  }
-
-  if (minutes > 0) {
-    return seconds > 0 ? `${minutes}분 ${seconds}초` : `${minutes}분`;
-  }
-
-  return `${Math.max(1, seconds)}초`;
-}
-
-function PopularGamesCard({ emptyCopy, games, periodKey, title }: PopularGamesCardProps) {
-  return (
-    <div className="flex h-full flex-col rounded-[24px] border border-primary/20 bg-background/80 p-4 shadow-sm shadow-primary/5">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <div className="text-xs text-muted-foreground">{title}</div>
-          <div className="mt-1 text-sm text-muted-foreground">
-            {games.length > 0
-              ? `${numberFormatter.format(games.length)}개 인기 게임에서 바로 시작할 수 있어요.`
-              : emptyCopy}
-          </div>
-        </div>
-        <Badge variant="secondary" className="w-fit text-[10px]">
-          Top 5
+      <span className="w-full truncate text-center text-[11px] font-medium leading-tight text-foreground">
+        {displayName}
+      </span>
+      {coreLabel && (
+        <Badge variant="secondary" className="text-[9px] px-1.5 py-0">
+          {coreLabel}
         </Badge>
-      </div>
-
-      {games.length > 0 ? (
-        <ScrollArea className="mt-4 min-h-0 flex-1">
-          <div className="space-y-3 pr-1 sm:pr-3">
-            {games.map((game, index) => (
-              <PopularGameSpotlightItem
-                key={`${periodKey}-${game.gameName}-${game.romPath ?? index}-${game.core ?? "unknown"}`}
-                game={game}
-                index={index}
-              />
-            ))}
-          </div>
-        </ScrollArea>
-      ) : (
-        <div className="mt-4 rounded-2xl border border-dashed border-border/70 bg-background/35 px-4 py-8 text-center text-sm text-muted-foreground">
-          {emptyCopy}
-        </div>
       )}
-    </div>
+    </button>
   );
 }
 
@@ -363,416 +145,183 @@ export default function HomePage({ hasProfile }: HomePageProps) {
   usePageSeo({
     title: "홈",
     description:
-      "브라우저에서 레트로 게임을 같이하거나 혼자 플레이하고, 방문 통계와 인기 게임, 최근 플레이 기록을 확인하세요.",
+      "브라우저에서 레트로 게임을 같이하거나 혼자 플레이할 수 있어요. 인기 게임을 바로 확인하고 시작해보세요.",
   });
 
-  const { error: noticeError, isLoading: noticesLoading, notices } = useOperationsNotices();
-  const { error: statsError, isLoading: statsLoading, stats, updatedAt } = useOperationsStats();
-  const profile = getUserProfile();
+  const { stats } = useOperationsStats();
+  const profile = hasProfile ? getUserProfile() : null;
   const recentGames = getRecentGames();
-  const recentOpponents = getRecentOpponents();
-  const totalPlayedCount = getTotalPlayedCount();
-  const previewNotices = notices.slice(0, 3);
   const recentGame = recentGames[0] ?? null;
-  const recentOpponent = recentOpponents[0] ?? null;
-  const activeRooms = stats?.activeRooms ?? 0;
+  const [activePeriod, setActivePeriod] = useState<PopularGamesPeriod>("today");
+
   const connectedPlayers = stats?.connectedPlayers ?? 0;
-  const activeNetplayRooms = stats?.activeNetplayRooms ?? 0;
-  const soloSessions = stats?.soloSessions ?? 0;
-  const openRooms = stats?.openRooms ?? 0;
-  const waitingRooms = stats?.waitingRooms ?? 0;
+  const todayGames = stats?.todayGames ?? 0;
+  const totalVisitors = stats?.totalVisitors ?? 0;
+  const totalGames = stats?.totalGames ?? 0;
   const todayPopularGames = stats?.todayPopularGames ?? [];
   const weeklyPopularGames = stats?.weeklyPopularGames ?? [];
   const monthlyPopularGames = stats?.monthlyPopularGames ?? [];
-  const [activePopularPeriod, setActivePopularPeriod] = useState<PopularGamesPeriod>("today");
 
-  const popularGamesSections: Array<{
-    emptyCopy: string;
-    games: PopularGameSummary[];
+  const periodOptions: Array<{
     key: PopularGamesPeriod;
     label: string;
-    title: string;
+    games: PopularGameSummary[];
   }> = [
-    {
-      key: "today",
-      label: "오늘",
-      title: "오늘 가장 많이 플레이된 게임",
-      games: todayPopularGames,
-      emptyCopy: "오늘 기록이 쌓이면 자동으로 보여드려요.",
-    },
-    {
-      key: "weekly",
-      label: "이번 주",
-      title: "이번 주 가장 많이 플레이된 게임",
-      games: weeklyPopularGames,
-      emptyCopy: "주간 기록이 쌓이면 자동으로 보여드려요.",
-    },
-    {
-      key: "monthly",
-      label: "이번 달",
-      title: "이번 달 가장 많이 플레이된 게임",
-      games: monthlyPopularGames,
-      emptyCopy: "월간 기록이 쌓이면 자동으로 보여드려요.",
-    },
+    { key: "today", label: "오늘", games: todayPopularGames },
+    { key: "weekly", label: "이번 주", games: weeklyPopularGames },
+    { key: "monthly", label: "이번 달", games: monthlyPopularGames },
   ];
-  const activePopularSection =
-    popularGamesSections.find((section) => section.key === activePopularPeriod) ??
-    popularGamesSections[0];
 
-  const recentPlayDescription = recentGame
-    ? recentOpponent
-      ? `${recentOpponent.nickname}님과 ${recentGame.displayName}을 플레이했어요.`
-      : `${recentGame.displayName}을 최근에 플레이했어요.`
-    : hasProfile
-      ? "첫 게임을 시작하면 최근 플레이 기록이 여기에 쌓여요."
-      : "프로필을 만들고 게임을 시작하면 최근 기록을 바로 볼 수 있어요.";
+  const activeGames =
+    periodOptions.find((p) => p.key === activePeriod)?.games ?? todayPopularGames;
 
   return (
-    <div className="flex w-full flex-col gap-6 lg:gap-8">
-      {recentGames.length === 0 && (
-        <section className="overflow-hidden rounded-[28px] border border-primary/30 bg-gradient-to-br from-primary/15 via-card/95 to-card/80 p-6 shadow-sm shadow-primary/10 lg:p-8">
-          <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div className="space-y-2">
-              <Badge variant="secondary" className="w-fit text-[10px]">
-                처음 오셨나요?
-              </Badge>
-              <h2 className="text-2xl font-semibold tracking-tight text-foreground lg:text-3xl">
-                지금 바로 레트로 게임을 시작해보세요!
-              </h2>
-              <p className="max-w-xl text-sm leading-6 text-muted-foreground">
-                브라우저에서 바로 실행되는 레트로 게임. 친구와 함께하거나 혼자서도 즐길 수 있어요.
-              </p>
-            </div>
-            <Button asChild size="lg" className="shrink-0 animate-bounce gap-2 font-bold tracking-tight shadow-lg shadow-primary/50">
-              <NavLink to="/netplay">
-                플레이 시작
-                <SpinningJoystick />
-              </NavLink>
-            </Button>
+    <div className="flex w-full flex-col gap-8 pb-8">
+      {/* Hero Section */}
+      <section className="relative overflow-hidden rounded-[28px] border border-primary/25 bg-gradient-to-br from-primary/10 via-card/90 to-card/80 px-6 py-10 text-center shadow-sm shadow-primary/10 sm:px-10 sm:py-14">
+        <div className="relative z-10 mx-auto flex max-w-md flex-col items-center gap-4">
+          <h1 className="font-arcade text-lg text-primary tracking-wide">RTCADE</h1>
+          <p className="text-sm leading-6 text-muted-foreground">
+            브라우저에서 바로 실행되는 레트로 게임.
+            <br className="hidden sm:block" /> 친구와 함께하거나 혼자서도 즐길 수 있어요.
+          </p>
+
+          <div className="flex items-center gap-3 text-xs text-muted-foreground">
+            <span>
+              총 방문자{" "}
+              <strong className="tabular-nums text-foreground">
+                {stats ? `${numberFormatter.format(totalVisitors)}명` : "--"}
+              </strong>
+            </span>
+            <span className="text-border" aria-hidden>·</span>
+            <span>
+              총 플레이{" "}
+              <strong className="tabular-nums text-foreground">
+                {stats ? `${numberFormatter.format(totalGames)}판` : "--"}
+              </strong>
+            </span>
           </div>
-        </section>
+
+          <Button asChild size="lg" className="mt-2 gap-2 font-bold tracking-tight shadow-lg shadow-primary/40">
+            <NavLink to="/netplay" data-tutorial="home-play-start">
+              <Play className="size-4" />
+              플레이 시작하기
+              <SpinningJoystick />
+            </NavLink>
+          </Button>
+        </div>
+      </section>
+
+      {/* Compact Stats Row */}
+      <div className="flex gap-3">
+        <div className="flex flex-1 items-center gap-3 rounded-2xl border border-border/70 bg-card/80 px-4 py-3.5">
+          <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10">
+            <Users className="size-5 text-primary" />
+          </div>
+          <div className="min-w-0">
+            <div className="text-lg font-semibold tabular-nums text-foreground">
+              {stats ? `${numberFormatter.format(connectedPlayers)}명` : "--"}
+            </div>
+            <div className="text-xs text-muted-foreground">접속 중</div>
+          </div>
+          <span className="ml-auto size-2 shrink-0 rounded-full bg-emerald-500" title="실시간" />
+        </div>
+
+        <div className="flex flex-1 items-center gap-3 rounded-2xl border border-border/70 bg-card/80 px-4 py-3.5">
+          <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10">
+            <Zap className="size-5 text-primary" />
+          </div>
+          <div className="min-w-0">
+            <div className="text-lg font-semibold tabular-nums text-foreground">
+              {stats ? `${numberFormatter.format(todayGames)}판` : "--"}
+            </div>
+            <div className="text-xs text-muted-foreground">오늘 플레이</div>
+          </div>
+          <span className="ml-auto size-2 shrink-0 rounded-full bg-emerald-500" title="실시간" />
+        </div>
+      </div>
+
+      {/* Popular Games */}
+      <section className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-foreground">인기 게임</h2>
+          <div className="flex gap-1.5">
+            {periodOptions.map(({ key, label }) => (
+              <Button
+                key={key}
+                type="button"
+                size="sm"
+                variant={key === activePeriod ? "default" : "outline"}
+                className="h-8 rounded-full px-3 text-xs"
+                onClick={() => setActivePeriod(key)}
+              >
+                {label}
+              </Button>
+            ))}
+          </div>
+        </div>
+
+        {activeGames.length > 0 ? (
+          <div className="-mx-4 sm:mx-0">
+            <div className="flex gap-2.5 overflow-x-auto px-4 sm:px-0 pb-2 scrollbar-none snap-x snap-mandatory">
+              {activeGames.map((game, index) => (
+                <PopularGameChip
+                  key={`${activePeriod}-${game.gameName}-${game.romPath ?? index}-${game.core ?? "unknown"}`}
+                  game={game}
+                />
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div className="rounded-2xl border border-dashed border-border/70 bg-background/50 px-4 py-10 text-center text-sm text-muted-foreground">
+            아직 기록이 쌓이지 않았어요. 게임을 시작하면 여기에 인기 게임이 표시됩니다.
+          </div>
+        )}
+      </section>
+
+      {/* Recent Activity (only if has profile and played before) */}
+      {profile && recentGame && (
+        <RecentActivityBar recentGame={recentGame} />
       )}
-
-      <section className="grid gap-4 lg:grid-cols-[1.4fr_0.8fr]">
-        <Card className="overflow-hidden border-border/70 bg-card/95">
-          <CardHeader className="space-y-4">
-            <Badge variant="secondary" className="w-fit text-[10px]">
-              내 플레이
-            </Badge>
-            <div className="space-y-3">
-              <CardTitle className="max-w-3xl text-3xl leading-tight lg:text-4xl">
-                {profile
-                  ? `${profile.nickname}님의 최근 플레이 기록이에요.`
-                  : "내 플레이 기록을 여기서 확인할 수 있어요."}
-              </CardTitle>
-              <CardDescription className="max-w-2xl text-sm leading-6 text-muted-foreground">
-                {recentPlayDescription}
-              </CardDescription>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid gap-3 sm:grid-cols-3 sm:items-stretch">
-              <div className="flex h-full flex-col rounded-lg border border-border/70 bg-background/50 p-4">
-                <div className="flex min-h-4 items-center gap-2 text-xs text-muted-foreground">
-                  <Gamepad2 className="size-3.5 text-primary" />
-                  최근 한 게임
-                </div>
-                <div className="mt-2 min-h-[2.75rem] text-sm font-medium text-foreground">
-                  {recentGame ? recentGame.displayName : "아직 기록이 없어요."}
-                </div>
-                <div className="mt-auto pt-1 text-xs text-muted-foreground">
-                  {recentGame
-                    ? `${relativeTimeFormatter.format(recentGame.playedAt)}에 플레이`
-                    : "첫 플레이를 시작해보세요."}
-                </div>
-              </div>
-
-              <div className="flex h-full flex-col rounded-lg border border-border/70 bg-background/50 p-4">
-                <div className="min-h-4 text-xs text-muted-foreground">내 브라우저 플레이</div>
-                <div className="mt-2 min-h-[2.75rem] text-2xl font-semibold text-foreground">
-                  {numberFormatter.format(totalPlayedCount)}판
-                </div>
-                <div className="mt-auto pt-1 text-xs text-muted-foreground">
-                  이 기기에서 플레이할 때마다 개인 기록으로 쌓여요.
-                </div>
-              </div>
-
-              <div className="flex h-full flex-col rounded-lg border border-border/70 bg-background/50 p-4">
-                <div className="min-h-4 text-xs text-muted-foreground">최근 함께한 상대</div>
-                <div className="mt-2 min-h-[2.75rem] text-sm font-medium text-foreground">
-                  {recentOpponent
-                    ? `${recentOpponent.avatar} ${recentOpponent.nickname}`
-                    : "아직 없어요."}
-                </div>
-                <div className="mt-auto pt-1 text-xs text-muted-foreground">
-                  {recentOpponent
-                    ? `${recentOpponent.playCount}번 함께 플레이했어요.`
-                    : "대전을 시작하면 상대 기록도 남아요."}
-                </div>
-              </div>
-            </div>
-
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-              <div className="flex flex-wrap gap-3">
-                <Button asChild size="lg" className="animate-bounce gap-2 font-bold tracking-tight shadow-md shadow-primary/40">
-                  <NavLink to="/netplay" data-tutorial="home-play-start">
-                    플레이 시작
-                    <SpinningJoystick />
-                  </NavLink>
-                </Button>
-                <Button asChild variant="outline" size="lg">
-                  <NavLink to="/notices">공지사항 보기</NavLink>
-                </Button>
-              </div>
-
-              <div className="rounded-lg border border-border/70 bg-background/60 px-3 py-2 text-xs text-muted-foreground">
-                인기 게임 목록에서 바로 같이하거나 혼자 시작할 수 있어요.
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-border/70 bg-card/95">
-          <CardHeader>
-            <div className="flex items-center gap-2 text-sm font-medium text-foreground">
-              <Bell className="size-4 text-primary" />
-              공지사항
-            </div>
-            <CardDescription>최근 올라온 공지를 먼저 보여드릴게요.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="rounded-lg border border-primary/20 bg-primary/5 p-4 text-sm leading-6 text-muted-foreground">
-              {stats
-                ? `현재 이용 현황은 방문 ${numberFormatter.format(stats.totalVisitors)}명, 실시간 세션 ${numberFormatter.format(activeRooms)}개, 누적 플레이 ${numberFormatter.format(stats.totalGames)}판 기준으로 갱신되고 있어요.`
-                : "실시간 운영 지표를 불러오는 중이에요."}
-            </div>
-            {noticesLoading ? (
-              <div className="rounded-lg border border-dashed border-border/70 bg-background/40 p-4 text-sm text-muted-foreground">
-                공지 목록을 불러오는 중입니다.
-              </div>
-            ) : noticeError ? (
-              <div className="rounded-lg border border-dashed border-border/70 bg-background/40 p-4 text-sm text-muted-foreground">
-                {noticeError}
-              </div>
-            ) : previewNotices.length === 0 ? (
-              <div className="rounded-lg border border-dashed border-border/70 bg-background/40 p-4 text-sm text-muted-foreground">
-                아직 공지가 없어요. 새 소식이 올라오면 여기에서 바로 볼 수 있어요.
-              </div>
-            ) : (
-              previewNotices.map((notice) => (
-                <div
-                  key={notice.id}
-                  className="rounded-lg border border-border/70 bg-background/50 p-4"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="space-y-2">
-                      <div className="text-sm font-medium text-foreground">{notice.title}</div>
-                      <div className="line-clamp-2 text-sm leading-6 text-muted-foreground">
-                        {notice.body}
-                      </div>
-                    </div>
-                    {notice.isPinned && (
-                      <Badge variant="secondary" className="text-[10px]">
-                        고정
-                      </Badge>
-                    )}
-                  </div>
-                </div>
-              ))
-            )}
-            <Button asChild variant="ghost" className="w-fit px-0 text-sm">
-              <NavLink to="/notices">
-                공지사항 전체 보기
-                <ArrowRight className="size-4" />
-              </NavLink>
-            </Button>
-          </CardContent>
-        </Card>
-      </section>
-
-      <section className="overflow-hidden rounded-[28px] border border-border/70 bg-card/95">
-        <div className="flex flex-col gap-3 border-b border-border/70 px-5 py-5 lg:flex-row lg:items-end lg:justify-between lg:px-6">
-          <div className="space-y-2">
-            <Badge variant="secondary" className="w-fit text-[10px]">
-              실시간 운영
-            </Badge>
-            <div className="space-y-1">
-              <h2 className="text-2xl font-semibold tracking-tight text-foreground lg:text-3xl">
-                실시간 이용 현황
-              </h2>
-              <p className="text-sm leading-6 text-muted-foreground">
-                방문, 플레이, 인기 게임 흐름을 한 번에 확인할 수 있어요.
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2 self-start rounded-full border border-primary/20 bg-primary/5 px-3 py-1.5 text-xs text-muted-foreground lg:self-auto">
-            <span className="size-2 rounded-full bg-primary" />
-            {statsLoading
-              ? "데이터 동기화 중"
-              : statsError
-                ? statsError
-                : `마지막 반영 ${updatedAt ? relativeTimeFormatter.format(updatedAt) : "방금 전"}`}
-          </div>
-        </div>
-
-        <div className="grid gap-4 p-4 lg:grid-cols-[1.45fr_0.95fr]">
-          <div className="flex h-full flex-col gap-4 rounded-[24px] bg-gradient-to-br from-primary/10 via-background/70 to-background/40 p-4 lg:p-5">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <div className="text-xs font-medium uppercase tracking-[0.2em] text-primary">
-                  Live Overview
-                </div>
-                <div className="mt-1 text-lg font-semibold text-foreground">실시간 이용 현황</div>
-              </div>
-              <Activity className="size-5 text-primary" />
-            </div>
-
-            <div className="grid gap-4 md:grid-cols-3">
-              <div className="rounded-[22px] border border-primary/15 bg-background/80 px-5 py-5 shadow-sm shadow-primary/5 lg:px-6">
-                <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-                  <Users className="size-3.5 text-primary" />총 방문자
-                </div>
-                <div className="mt-3 text-4xl font-semibold tracking-tight text-foreground lg:text-5xl">
-                  {stats ? `${numberFormatter.format(stats.totalVisitors)}명` : "--"}
-                </div>
-                <p className="mt-2 text-sm text-muted-foreground">
-                  {stats
-                    ? `오늘 신규 방문은 ${numberFormatter.format(stats.todayVisitors)}명이에요.`
-                    : "방문 지표를 불러오는 중이에요."}
-                </p>
-              </div>
-
-              <div className="rounded-[22px] border border-primary/15 bg-background/80 px-5 py-5 shadow-sm shadow-primary/5 lg:px-6">
-                <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-                  <Activity className="size-3.5 text-primary" />
-                  지금 게임 중
-                </div>
-                <div className="mt-3 text-4xl font-semibold tracking-tight text-foreground lg:text-5xl">
-                  {stats ? `${numberFormatter.format(activeRooms)}개` : "--"}
-                </div>
-                <p className="mt-2 text-sm text-muted-foreground">
-                  {stats
-                    ? `${connectedPlayers}명이 ${activeRooms}개 세션에서 플레이 중이에요.`
-                    : "실시간 세션을 불러오는 중이에요."}
-                </p>
-              </div>
-
-              <div className="rounded-[22px] border border-primary/15 bg-background/80 px-5 py-5 shadow-sm shadow-primary/5 lg:px-6">
-                <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-                  <Gamepad2 className="size-3.5 text-primary" />총 플레이 게임
-                </div>
-                <div className="mt-3 text-4xl font-semibold tracking-tight text-foreground lg:text-5xl">
-                  {stats ? `${numberFormatter.format(stats.totalGames)}판` : "--"}
-                </div>
-                <p className="mt-2 text-sm text-muted-foreground">
-                  {stats
-                    ? `오늘 시작된 게임은 ${numberFormatter.format(stats.todayGames)}판이에요.`
-                    : "플레이 기록을 불러오는 중이에요."}
-                </p>
-              </div>
-            </div>
-
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="space-y-4 rounded-[22px] border border-primary/15 bg-background/75 px-5 py-5 shadow-sm shadow-primary/5 lg:px-6">
-                <div className="flex items-center gap-2 text-sm font-medium text-foreground">
-                  <Radio className="size-4 text-primary" />
-                  실시간 모드 분포
-                </div>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div className="rounded-2xl border border-border/70 bg-card/80 p-4">
-                    <div className="text-xs text-muted-foreground">넷플레이 세션</div>
-                    <div className="mt-2 text-3xl font-semibold text-foreground">
-                      {stats ? `${numberFormatter.format(activeNetplayRooms)}개` : "--"}
-                    </div>
-                    <div className="mt-1 text-xs text-muted-foreground">
-                      열린 방 {numberFormatter.format(openRooms)}개 · 대기{" "}
-                      {numberFormatter.format(waitingRooms)}개
-                    </div>
-                  </div>
-                  <div className="rounded-2xl border border-border/70 bg-card/80 p-4">
-                    <div className="text-xs text-muted-foreground">혼자하기 세션</div>
-                    <div className="mt-2 text-3xl font-semibold text-foreground">
-                      {stats ? `${numberFormatter.format(soloSessions)}개` : "--"}
-                    </div>
-                    <div className="mt-1 text-xs text-muted-foreground">
-                      상대 연결 없이 바로 실행된 플레이예요.
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="space-y-4 rounded-[22px] border border-primary/15 bg-background/75 px-5 py-5 shadow-sm shadow-primary/5 lg:px-6">
-                <div className="flex items-center gap-2 text-sm font-medium text-foreground">
-                  <CalendarDays className="size-4 text-primary" />
-                  오늘 흐름
-                </div>
-                <div className="space-y-3">
-                  <div className="flex items-start justify-between gap-3 border-b border-border/70 pb-3">
-                    <div>
-                      <div className="text-sm font-medium text-foreground">오늘 방문자</div>
-                      <div className="text-xs text-muted-foreground">오늘 들어온 사용자 수</div>
-                    </div>
-                    <div className="text-right text-2xl font-semibold text-foreground">
-                      {stats ? `${numberFormatter.format(stats.todayVisitors)}명` : "--"}
-                    </div>
-                  </div>
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <div className="text-sm font-medium text-foreground">오늘 시작된 게임</div>
-                      <div className="text-xs text-muted-foreground">기록된 전체 시작 수</div>
-                    </div>
-                    <div className="text-right text-2xl font-semibold text-foreground">
-                      {stats ? `${numberFormatter.format(stats.todayGames)}판` : "--"}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <aside
-            className="flex h-full min-h-0 flex-col overflow-hidden rounded-[24px] bg-gradient-to-br from-primary/10 via-background/70 to-background/40 px-5 py-5 lg:px-6"
-            aria-label="인기 게임 스포트라이트"
-          >
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <div className="text-xs font-medium uppercase tracking-[0.2em] text-primary">
-                  Popular Now
-                </div>
-                <div className="mt-1 text-lg font-semibold text-foreground">
-                  인기 게임 스포트라이트
-                </div>
-              </div>
-              <Trophy className="size-5 text-primary" />
-            </div>
-
-            <div className="mt-4 flex min-h-0 flex-1 flex-col gap-4">
-              <div className="flex flex-wrap gap-2">
-                {popularGamesSections.map((section) => (
-                  <Button
-                    key={section.key}
-                    type="button"
-                    size="sm"
-                    variant={section.key === activePopularPeriod ? "default" : "outline"}
-                    className="h-8 rounded-full px-3 text-[11px]"
-                    onClick={() => setActivePopularPeriod(section.key)}
-                  >
-                    {section.label}
-                  </Button>
-                ))}
-              </div>
-
-              <PopularGamesCard
-                periodKey={activePopularSection.key}
-                title={activePopularSection.title}
-                games={activePopularSection.games}
-                emptyCopy={activePopularSection.emptyCopy}
-              />
-            </div>
-          </aside>
-        </div>
-      </section>
     </div>
+  );
+}
+
+function RecentActivityBar({ recentGame }: { recentGame: { displayName: string; romPath: string; core: string; playedAt: number } }) {
+  const navigate = useNavigate();
+  const resetLobby = useNetplayLobbyStore((store) => store.resetLobby);
+
+  const href = `/netplay?entry=create-room&romPath=${encodeURIComponent(recentGame.romPath)}&core=${encodeURIComponent(recentGame.core)}`;
+
+  const handlePlayAgain = useCallback(() => {
+    resetLobby();
+    navigate(href);
+  }, [navigate, href, resetLobby]);
+
+  return (
+    <section className="rounded-2xl border border-border/70 bg-card/80 px-4 py-3.5">
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <div className="text-xs text-muted-foreground">최근 플레이</div>
+          <div className="mt-0.5 flex items-baseline gap-2">
+            <span className="truncate text-sm font-medium text-foreground">
+              {recentGame.displayName}
+            </span>
+            <span className="shrink-0 text-xs text-muted-foreground">
+              {relativeTimeFormatter.format(recentGame.playedAt)}
+            </span>
+          </div>
+        </div>
+        <Button
+          type="button"
+          size="sm"
+          className="h-9 shrink-0 rounded-full px-4 text-xs"
+          onClick={handlePlayAgain}
+        >
+          <Play className="size-3.5" />
+          다시하기
+        </Button>
+      </div>
+    </section>
   );
 }
