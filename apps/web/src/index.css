@@ -300,9 +300,10 @@
   padding-right: env(safe-area-inset-right, 8px);
 }
 
-/* 모바일 최대화 시 헤더/nav/공지 배너 숨김 + pull-to-refresh 방지 + 전체 높이 flex 체인 */
+/* 모바일 최대화 시 헤더/nav/공지 배너 숨김 + pull-to-refresh 방지 + 스크롤 방지 + 전체 높이 flex 체인 */
 body.mobile-maximized {
   overscroll-behavior: none;
+  overflow: hidden;
 }
 
 body.mobile-maximized #root {

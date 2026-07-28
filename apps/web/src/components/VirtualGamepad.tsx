@@ -112,7 +112,7 @@ export default function VirtualGamepad({
       zone,
       mode: "static",
       position: { top: "50%", left: "50%" },
-      size: 120,
+      size: 100,
       threshold: 0.35,
       color: dpadColor,
       restJoystick: true,
@@ -333,7 +333,7 @@ export default function VirtualGamepad({
           <div
             ref={dpadZoneRef}
             className="relative shrink-0"
-            style={{ width: 120, height: 120 }}
+            style={{ width: 100, height: 100 }}
           />
         </div>
 
@@ -414,7 +414,7 @@ export default function VirtualGamepad({
       <div
         ref={dpadZoneRef}
         className="relative shrink-0"
-        style={{ width: 120, height: 120 }}
+        style={{ width: 100, height: 100 }}
       />
 
       {/* ── Button area (right) — native touch events via ref ── */}
