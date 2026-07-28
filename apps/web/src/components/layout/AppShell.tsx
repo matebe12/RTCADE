@@ -39,7 +39,7 @@ export default function AppShell({ profile, onOpenProfile }: AppShellProps) {
   const { showLeftRail, showRightRail } = useAdVisibility();
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="flex min-h-dvh flex-col bg-background text-foreground">
       <div className="pointer-events-none fixed inset-0 -z-10 bg-[radial-gradient(circle_at_top,rgba(0,160,255,0.14),transparent_32%),radial-gradient(circle_at_bottom_right,rgba(255,135,61,0.12),transparent_22%)]" />
 
       <header className="sticky top-0 z-40 border-b border-border/70 bg-background/86 backdrop-blur-xl">
@@ -160,11 +160,11 @@ export default function AppShell({ profile, onOpenProfile }: AppShellProps) {
         </div>
       )}
 
-      <main className="mx-auto flex w-full max-w-[104rem] gap-6 px-4 py-8 lg:py-10 xl:px-6">
+      <main className="mx-auto flex w-full max-w-[104rem] flex-1 min-h-0 gap-6 px-4 py-8 lg:py-10 xl:px-6">
         <SideRailAd placement="left" visible={showLeftRail} />
 
-        <div className="min-w-0 flex-1">
-          <div className="mx-auto flex w-full max-w-6xl flex-1">
+        <div className="min-w-0 flex-1 flex flex-col min-h-0">
+          <div className="mx-auto flex w-full max-w-6xl flex-1 min-h-0">
             <Outlet />
           </div>
         </div>

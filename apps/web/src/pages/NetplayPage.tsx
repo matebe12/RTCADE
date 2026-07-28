@@ -33,7 +33,7 @@ export default function NetplayPage({ hasProfile }: { hasProfile: boolean }) {
         className={
           showHeroCard
             ? "grid w-full gap-4 lg:grid-cols-[0.8fr_1.2fr] lg:items-stretch"
-            : "flex w-full"
+            : "flex w-full flex-1 min-h-0"
         }
       >
         {showHeroCard && (
@@ -74,7 +74,7 @@ export default function NetplayPage({ hasProfile }: { hasProfile: boolean }) {
           </Card>
         )}
 
-        <div className="min-w-0 w-full lg:h-full">
+        <div className="min-w-0 w-full h-full flex flex-col min-h-0">
           {/* 모바일 안내 — 게임 시작 전 메뉴 화면에서만 표시 */}
           {isMobile && showHeroCard && (
             <div className="mb-4 rounded-lg border border-border/70 bg-card/80 px-4 py-3 text-xs text-muted-foreground">
