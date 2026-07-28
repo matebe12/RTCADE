@@ -43,14 +43,26 @@ export default function SoloPlayingScreen({
   const isMobile = useMobileDetect();
   const [isMaximized, setIsMaximized] = useState(false);
 
-  // 모바일 최대화 시 AppShell 헤더/nav 숨김
+  // 모바일 최대화 시 AppShell 헤더/nav 숨김 + 가로모드 전환
   useEffect(() => {
     if (isMaximized) {
       document.body.classList.add("mobile-maximized");
+      // Screen Orientation API: 가로모드 요청
+      if (screen.orientation?.lock) {
+        screen.orientation.lock("landscape").catch(() => {});
+      }
     } else {
       document.body.classList.remove("mobile-maximized");
+      if (screen.orientation?.unlock) {
+        screen.orientation.unlock();
+      }
     }
-    return () => { document.body.classList.remove("mobile-maximized"); };
+    return () => {
+      document.body.classList.remove("mobile-maximized");
+      if (screen.orientation?.unlock) {
+        screen.orientation.unlock();
+      }
+    };
   }, [isMaximized]);
 
   // Android 뒤로가기 두 번 터치로 종료
@@ -121,7 +133,7 @@ export default function SoloPlayingScreen({
 
       <div
         data-tutorial="solo-emulator-stage"
-        className={cn(isMobile ? (isMaximized ? "relative w-full flex-1 min-h-0 flex items-center justify-center" : "flex-1 min-h-0 max-h-[55vh]") : "")}
+        className={cn(isMobile ? (isMaximized ? "relative w-full flex-1 min-h-0 flex items-center justify-center game-area-landscape" : "flex-1 min-h-0 max-h-[55vh]") : "")}
       >
         {/* 최대화 모드 나가기 버튼 (캔버스 내) */}
         {isMaximized && (
@@ -152,8 +164,17 @@ export default function SoloPlayingScreen({
 
       {/* Virtual gamepad — mobile only, always visible */}
       {isMobile && (
-        <div className={cn("virtual-gamepad w-full pb-safe flex items-end pt-6 pb-4 mt-auto", "flex-shrink-0")}>
-          <VirtualGamepad onLocalInput={handleVirtualInput} active />
+        <div className={cn(
+          "virtual-gamepad flex-shrink-0",
+          isMaximized
+            ? "fixed inset-0 z-30 pointer-events-none"
+            : "w-full pb-safe flex items-end pt-6 pb-4 mt-auto",
+        )}>
+          <VirtualGamepad
+            onLocalInput={handleVirtualInput}
+            active
+            landscape={isMaximized}
+          />
         </div>
       )}
     </div>

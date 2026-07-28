@@ -275,6 +275,18 @@
   }
 }
 
+/* 가로모드 최대화 게임패드 패널 너비 */
+:root {
+  --gamepad-panel-width: 160px;
+}
+
+/* L/R 버튼 (가로모드 패널 내 중간 크기) */
+.action-btn--lr {
+  width: 48px;
+  height: 48px;
+  @apply text-sm;
+}
+
 /* 세이프 에어리어 */
 .pb-safe {
   padding-bottom: env(safe-area-inset-bottom, 8px);
@@ -302,4 +314,10 @@ body.mobile-maximized #root {
 body.mobile-maximized header,
 body.mobile-maximized [data-pinned-notice] {
   display: none !important;
+}
+
+/* 가로모드 최대화 시 게임 영역 좌우 패딩 (패널 너비만큼) */
+body.mobile-maximized .game-area-landscape {
+  padding-left: var(--gamepad-panel-width, 160px);
+  padding-right: var(--gamepad-panel-width, 160px);
 }

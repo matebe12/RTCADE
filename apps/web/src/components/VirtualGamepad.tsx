@@ -58,6 +58,8 @@ interface VirtualGamepadProps {
   onLocalInput: (button: number, down: boolean) => void;
   /** false면 터치 영역이 렌더링되지만 입력은 무시됨 (게임 시작 전) */
   active?: boolean;
+  /** 가로모드 최대화: 좌우 fixed 패널로 D-Pad와 버튼을 분산 배치 */
+  landscape?: boolean;
 }
 
 /* ------------------------------------------------------------------ */
@@ -67,6 +69,7 @@ interface VirtualGamepadProps {
 export default function VirtualGamepad({
   onLocalInput,
   active = true,
+  landscape = false,
 }: VirtualGamepadProps) {
   /* ---- refs ---- */
   const dpadZoneRef = useRef<HTMLDivElement>(null);
@@ -293,7 +296,114 @@ export default function VirtualGamepad({
     };
   }, []);
 
-  /* ---- Render ---- */
+  /* ---- Landscape render: 좌우 fixed 패널 ---- */
+  if (landscape) {
+    return (
+      <>
+        {/* Left panel: D-Pad + L button */}
+        <div
+          className="fixed left-0 top-0 bottom-0 z-40 flex flex-col items-center justify-center gap-4 bg-black pointer-events-auto"
+          style={{ width: "var(--gamepad-panel-width, 160px)", touchAction: "manipulation" }}
+          onContextMenu={(e) => e.preventDefault()}
+        >
+          <div
+            ref={dpadZoneRef}
+            className="relative shrink-0"
+            style={{ width: 120, height: 120 }}
+          />
+          {/* L button — inline touch handlers (left panel not covered by buttonsRef) */}
+          <button
+            type="button"
+            data-btn={11}
+            style={{ touchAction: "none" }}
+            className="action-btn action-btn--lr"
+            onTouchStart={(e) => {
+              e.preventDefault();
+              if (!activeRef.current) return;
+              (e.currentTarget as HTMLElement).classList.add("action-btn--pressed");
+              onLocalInputRef.current(11, true);
+            }}
+            onTouchEnd={(e) => {
+              e.preventDefault();
+              (e.currentTarget as HTMLElement).classList.remove("action-btn--pressed");
+              onLocalInputRef.current(11, false);
+            }}
+            onTouchCancel={(e) => {
+              (e.currentTarget as HTMLElement).classList.remove("action-btn--pressed");
+              onLocalInputRef.current(11, false);
+            }}
+          >
+            L
+          </button>
+        </div>
+
+        {/* Right panel: COIN/START + Action buttons + R button */}
+        <div
+          ref={buttonsRef}
+          className="fixed right-0 top-0 bottom-0 z-40 flex flex-col items-center justify-center gap-4 bg-black pointer-events-auto"
+          style={{ width: "var(--gamepad-panel-width, 160px)", touchAction: "manipulation" }}
+          onContextMenu={(e) => e.preventDefault()}
+        >
+          {/* COIN, START (small) */}
+          <div className="flex gap-2">
+            <button
+              type="button"
+              data-btn={2}
+              style={{ touchAction: "none" }}
+              className="action-btn action-btn--small"
+            >
+              COIN
+            </button>
+            <button
+              type="button"
+              data-btn={3}
+              style={{ touchAction: "none" }}
+              className="action-btn action-btn--small"
+            >
+              START
+            </button>
+          </div>
+
+          {/* Action buttons: A S / D F 2×2 grid */}
+          <div
+            className="grid shrink-0 gap-2"
+            style={{
+              gridTemplateColumns: "repeat(2, 52px)",
+              gridTemplateRows: "repeat(2, 52px)",
+            }}
+          >
+            {ACTION_GRID.map((def) => (
+              <button
+                key={def.btn}
+                type="button"
+                data-btn={def.btn}
+                style={{
+                  gridRow: (def.row ?? 0) + 1,
+                  gridColumn: (def.col ?? 0) + 1,
+                  touchAction: "none",
+                }}
+                className="action-btn"
+              >
+                {def.label}
+              </button>
+            ))}
+          </div>
+
+          {/* R button */}
+          <button
+            type="button"
+            data-btn={10}
+            style={{ touchAction: "none" }}
+            className="action-btn action-btn--lr"
+          >
+            R
+          </button>
+        </div>
+      </>
+    );
+  }
+
+  /* ---- Default render (세로모드) ---- */
   return (
     <div
       className="virtual-gamepad flex w-full select-none items-center justify-between px-3"

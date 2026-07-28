@@ -155,14 +155,26 @@ export default function NetplayPlayingScreen({
   // 모바일 최대화 모드일 때도 isMaximized=true면 동일하게 처리하기 위한 통합 플래그
   const isExpanded = isMobile ? isMaximized : isFullscreen;
 
-  // 모바일 최대화 시 AppShell 헤더/nav 숨김
+  // 모바일 최대화 시 AppShell 헤더/nav 숨김 + 가로모드 전환
   useEffect(() => {
     if (isMobile && isMaximized) {
       document.body.classList.add("mobile-maximized");
+      // Screen Orientation API: 가로모드 요청
+      if (screen.orientation?.lock) {
+        screen.orientation.lock("landscape").catch(() => {});
+      }
     } else {
       document.body.classList.remove("mobile-maximized");
+      if (screen.orientation?.unlock) {
+        screen.orientation.unlock();
+      }
     }
-    return () => { document.body.classList.remove("mobile-maximized"); };
+    return () => {
+      document.body.classList.remove("mobile-maximized");
+      if (screen.orientation?.unlock) {
+        screen.orientation.unlock();
+      }
+    };
   }, [isMobile, isMaximized]);
 
   // Android 뒤로가기 두 번 터치로 종료
@@ -330,7 +342,7 @@ export default function NetplayPlayingScreen({
             isFullscreen
               ? "flex-1 min-w-0 flex items-center justify-center"
               : isExpanded
-                ? "w-full flex-1 min-h-0 flex items-center justify-center"
+                ? "w-full flex-1 min-h-0 flex items-center justify-center game-area-landscape"
                 : isMobile
                   ? "w-full flex-shrink-0"
                   : "w-full xl:flex-1 xl:min-w-0",
@@ -460,10 +472,16 @@ export default function NetplayPlayingScreen({
 
         {/* Virtual gamepad — mobile only, always visible */}
         {isMobile && gameStarted && (
-          <div className="virtual-gamepad w-full pb-safe flex items-end pt-6 pb-4 flex-shrink-0 mt-auto">
+          <div className={cn(
+            "virtual-gamepad flex-shrink-0",
+            isExpanded
+              ? "fixed inset-0 z-30 pointer-events-none"
+              : "w-full pb-safe flex items-end pt-6 pb-4 mt-auto",
+          )}>
             <VirtualGamepad
               onLocalInput={handleVirtualInput}
               active={gameStarted}
+              landscape={isExpanded}
             />
           </div>
         )}
