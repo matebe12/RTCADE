@@ -303,3 +303,10 @@ body.mobile-maximized header,
 body.mobile-maximized [data-pinned-notice] {
   display: none !important;
 }
+
+/* 최대화 시 에뮬레이터 컨테이너가 남는 세로 공간을 채우도록 aspect-ratio 해제 */
+/* fitCanvasToContainer가 게임 비율 유지 + 중앙 정렬을 알아서 처리함 */
+body.mobile-maximized .aspect-4\/3 {
+  aspect-ratio: auto !important;
+  height: 100% !important;
+}
