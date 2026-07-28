@@ -10,18 +10,6 @@
 import { useEffect, useRef, useState } from "react";
 import nipplejs from "nipplejs";
 
-/** nipplejs plain 이벤트의 방향 데이터 (Direction 인터페이스 inline) */
-interface NippleDirection {
-  angle?: string;
-  x?: string;
-  y?: string;
-}
-
-/** nipplejs plain 이벤트의 데이터 (JoystickEventData 인터페이스 inline) */
-interface NippleEventData {
-  direction?: NippleDirection;
-}
-
 /* ------------------------------------------------------------------ */
 /*  Button definitions                                                  */
 /* ------------------------------------------------------------------ */
@@ -141,23 +129,38 @@ export default function VirtualGamepad({
     resizeObserver.observe(zone);
     if (zone.parentElement) resizeObserver.observe(zone.parentElement);
 
-    // nipplejs v1: InternalEventHandler<T> = (evt: InternalEvent<T>) => void
-    // InternalEvent = { type, target, data }
-    const handlePlain = (evt: { data: NippleEventData }) => {
+    // 축 우선(axis locking): Metal Slug 같은 게임에서 실수로 상하 입력 방지
+    // abs(dominant) > abs(weak) * 1.8 이면 dominant 축만 트리거
+    const AXIS_LOCK_RATIO = 1.8;
+
+    const computeDirs = (vx: number, vy: number): Set<number> => {
+      const dirs = new Set<number>();
+      const absX = Math.abs(vx);
+      const absY = Math.abs(vy);
+
+      const onlyX = absX > absY * AXIS_LOCK_RATIO;
+      const onlyY = absY > absX * AXIS_LOCK_RATIO;
+
+      if ((onlyX || !onlyY) && vx < 0) dirs.add(DIR_TO_BUTTON.left);
+      if ((onlyX || !onlyY) && vx > 0) dirs.add(DIR_TO_BUTTON.right);
+      if ((onlyY || !onlyX) && vy < 0) dirs.add(DIR_TO_BUTTON.up);
+      if ((onlyY || !onlyX) && vy > 0) dirs.add(DIR_TO_BUTTON.down);
+
+      return dirs;
+    };
+
+    const handleMove = (evt: { data: { vector?: { x: number; y: number }; force?: number } }) => {
       if (!activeRef.current) return;
-      const dir = evt.data?.direction;
-      const newDirs = new Set<number>();
+      const v = evt.data?.vector;
+      const force = evt.data?.force ?? 0;
+      if (!v || force < 0.15) return;
 
-      if (dir?.x) newDirs.add(DIR_TO_BUTTON[dir.x]);
-      if (dir?.y) newDirs.add(DIR_TO_BUTTON[dir.y]);
-
+      const newDirs = computeDirs(v.x, v.y);
       const held = heldDirectionsRef.current;
 
-      // release directions no longer held
       for (const btn of held) {
         if (!newDirs.has(btn)) onLocalInputRef.current(btn, false);
       }
-      // press newly held directions
       for (const btn of newDirs) {
         if (!held.has(btn)) onLocalInputRef.current(btn, true);
       }
@@ -174,14 +177,14 @@ export default function VirtualGamepad({
     };
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (collection as any).on("plain", handlePlain);
+    (collection as any).on("move", handleMove);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (collection as any).on("end", handleEnd);
 
     return () => {
       resizeObserver.disconnect();
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (collection as any).off("plain", handlePlain);
+      (collection as any).off("move", handleMove);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (collection as any).off("end", handleEnd);
       collection.destroy();
