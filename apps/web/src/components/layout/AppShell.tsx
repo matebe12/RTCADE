@@ -127,7 +127,7 @@ export default function AppShell({ profile, onOpenProfile }: AppShellProps) {
       </header>
 
       {pinnedNotice && (
-        <div className="border-b border-primary/20 bg-[linear-gradient(90deg,rgba(0,160,255,0.12),rgba(255,135,61,0.08))]">
+        <div data-pinned-notice className="border-b border-primary/20 bg-[linear-gradient(90deg,rgba(0,160,255,0.12),rgba(255,135,61,0.08))]">
           <div className="mx-auto w-full max-w-[104rem] px-4 py-3 xl:px-6">
             <div className="flex gap-6">
               {showLeftRail && <div aria-hidden className={leftRailSpacerClassName} />}

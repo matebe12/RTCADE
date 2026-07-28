@@ -340,7 +340,7 @@ function PopularGamesCard({ emptyCopy, games, periodKey, title }: PopularGamesCa
 
       {games.length > 0 ? (
         <ScrollArea className="mt-4 min-h-0 flex-1">
-          <div className="space-y-3 pr-3">
+          <div className="space-y-3 pr-1 sm:pr-3">
             {games.map((game, index) => (
               <PopularGameSpotlightItem
                 key={`${periodKey}-${game.gameName}-${game.romPath ?? index}-${game.core ?? "unknown"}`}

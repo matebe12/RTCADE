@@ -152,7 +152,7 @@ export default function SoloPlayingScreen({
 
       {/* Virtual gamepad — mobile only, always visible */}
       {isMobile && (
-        <div className={cn("virtual-gamepad w-full pb-safe flex items-center", isMaximized ? "flex-1 min-h-0 pt-3" : "flex-shrink-0")}>
+        <div className={cn("virtual-gamepad w-full pb-safe flex items-end", isMaximized ? "flex-1 min-h-0" : "flex-shrink-0")}>
           <VirtualGamepad onLocalInput={handleVirtualInput} active />
         </div>
       )}

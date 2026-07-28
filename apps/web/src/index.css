@@ -288,11 +288,12 @@
   padding-right: env(safe-area-inset-right, 8px);
 }
 
-/* 모바일 최대화 시 헤더/nav 숨김 + pull-to-refresh 방지 */
+/* 모바일 최대화 시 헤더/nav/공지 배너 숨김 + pull-to-refresh 방지 */
 body.mobile-maximized {
   overscroll-behavior: none;
 }
 
-body.mobile-maximized header {
+body.mobile-maximized header,
+body.mobile-maximized [data-pinned-notice] {
   display: none !important;
 }
