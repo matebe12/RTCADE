@@ -280,11 +280,11 @@
   --gamepad-panel-width: 160px;
 }
 
-/* L/R 버튼 (가로모드 패널 내 중간 크기) */
+/* L/R 버튼 (가로모드 패널 내 작은 크기) */
 .action-btn--lr {
-  width: 48px;
-  height: 48px;
-  @apply text-sm;
+  width: 40px;
+  height: 40px;
+  @apply text-[11px];
 }
 
 /* 세이프 에어리어 */

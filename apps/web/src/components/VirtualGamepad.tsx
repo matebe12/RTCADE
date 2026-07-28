@@ -300,18 +300,13 @@ export default function VirtualGamepad({
   if (landscape) {
     return (
       <>
-        {/* Left panel: D-Pad + L button */}
+        {/* Left panel: L button + D-Pad */}
         <div
           className="fixed left-0 top-0 bottom-0 z-40 flex flex-col items-center justify-center gap-4 bg-black pointer-events-auto"
           style={{ width: "var(--gamepad-panel-width, 160px)", touchAction: "manipulation" }}
           onContextMenu={(e) => e.preventDefault()}
         >
-          <div
-            ref={dpadZoneRef}
-            className="relative shrink-0"
-            style={{ width: 120, height: 120 }}
-          />
-          {/* L button — inline touch handlers (left panel not covered by buttonsRef) */}
+          {/* L button (above D-Pad) */}
           <button
             type="button"
             data-btn={11}
@@ -335,15 +330,30 @@ export default function VirtualGamepad({
           >
             L
           </button>
+          <div
+            ref={dpadZoneRef}
+            className="relative shrink-0"
+            style={{ width: 120, height: 120 }}
+          />
         </div>
 
-        {/* Right panel: COIN/START + Action buttons + R button */}
+        {/* Right panel: R button + COIN/START + Action buttons */}
         <div
           ref={buttonsRef}
           className="fixed right-0 top-0 bottom-0 z-40 flex flex-col items-center justify-center gap-4 bg-black pointer-events-auto"
           style={{ width: "var(--gamepad-panel-width, 160px)", touchAction: "manipulation" }}
           onContextMenu={(e) => e.preventDefault()}
         >
+          {/* R button (above everything) */}
+          <button
+            type="button"
+            data-btn={10}
+            style={{ touchAction: "none" }}
+            className="action-btn action-btn--lr"
+          >
+            R
+          </button>
+
           {/* COIN, START (small) */}
           <div className="flex gap-2">
             <button
@@ -388,16 +398,6 @@ export default function VirtualGamepad({
               </button>
             ))}
           </div>
-
-          {/* R button */}
-          <button
-            type="button"
-            data-btn={10}
-            style={{ touchAction: "none" }}
-            className="action-btn action-btn--lr"
-          >
-            R
-          </button>
         </div>
       </>
     );
