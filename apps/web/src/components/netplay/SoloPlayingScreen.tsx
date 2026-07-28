@@ -121,7 +121,7 @@ export default function SoloPlayingScreen({
 
       <div
         data-tutorial="solo-emulator-stage"
-        className={cn(isMobile ? (isMaximized ? "relative flex-[0_0_50%] min-h-0" : "flex-1 min-h-0 max-h-[55vh]") : "")}
+        className={cn(isMobile ? (isMaximized ? "relative flex-1 min-h-0" : "flex-1 min-h-0 max-h-[55vh]") : "")}
       >
         {/* 최대화 모드 나가기 버튼 (캔버스 내) */}
         {isMaximized && (
@@ -152,7 +152,7 @@ export default function SoloPlayingScreen({
 
       {/* Virtual gamepad — mobile only, always visible */}
       {isMobile && (
-        <div className={cn("virtual-gamepad w-full pb-safe flex items-end pb-4", isMaximized ? "flex-1 min-h-0" : "flex-shrink-0")}>
+        <div className={cn("virtual-gamepad w-full pb-safe flex items-end pb-4", "flex-shrink-0")}>
           <VirtualGamepad onLocalInput={handleVirtualInput} active />
         </div>
       )}

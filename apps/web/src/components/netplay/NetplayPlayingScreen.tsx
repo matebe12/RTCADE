@@ -314,7 +314,7 @@ export default function NetplayPlayingScreen({
             isFullscreen
               ? "flex-1 min-w-0 flex items-center justify-center"
               : isExpanded
-                ? "w-full flex-[0_0_50%] min-h-0"
+                ? "w-full flex-1 min-h-0"
                 : isMobile
                   ? "w-full flex-shrink-0"
                   : "w-full xl:flex-1 xl:min-w-0",
@@ -445,7 +445,7 @@ export default function NetplayPlayingScreen({
 
         {/* Virtual gamepad — mobile only, always visible */}
         {isMobile && gameStarted && (
-          <div className={cn("virtual-gamepad w-full pb-safe flex items-end pb-4", isExpanded ? "flex-1 min-h-0" : "flex-shrink-0")}>
+          <div className="virtual-gamepad w-full pb-safe flex items-end pb-4 flex-shrink-0">
             <VirtualGamepad
               onLocalInput={handleVirtualInput}
               active={gameStarted}

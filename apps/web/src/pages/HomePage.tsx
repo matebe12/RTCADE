@@ -186,12 +186,12 @@ function PopularGameSpotlightItem({
 
   return (
     <>
-      <div className="rounded-2xl border border-border/70 bg-background/55 px-3 py-3">
-        <div className="flex items-start gap-3">
+      <div className="rounded-2xl border border-border/70 bg-background/55 px-2.5 py-2.5 sm:px-3 sm:py-3">
+        <div className="flex items-start gap-2.5 sm:gap-3">
           <button
             type="button"
             onClick={() => setPreviewOpen(true)}
-            className="relative size-16 shrink-0 overflow-hidden rounded-2xl border border-primary/15 bg-background/70 shadow-sm shadow-primary/10"
+            className="relative size-12 sm:size-16 shrink-0 overflow-hidden rounded-2xl border border-primary/15 bg-background/70 shadow-sm shadow-primary/10"
             aria-label={`${displayName} 썸네일 크게 보기`}
           >
             {thumbnailUrl || fallbackThumbnailUrl ? (
@@ -208,7 +208,7 @@ function PopularGameSpotlightItem({
               </div>
             )}
             <div className="pointer-events-none absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-black/45 to-transparent" />
-            <span className="pointer-events-none absolute inset-x-0 bottom-1 text-center text-[9px] font-medium text-white">
+            <span className="pointer-events-none absolute inset-x-0 bottom-1 text-center text-[9px] font-medium text-white hidden sm:block">
               크게 보기
             </span>
           </button>

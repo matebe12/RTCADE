@@ -143,8 +143,9 @@ export default function VirtualGamepad({
 
       if ((onlyX || !onlyY) && vx < 0) dirs.add(DIR_TO_BUTTON.left);
       if ((onlyX || !onlyY) && vx > 0) dirs.add(DIR_TO_BUTTON.right);
-      if ((onlyY || !onlyX) && vy < 0) dirs.add(DIR_TO_BUTTON.up);
-      if ((onlyY || !onlyX) && vy > 0) dirs.add(DIR_TO_BUTTON.down);
+      // nipplejs vector.y: 양수=위, 음수=아래 (게임 좌표계)
+      if ((onlyY || !onlyX) && vy > 0) dirs.add(DIR_TO_BUTTON.up);
+      if ((onlyY || !onlyX) && vy < 0) dirs.add(DIR_TO_BUTTON.down);
 
       return dirs;
     };
