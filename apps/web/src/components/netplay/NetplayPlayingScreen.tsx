@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
+import { toast } from "sonner";
 
 import EmulatorPlayer, { type SystemCore } from "@/components/EmulatorPlayer";
 import GuestVideoDisplay, { sendLocalGuestInput } from "@/components/netplay/GuestVideoDisplay";
@@ -162,6 +163,24 @@ export default function NetplayPlayingScreen({
     }
     return () => { document.body.classList.remove("mobile-maximized"); };
   }, [isMobile, isMaximized]);
+
+  // Android 뒤로가기 두 번 터치로 종료
+  const backPressTimer = useRef(0);
+  useEffect(() => {
+    history.pushState(null, "", location.href);
+    const handler = () => {
+      const now = Date.now();
+      if (now - backPressTimer.current < 2000) {
+        onBack();
+      } else {
+        backPressTimer.current = now;
+        history.pushState(null, "", location.href);
+        toast("뒤로가기를 한 번 더 누르면 종료됩니다");
+      }
+    };
+    window.addEventListener("popstate", handler);
+    return () => window.removeEventListener("popstate", handler);
+  }, [onBack]);
 
   useEffect(() => {
     const handler = () => setIsFullscreen(!!document.fullscreenElement);
@@ -426,7 +445,7 @@ export default function NetplayPlayingScreen({
 
         {/* Virtual gamepad — mobile only, always visible */}
         {isMobile && gameStarted && (
-          <div className={cn("virtual-gamepad w-full pb-safe flex items-center", isExpanded ? "flex-1 min-h-0" : "flex-shrink-0")}>
+          <div className={cn("virtual-gamepad w-full pb-safe flex items-center", isExpanded ? "flex-1 min-h-0 pt-3" : "flex-shrink-0")}>
             <VirtualGamepad
               onLocalInput={handleVirtualInput}
               active={gameStarted}

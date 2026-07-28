@@ -128,9 +128,18 @@ export default function VirtualGamepad({
       restOpacity: 0.5,
       fadeTime: 100,
       shape: "circle",
+      dynamicPage: true,
     });
 
     nippleRef.current = collection;
+
+    // D-Pad 영역 위치 변경 시 재계산 (전체화면 전환 등으로 부모 크기 변화)
+    const resizeObserver = new ResizeObserver(() => {
+      collection.reposition();
+    });
+    // zone 자체와 부모 양쪽 관찰
+    resizeObserver.observe(zone);
+    if (zone.parentElement) resizeObserver.observe(zone.parentElement);
 
     // nipplejs v1: InternalEventHandler<T> = (evt: InternalEvent<T>) => void
     // InternalEvent = { type, target, data }
@@ -170,6 +179,7 @@ export default function VirtualGamepad({
     (collection as any).on("end", handleEnd);
 
     return () => {
+      resizeObserver.disconnect();
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (collection as any).off("plain", handlePlain);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -282,7 +292,7 @@ export default function VirtualGamepad({
   /* ---- Render ---- */
   return (
     <div
-      className="virtual-gamepad flex w-full select-none items-center justify-between gap-3 px-3"
+      className="virtual-gamepad flex w-full select-none items-center justify-between px-3"
       onContextMenu={(e) => e.preventDefault()}
       style={{ touchAction: "manipulation" }}
     >
@@ -294,7 +304,7 @@ export default function VirtualGamepad({
       />
 
       {/* ── Button area (right) — native touch events via ref ── */}
-      <div ref={buttonsRef} className="flex shrink-0 flex-col items-end gap-4">
+      <div ref={buttonsRef} className="flex shrink-0 flex-col items-end gap-4 mr-2">
         {/* Top row: COIN, START, L, R */}
         <div className="flex gap-2.5">
           {TOP_BUTTONS.map((def) => (

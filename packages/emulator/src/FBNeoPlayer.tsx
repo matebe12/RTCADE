@@ -384,15 +384,32 @@ const FBNeoPlayer = forwardRef<HTMLDivElement, FBNeoPlayerProps>(function FBNeoP
 
     const loop = (now: number) => {
       if (aborted) return;
+      // Vertical arcade 게임(예: 1941) 회전 처리
+      const rotateGame = arc.gameInfo?.rotateGame ?? 0;
+
       if (!canvasFittedRef.current && canvasRef.current) {
-        fitCanvasToContainer(canvasRef.current, arc.width, arc.height);
+        if (rotateGame && canvasRef.current.parentElement) {
+          // 내부 해상도는 원본 유지, CSS 크기는 회전 후 fit 기준 uniform scale
+          canvasRef.current.width = arc.width;
+          canvasRef.current.height = arc.height;
+          const parent = canvasRef.current.parentElement;
+          const s = Math.min(
+            parent.clientWidth / arc.height,
+            parent.clientHeight / arc.width,
+            4,
+          );
+          canvasRef.current.style.width = `${Math.floor(arc.width * s)}px`;
+          canvasRef.current.style.height = `${Math.floor(arc.height * s)}px`;
+          canvasRef.current.style.position = "absolute";
+          canvasRef.current.style.left = "50%";
+          canvasRef.current.style.top = "50%";
+        } else {
+          fitCanvasToContainer(canvasRef.current, arc.width, arc.height);
+        }
         canvasFittedRef.current = true;
       }
 
-      // Vertical arcade 게임(예: 1941) 회전 처리
-      const rotateGame = arc.gameInfo?.rotateGame ?? 0;
       if (rotateGame && canvasRef.current) {
-        // fitCanvasToContainer가 설정한 크기 유지, 회전만 추가
         const deg = rotateGame === 1 ? -90 : 90;
         canvasRef.current.style.transform = `translate(-50%, -50%) rotate(${deg}deg)`;
       }

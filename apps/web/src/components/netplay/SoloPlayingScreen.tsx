@@ -1,5 +1,6 @@
 import type { RefObject } from "react";
-import { useCallback, useState, useEffect } from "react";
+import { useCallback, useState, useEffect, useRef } from "react";
+import { toast } from "sonner";
 
 import EmulatorPlayer, { type SystemCore } from "@/components/EmulatorPlayer";
 import PlayControlsGuide from "@/components/netplay/PlayControlsGuide";
@@ -51,6 +52,24 @@ export default function SoloPlayingScreen({
     }
     return () => { document.body.classList.remove("mobile-maximized"); };
   }, [isMaximized]);
+
+  // Android 뒤로가기 두 번 터치로 종료
+  const backPressTimer = useRef(0);
+  useEffect(() => {
+    history.pushState(null, "", location.href);
+    const handler = () => {
+      const now = Date.now();
+      if (now - backPressTimer.current < 2000) {
+        onBack();
+      } else {
+        backPressTimer.current = now;
+        history.pushState(null, "", location.href);
+        toast("뒤로가기를 한 번 더 누르면 종료됩니다");
+      }
+    };
+    window.addEventListener("popstate", handler);
+    return () => window.removeEventListener("popstate", handler);
+  }, [onBack]);
 
   const handleVirtualInput = useCallback(
     (button: number, down: boolean) => {
@@ -133,7 +152,7 @@ export default function SoloPlayingScreen({
 
       {/* Virtual gamepad — mobile only, always visible */}
       {isMobile && (
-        <div className={cn("virtual-gamepad w-full pb-safe flex items-center", isMaximized ? "flex-1 min-h-0" : "flex-shrink-0")}>
+        <div className={cn("virtual-gamepad w-full pb-safe flex items-center", isMaximized ? "flex-1 min-h-0 pt-3" : "flex-shrink-0")}>
           <VirtualGamepad onLocalInput={handleVirtualInput} active />
         </div>
       )}
