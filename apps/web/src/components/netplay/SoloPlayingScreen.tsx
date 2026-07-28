@@ -1,5 +1,5 @@
 import type { RefObject } from "react";
-import { useCallback, useState } from "react";
+import { useCallback, useState, useEffect } from "react";
 
 import EmulatorPlayer, { type SystemCore } from "@/components/EmulatorPlayer";
 import PlayControlsGuide from "@/components/netplay/PlayControlsGuide";
@@ -41,6 +41,16 @@ export default function SoloPlayingScreen({
 }: SoloPlayingScreenProps) {
   const isMobile = useMobileDetect();
   const [isMaximized, setIsMaximized] = useState(false);
+
+  // 모바일 최대화 시 AppShell 헤더/nav 숨김
+  useEffect(() => {
+    if (isMaximized) {
+      document.body.classList.add("mobile-maximized");
+    } else {
+      document.body.classList.remove("mobile-maximized");
+    }
+    return () => { document.body.classList.remove("mobile-maximized"); };
+  }, [isMaximized]);
 
   const handleVirtualInput = useCallback(
     (button: number, down: boolean) => {

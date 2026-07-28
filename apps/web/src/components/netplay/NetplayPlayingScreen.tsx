@@ -153,6 +153,16 @@ export default function NetplayPlayingScreen({
   // 모바일 최대화 모드일 때도 isMaximized=true면 동일하게 처리하기 위한 통합 플래그
   const isExpanded = isMobile ? isMaximized : isFullscreen;
 
+  // 모바일 최대화 시 AppShell 헤더/nav 숨김
+  useEffect(() => {
+    if (isMobile && isMaximized) {
+      document.body.classList.add("mobile-maximized");
+    } else {
+      document.body.classList.remove("mobile-maximized");
+    }
+    return () => { document.body.classList.remove("mobile-maximized"); };
+  }, [isMobile, isMaximized]);
+
   useEffect(() => {
     const handler = () => setIsFullscreen(!!document.fullscreenElement);
     document.addEventListener("fullscreenchange", handler);

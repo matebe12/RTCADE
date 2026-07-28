@@ -287,3 +287,8 @@
 .pr-safe {
   padding-right: env(safe-area-inset-right, 8px);
 }
+
+/* 모바일 최대화 시 헤더/nav 숨김 */
+body.mobile-maximized header {
+  display: none !important;
+}

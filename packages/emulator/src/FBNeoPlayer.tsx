@@ -378,27 +378,57 @@ const FBNeoPlayer = forwardRef<HTMLDivElement, FBNeoPlayerProps>(function FBNeoP
     }
     const capCvs = captureCanvasRef.current;
 
-    const loop = () => {
+    // FPS 제한을 위한 타이밍 변수
+    let lastFrameTime = performance.now();
+    let frameAccum = 0;
+
+    const loop = (now: number) => {
       if (aborted) return;
       if (!canvasFittedRef.current && canvasRef.current) {
         fitCanvasToContainer(canvasRef.current, arc.width, arc.height);
         canvasFittedRef.current = true;
       }
-      // Apply local input
-      arc.setInput(localPlayer, pressedMaskRef.current);
-      // Apply remote input (netplay only — guest's input via DataChannel)
-      if (isNetplay) {
-        const remotePlayer = localPlayer === 0 ? 1 : 0;
-        arc.setInput(remotePlayer, remoteMaskRef.current);
+
+      // Vertical arcade 게임(예: 1941) 회전 처리
+      const rotateGame = arc.gameInfo?.rotateGame ?? 0;
+      if (rotateGame && canvasRef.current) {
+        // fitCanvasToContainer가 설정한 크기 유지, 회전만 추가
+        const deg = rotateGame === 1 ? -90 : 90;
+        canvasRef.current.style.transform = `translate(-50%, -50%) rotate(${deg}deg)`;
       }
-      arc.clockFrame();
+
+      const targetFps = arc.gameInfo?.fps ?? 60;
+      const frameInterval = 1000 / targetFps;
+      const delta = now - lastFrameTime;
+      lastFrameTime = now;
+
+      // 누적 시간 기반 프레임 스킵/캐치업 (최대 3프레임으로 spiral of death 방지)
+      frameAccum += delta;
+      const maxCatchup = frameInterval * 3;
+      if (frameAccum > maxCatchup) frameAccum = maxCatchup;
+
+      let framesRun = 0;
+      while (frameAccum >= frameInterval && framesRun < 3) {
+        // Apply local input
+        arc.setInput(localPlayer, pressedMaskRef.current);
+        // Apply remote input (netplay only)
+        if (isNetplay) {
+          const remotePlayer = localPlayer === 0 ? 1 : 0;
+          arc.setInput(remotePlayer, remoteMaskRef.current);
+        }
+        arc.clockFrame();
+        frameAccum -= frameInterval;
+        framesRun++;
+      }
+
+      // Render the latest frame
       const buf = arc.getFrameBuffer();
       if (buf.length > 0 && canvasRef.current) {
         renderFrameToCanvas(canvasRef.current, buf, arc.width, arc.height, {
           smooth: false, autoResize: false,
         });
       }
-      // HOST: 업스케일된 프레임을 캡처 Canvas에 렌더링 (WebRTC 스트리밍 품질 향상)
+      // HOST: 업스케일된 프레임을 캡처 Canvas에 렌더링
       if (capCvs && canvasRef.current) {
         renderUpscaledFrame(capCvs, canvasRef.current, arc.width, arc.height, HOST_STREAM_UPSCALE_FACTOR);
       }
