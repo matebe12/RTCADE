@@ -5,6 +5,7 @@ import NetplaySessionSummary from "./NetplaySessionSummary";
 import NetplayBrowseRomsScreen from "@/components/netplay/NetplayBrowseRomsScreen";
 import NetplayJoinRoomScreen from "@/components/netplay/NetplayJoinRoomScreen";
 import NetplayMenuScreen from "@/components/netplay/NetplayMenuScreen";
+import NetplayModeTabs from "@/components/netplay/NetplayModeTabs";
 import NetplayPlayingScreen from "@/components/netplay/NetplayPlayingScreen";
 import NetplayPublicRoomsScreen from "@/components/netplay/NetplayPublicRoomsScreen";
 import NetplaySpectateCodeScreen from "@/components/netplay/NetplaySpectateCodeScreen";
@@ -745,9 +746,28 @@ export default function NetplayLobby({ hasProfile = true }: { hasProfile?: boole
     );
   }
 
+  const showModeTabs =
+    state.step === "menu" ||
+    state.step === "browse" ||
+    state.step === "solo-browse" ||
+    state.step === "public-rooms" ||
+    state.step === "watch-rooms" ||
+    state.step === "join-input" ||
+    state.step === "spectate-input";
+
   if (!content) {
     return null;
   }
 
-  return <div className="flex h-full flex-col gap-4">{content}</div>;
+  return (
+    <div className="flex h-full flex-col gap-4 min-h-0">
+      {showModeTabs && (
+        <NetplayModeTabs
+          mode={mode}
+          onModeChange={handleModeChange}
+        />
+      )}
+      <div className="flex-1 min-h-0 flex flex-col">{content}</div>
+    </div>
+  );
 }

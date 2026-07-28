@@ -123,14 +123,14 @@ export default function SoloBrowseRomsScreen({
   const virtualListRoms = isSearching || categoryFilter ? filteredBrowseRoms : browseRoms;
 
   return (
-    <Card className="w-full border-border/70 bg-card/95" data-tutorial="solo-browse-panel">
+    <Card className="w-full border-border/70 bg-card/95 flex flex-col min-h-0" data-tutorial="solo-browse-panel">
       <CardHeader className="flex flex-row items-center gap-3 pb-3">
         <Button variant="ghost" size="icon" className="size-8" onClick={onBack}>
           <ArrowLeft className="size-4" />
         </Button>
         <CardTitle className="text-sm">혼자 플레이할 게임을 선택하세요</CardTitle>
       </CardHeader>
-      <CardContent className="flex flex-col gap-3">
+      <CardContent className="flex flex-col gap-3 flex-1 min-h-0">
         <div className="rounded-lg border border-border/70 bg-background/40 p-3 text-[11px] leading-5 text-muted-foreground">
           서버에 올라온 ROM으로 바로 실행합니다. 상대방 연결 없이 혼자 플레이합니다.
         </div>

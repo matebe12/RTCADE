@@ -43,7 +43,7 @@ export default function NetplayWatchingRoomsScreen({
   onSpectateRoom,
 }: NetplayWatchingRoomsScreenProps) {
   return (
-    <Card className="w-full" data-tutorial="netplay-watch-rooms-panel">
+    <Card className="w-full flex flex-col min-h-0" data-tutorial="netplay-watch-rooms-panel">
       <CardHeader className="flex flex-row items-center gap-3 pb-3">
         <Button
           variant="ghost"
@@ -73,7 +73,7 @@ export default function NetplayWatchingRoomsScreen({
           <RefreshCcw className="size-4" />
         </Button>
       </CardHeader>
-      <CardContent className="flex flex-col gap-3">
+      <CardContent className="flex flex-col gap-3 flex-1 min-h-0">
         <div className="rounded-lg border border-border/70 bg-muted/20 px-3 py-2 text-[11px] text-muted-foreground">
           5초마다 자동 새로고침됩니다. 비공개 방은 코드로만 관전할 수 있습니다.
         </div>

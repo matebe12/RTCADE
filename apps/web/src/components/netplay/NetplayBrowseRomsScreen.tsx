@@ -112,7 +112,7 @@ export default function NetplayBrowseRomsScreen({
   const virtualListRoms = isSearching || categoryFilter ? filteredBrowseRoms : browseRoms;
 
   return (
-    <Card className="w-full" data-tutorial="netplay-browse-panel">
+    <Card className="w-full flex flex-col min-h-0" data-tutorial="netplay-browse-panel">
       <CardHeader className="flex flex-row items-center gap-3 pb-3">
         <Button
           variant="ghost"
@@ -125,7 +125,7 @@ export default function NetplayBrowseRomsScreen({
         </Button>
         <CardTitle className="text-sm">게임을 선택하세요</CardTitle>
       </CardHeader>
-      <CardContent className="flex flex-col gap-3">
+      <CardContent className="flex flex-col gap-3 flex-1 min-h-0">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input

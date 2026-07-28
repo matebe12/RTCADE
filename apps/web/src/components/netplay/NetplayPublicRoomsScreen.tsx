@@ -31,7 +31,7 @@ export default function NetplayPublicRoomsScreen({
   onJoinRoom,
 }: NetplayPublicRoomsScreenProps) {
   return (
-    <Card className="w-full" data-tutorial="netplay-public-rooms-panel">
+    <Card className="w-full flex flex-col min-h-0" data-tutorial="netplay-public-rooms-panel">
       <CardHeader className="flex flex-row items-center gap-3 pb-3">
         <Button
           variant="ghost"
@@ -50,7 +50,7 @@ export default function NetplayPublicRoomsScreen({
           <RefreshCcw className="size-4" />
         </Button>
       </CardHeader>
-      <CardContent className="flex flex-col gap-3">
+      <CardContent className="flex flex-col gap-3 flex-1 min-h-0">
         <div className="rounded-lg border border-border/70 bg-muted/20 px-3 py-2 text-[11px] text-muted-foreground">
           5초마다 자동 새로고침됩니다. 마음에 드는 방이 있으면 바로 참가하면 됩니다.
         </div>
