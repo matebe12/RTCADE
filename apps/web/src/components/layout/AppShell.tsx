@@ -1,12 +1,10 @@
-import { ArrowRight, Bell, BookOpen, Globe, Home, Moon, Pin, Settings, Sun } from "lucide-react";
+import {  Bell, BookOpen, Globe, Home, Moon,  Settings, Sun } from "lucide-react";
 import { NavLink, Outlet } from "react-router-dom";
 
 import { SideRailAd } from "@/components/ads/SideRailAd";
 import { appEnvironment } from "@/config/environment";
-import { useOperationsNotices } from "@/hooks/useOperationsNotices";
 import { useAdVisibility } from "@/hooks/useAdVisibility";
 import { UserBadge } from "@/components/UserBadge";
-import { Badge } from "@rtcade/ui";
 import { Button } from "@rtcade/ui";
 import { cn } from "@rtcade/ui";
 import type { UserProfile } from "@/lib/user-profile";
@@ -30,9 +28,7 @@ const rightRailSpacerClassName = "hidden w-[180px] shrink-0 xl:block";
 
 export default function AppShell({ profile, onOpenProfile }: AppShellProps) {
   const { resolvedTheme, setTheme } = useTheme();
-  const { error: noticeError, notices } = useOperationsNotices();
   const { startTutorial } = useAppTutorial();
-  const pinnedNotice = noticeError ? null : (notices.find((notice) => notice.isPinned) ?? null);
   const isDarkMode = resolvedTheme === "dark";
   const ThemeIcon = isDarkMode ? Sun : Moon;
   const themeToggleLabel = isDarkMode ? "라이트 모드로 전환" : "다크 모드로 전환";
@@ -125,40 +121,6 @@ export default function AppShell({ profile, onOpenProfile }: AppShellProps) {
           </div>
         </div>
       </header>
-
-      {pinnedNotice && (
-        <div data-pinned-notice className="border-b border-primary/20 bg-[linear-gradient(90deg,rgba(0,160,255,0.12),rgba(255,135,61,0.08))]">
-          <div className="mx-auto w-full max-w-[104rem] px-4 py-3 xl:px-6">
-            <div className="flex gap-6">
-              {showLeftRail && <div aria-hidden className={leftRailSpacerClassName} />}
-
-              <div className="min-w-0 flex-1">
-                <div className="mx-auto flex w-full max-w-6xl flex-col gap-3 lg:flex-row lg:items-center lg:gap-4">
-                  <div className="flex min-w-0 flex-1 items-start gap-3">
-                    <Badge variant="secondary" className="mt-0.5 shrink-0 text-[10px]">
-                      <Pin className="size-3" />
-                      고정 공지
-                    </Badge>
-                    <div className="min-w-0 space-y-1">
-                      <div className="text-sm font-medium text-foreground">{pinnedNotice.title}</div>
-                      <div className="truncate text-sm text-muted-foreground">{pinnedNotice.body}</div>
-                    </div>
-                  </div>
-
-                  <Button asChild variant="secondary" size="sm" className="shrink-0">
-                    <NavLink to="/notices">
-                      전체 공지 보기
-                      <ArrowRight className="size-4" />
-                    </NavLink>
-                  </Button>
-                </div>
-              </div>
-
-              {showRightRail && <div aria-hidden className={rightRailSpacerClassName} />}
-            </div>
-          </div>
-        </div>
-      )}
 
       <main className="mx-auto flex w-full max-w-[104rem] flex-1 min-h-0 gap-6 px-4 py-8 lg:py-10 xl:px-6">
         <SideRailAd placement="left" visible={showLeftRail} />

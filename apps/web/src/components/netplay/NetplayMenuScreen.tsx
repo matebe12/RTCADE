@@ -53,7 +53,7 @@ export default function NetplayMenuScreen({
       {/* Action Buttons */}
       <div className="grid grid-cols-2 gap-2.5" data-tutorial="netplay-menu-actions">
         <Button
-          className="col-span-2 h-14 text-base font-bold shadow-sm shadow-primary/30"
+          className="h-14 text-base font-bold shadow-sm shadow-primary/30"
           data-tutorial="netplay-open-browse"
           onClick={onOpenBrowse}
         >
