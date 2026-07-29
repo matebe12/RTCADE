@@ -1,4 +1,4 @@
-import { ArrowRight, Bell, BookOpen, Globe, Home, Moon, Pin, Settings, Sun } from "lucide-react";
+import {  Bell, BookOpen, Globe, Home, Moon,  Settings, Sun } from "lucide-react";
 import { NavLink, Outlet } from "react-router-dom";
 
 import { SideRailAd } from "@/components/ads/SideRailAd";
@@ -6,7 +6,6 @@ import { appEnvironment } from "@/config/environment";
 import { useOperationsNotices } from "@/hooks/useOperationsNotices";
 import { useAdVisibility } from "@/hooks/useAdVisibility";
 import { UserBadge } from "@/components/UserBadge";
-import { Badge } from "@rtcade/ui";
 import { Button } from "@rtcade/ui";
 import { cn } from "@rtcade/ui";
 import type { UserProfile } from "@/lib/user-profile";
@@ -32,7 +31,6 @@ export default function AppShell({ profile, onOpenProfile }: AppShellProps) {
   const { resolvedTheme, setTheme } = useTheme();
   const { error: noticeError, notices } = useOperationsNotices();
   const { startTutorial } = useAppTutorial();
-  const pinnedNotice = noticeError ? null : (notices.find((notice) => notice.isPinned) ?? null);
   const isDarkMode = resolvedTheme === "dark";
   const ThemeIcon = isDarkMode ? Sun : Moon;
   const themeToggleLabel = isDarkMode ? "라이트 모드로 전환" : "다크 모드로 전환";
