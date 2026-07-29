@@ -3,7 +3,6 @@ import { NavLink, Outlet } from "react-router-dom";
 
 import { SideRailAd } from "@/components/ads/SideRailAd";
 import { appEnvironment } from "@/config/environment";
-import { useOperationsNotices } from "@/hooks/useOperationsNotices";
 import { useAdVisibility } from "@/hooks/useAdVisibility";
 import { UserBadge } from "@/components/UserBadge";
 import { Button } from "@rtcade/ui";
@@ -29,7 +28,6 @@ const rightRailSpacerClassName = "hidden w-[180px] shrink-0 xl:block";
 
 export default function AppShell({ profile, onOpenProfile }: AppShellProps) {
   const { resolvedTheme, setTheme } = useTheme();
-  const { error: noticeError, notices } = useOperationsNotices();
   const { startTutorial } = useAppTutorial();
   const isDarkMode = resolvedTheme === "dark";
   const ThemeIcon = isDarkMode ? Sun : Moon;
