@@ -1,4 +1,4 @@
-import { Gamepad2, Play, Users, Zap } from "lucide-react";
+import { Gamepad2, Play, TrendingUp, Users, Zap } from "lucide-react";
 import { useCallback, useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 
@@ -156,6 +156,7 @@ export default function HomePage({ hasProfile }: HomePageProps) {
 
   const connectedPlayers = stats?.connectedPlayers ?? 0;
   const todayGames = stats?.todayGames ?? 0;
+  const todayVisitors = stats?.todayVisitors ?? 0;
   const totalVisitors = stats?.totalVisitors ?? 0;
   const totalGames = stats?.totalGames ?? 0;
   const todayPopularGames = stats?.todayPopularGames ?? [];
@@ -216,13 +217,25 @@ export default function HomePage({ hasProfile }: HomePageProps) {
       <div className="flex gap-3">
         <div className="flex flex-1 items-center gap-3 rounded-2xl border border-border/70 bg-card/80 px-4 py-3.5">
           <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10">
+            <TrendingUp className="size-5 text-primary" />
+          </div>
+          <div className="min-w-0">
+            <div className="text-lg font-semibold tabular-nums text-foreground">
+              {stats ? `${numberFormatter.format(todayVisitors)}명` : "--"}
+            </div>
+            <div className="text-xs text-muted-foreground">오늘 방문자</div>
+          </div>
+        </div>
+
+        <div className="flex flex-1 items-center gap-3 rounded-2xl border border-border/70 bg-card/80 px-4 py-3.5">
+          <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10">
             <Users className="size-5 text-primary" />
           </div>
           <div className="min-w-0">
             <div className="text-lg font-semibold tabular-nums text-foreground">
               {stats ? `${numberFormatter.format(connectedPlayers)}명` : "--"}
             </div>
-            <div className="text-xs text-muted-foreground">접속 중</div>
+            <div className="text-xs text-muted-foreground">현재 플레이</div>
           </div>
           <span className="ml-auto size-2 shrink-0 rounded-full bg-emerald-500" title="실시간" />
         </div>
