@@ -1,11 +1,22 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { driver, type DriveStep, type Driver } from "driver.js";
-import "driver.js/dist/driver.css";
+import type { DriveStep, Driver } from "driver.js";
 import { toast } from "sonner";
 
 import { useNetplayLobbyStore } from "@/stores/useNetplayLobbyStore";
 import { AppTutorialContext, type AppTutorialContextValue } from "@/tutorial/app-tutorial-context";
+
+// Lazy-load driver.js only when tutorial actually starts
+let driverModulePromise: Promise<typeof import("driver.js")> | null = null;
+function loadDriver() {
+  if (!driverModulePromise) {
+    driverModulePromise = (async () => {
+      await import("driver.js/dist/driver.css");
+      return import("driver.js");
+    })();
+  }
+  return driverModulePromise;
+}
 
 const APP_TUTORIAL_STORAGE_KEY = "rtcade_app_tutorial_v1";
 const APP_TUTORIAL_VERSION = 4;
@@ -161,7 +172,7 @@ export function AppTutorialProvider({ blocked = false, children }: AppTutorialPr
   }, [clickTutorialTarget, lobbyStep]);
 
   const highlightStage = useCallback(
-    (stage: TutorialStage, step: DriveStep) => {
+    async (stage: TutorialStage, step: DriveStep) => {
       if (shownStageRef.current === stage && driverRef.current?.isActive()) {
         return true;
       }
@@ -173,6 +184,8 @@ export function AppTutorialProvider({ blocked = false, children }: AppTutorialPr
       }
 
       destroyDriver();
+
+      const { driver } = await loadDriver();
 
       const instance = driver({
         animate: true,
@@ -301,7 +314,7 @@ export function AppTutorialProvider({ blocked = false, children }: AppTutorialPr
       return;
     }
 
-    const highlightedPrimaryGame = highlightStage("netplay-create-room", {
+    void highlightStage("netplay-create-room", {
       element: '[data-tutorial="netplay-primary-game"]',
       popover: {
         title: "게임 선택과 즉시 방 생성",
@@ -314,20 +327,17 @@ export function AppTutorialProvider({ blocked = false, children }: AppTutorialPr
             clickTutorialTarget('[data-tutorial="netplay-primary-game"]'),
           ),
       },
-    });
-
-    if (highlightedPrimaryGame) {
-      return;
-    }
-
-    highlightStage("netplay-create-room", {
-      element: '[data-tutorial="netplay-browse-panel"]',
-      popover: {
-        title: "게임 선택과 즉시 방 생성",
-        description:
-          "여기서는 게임 카드를 누르거나 썸네일 미리보기의 방 만들기를 눌러 바로 새 방을 만듭니다. 목록이 준비되면 첫 게임 카드에 바로 튜토리얼이 이어집니다.",
-        showButtons: ["close"],
-      },
+    }).then((highlighted) => {
+      if (highlighted) return;
+      void highlightStage("netplay-create-room", {
+        element: '[data-tutorial="netplay-browse-panel"]',
+        popover: {
+          title: "게임 선택과 즉시 방 생성",
+          description:
+            "여기서는 게임 카드를 누르거나 썸네일 미리보기의 방 만들기를 눌러 바로 새 방을 만듭니다. 목록이 준비되면 첫 게임 카드에 바로 튜토리얼이 이어집니다.",
+          showButtons: ["close"],
+        },
+      });
     });
   }, [
     activeStage,
