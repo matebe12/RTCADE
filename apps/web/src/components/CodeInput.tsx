@@ -47,7 +47,7 @@ export function CodeInput({ value, onChange, onSubmit, className }: CodeInputPro
   };
 
   return (
-    <div className={cn("flex gap-2 justify-center", className)}>
+    <div className={cn("flex gap-1.5 sm:gap-2 justify-center", className)}>
       {digits.map((d, i) => (
         <Input
           key={i}
@@ -59,7 +59,7 @@ export function CodeInput({ value, onChange, onSubmit, className }: CodeInputPro
           onKeyDown={(e) => handleKeyDown(i, e)}
           onPaste={i === 0 ? handlePaste : undefined}
           maxLength={1}
-          className="size-12 text-center text-xl font-mono"
+          className="size-10 sm:size-12 text-center text-lg sm:text-xl font-mono"
           inputMode="numeric"
         />
       ))}

@@ -55,6 +55,7 @@ RTCADE is a browser-based retro game P2P netplay app. Two separate netplay archi
 - **TypeScript strict** — `noUnusedLocals`, `noUnusedParameters`, `noImplicitReturns`, `erasableSyntaxOnly`
 - **`@/` path alias** maps to `src/` (e.g. `@/components/...`, `@/lib/...`)
 - **UI**: Tailwind CSS v4 + shadcn/ui dark theme. No inline styles. Use `cn()` from `@/lib/utils` for class merging.
+- **Responsive**: Mobile-first — 360px 최소 지원. 기본(모바일) 스타일이 360px에서 깨지지 않아야 함. `sm:`(640px) 브레이크포인트로 데스크탑 확장. Flex/grid row는 모바일에서 `flex-col`로 쌓고 `sm:flex-row`로 전환. 카드는 모바일에서 `w-full`, 데스크탑에서 `sm:flex-1` 또는 `sm:w-auto`. 텍스트는 모바일 `text-base`, 데스크탑 `sm:text-lg`. 플레이 페이지 툴바: `gap-2`, 버튼 텍스트 `hidden sm:inline`. CodeInput: `size-10 sm:size-12`. 다이얼로그 스크롤: `h-72 sm:h-[420px]`. 가상 리스트: `h-64 sm:h-96`.
 - **Notifications**: `sonner` toast — never use `alert()`
 - **Destructive actions**: require `AlertDialog` confirmation
 - **URLs**: environment variables only (`VITE_API_URL`, `VITE_WS_URL`, `CORS_ORIGIN`) — never hardcode

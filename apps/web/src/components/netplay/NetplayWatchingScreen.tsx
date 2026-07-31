@@ -105,7 +105,7 @@ export default function NetplayWatchingScreen({
 
   return (
     <div className="flex w-full flex-col gap-3">
-      <div className="flex w-full flex-wrap items-center gap-3">
+      <div className="flex w-full flex-wrap items-center gap-2">
         <AlertDialog>
           <AlertDialogTrigger asChild>
             <Button variant="ghost" size="sm" className="text-xs">
@@ -178,7 +178,7 @@ export default function NetplayWatchingScreen({
           onClick={toggleFullscreen}
         >
           <Maximize2 className="size-3" />
-          전체화면
+          <span className="hidden sm:inline">전체화면</span>
         </Button>
       </div>
 

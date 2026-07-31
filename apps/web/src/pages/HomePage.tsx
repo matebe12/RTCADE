@@ -214,25 +214,25 @@ export default function HomePage({ hasProfile }: HomePageProps) {
       </section>
 
       {/* Compact Stats Row */}
-      <div className="flex gap-3">
-        <div className="flex flex-1 items-center gap-3 rounded-2xl border border-border/70 bg-card/80 px-4 py-3.5">
+      <div className="flex flex-col gap-2 sm:flex-row sm:gap-3">
+        <div className="flex items-center gap-3 rounded-2xl border border-border/70 bg-card/80 px-4 py-3.5 sm:flex-1">
           <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10">
             <TrendingUp className="size-5 text-primary" />
           </div>
           <div className="min-w-0">
-            <div className="text-lg font-semibold tabular-nums text-foreground">
+            <div className="text-base font-semibold tabular-nums text-foreground sm:text-lg">
               {stats ? `${numberFormatter.format(todayVisitors)}명` : "--"}
             </div>
             <div className="text-xs text-muted-foreground">오늘 방문자</div>
           </div>
         </div>
 
-        <div className="flex flex-1 items-center gap-3 rounded-2xl border border-border/70 bg-card/80 px-4 py-3.5">
+        <div className="flex items-center gap-3 rounded-2xl border border-border/70 bg-card/80 px-4 py-3.5 sm:flex-1">
           <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10">
             <Users className="size-5 text-primary" />
           </div>
           <div className="min-w-0">
-            <div className="text-lg font-semibold tabular-nums text-foreground">
+            <div className="text-base font-semibold tabular-nums text-foreground sm:text-lg">
               {stats ? `${numberFormatter.format(connectedPlayers)}명` : "--"}
             </div>
             <div className="text-xs text-muted-foreground">현재 플레이</div>
@@ -240,12 +240,12 @@ export default function HomePage({ hasProfile }: HomePageProps) {
           <span className="ml-auto size-2 shrink-0 rounded-full bg-emerald-500" title="실시간" />
         </div>
 
-        <div className="flex flex-1 items-center gap-3 rounded-2xl border border-border/70 bg-card/80 px-4 py-3.5">
+        <div className="flex items-center gap-3 rounded-2xl border border-border/70 bg-card/80 px-4 py-3.5 sm:flex-1">
           <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10">
             <Zap className="size-5 text-primary" />
           </div>
           <div className="min-w-0">
-            <div className="text-lg font-semibold tabular-nums text-foreground">
+            <div className="text-base font-semibold tabular-nums text-foreground sm:text-lg">
               {stats ? `${numberFormatter.format(todayGames)}판` : "--"}
             </div>
             <div className="text-xs text-muted-foreground">오늘 플레이</div>
@@ -313,10 +313,10 @@ function RecentActivityBar({ recentGame }: { recentGame: { displayName: string; 
 
   return (
     <section className="rounded-2xl border border-border/70 bg-card/80 px-4 py-3.5">
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0 flex-1">
           <div className="text-xs text-muted-foreground">최근 플레이</div>
-          <div className="mt-0.5 flex items-baseline gap-2">
+          <div className="mt-0.5 flex flex-col gap-0.5 sm:flex-row sm:items-baseline sm:gap-2">
             <span className="truncate text-sm font-medium text-foreground">
               {recentGame.displayName}
             </span>
@@ -328,7 +328,7 @@ function RecentActivityBar({ recentGame }: { recentGame: { displayName: string; 
         <Button
           type="button"
           size="sm"
-          className="h-9 shrink-0 rounded-full px-4 text-xs"
+          className="h-9 w-full shrink-0 rounded-full px-4 text-xs sm:w-auto"
           onClick={handlePlayAgain}
         >
           <Play className="size-3.5" />

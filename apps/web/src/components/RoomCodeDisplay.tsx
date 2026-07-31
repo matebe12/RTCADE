@@ -75,21 +75,23 @@ export function RoomCodeDisplay({ code, className }: RoomCodeDisplayProps) {
   };
 
   return (
-    <div className={cn("flex flex-wrap items-center gap-2", className)}>
+    <div className={cn("flex flex-col items-start gap-2 sm:flex-row sm:items-center", className)}>
       {/* 방 코드 */}
-      <span className="font-arcade text-2xl tracking-[0.5em] text-primary">{code}</span>
+      <span className="shrink-0 font-arcade text-xl tracking-[0.3em] text-primary sm:text-2xl sm:tracking-[0.5em]">{code}</span>
 
-      {/* 코드 복사 */}
-      <Button variant="ghost" size="sm" className="gap-1.5" onClick={handleCopy}>
-        {copied ? <Check className="size-3.5 text-green-500" /> : <Copy className="size-3.5" />}
-        <span className="text-xs">{copied ? "복사됨!" : "코드 복사"}</span>
-      </Button>
+      <div className="flex flex-wrap items-center gap-1">
+        {/* 코드 복사 */}
+        <Button variant="ghost" size="sm" className="gap-1.5" onClick={handleCopy}>
+          {copied ? <Check className="size-3.5 text-green-500" /> : <Copy className="size-3.5" />}
+          <span className="text-xs">{copied ? "복사됨!" : "코드 복사"}</span>
+        </Button>
 
-      {/* 친구 초대 — 모바일: 공유 시트, 데스크탑: 링크 복사 */}
-      <Button variant="ghost" size="sm" className="gap-1.5" onClick={handleShare}>
-        {shared ? <Check className="size-3.5 text-green-500" /> : <Share2 className="size-3.5" />}
-        <span className="text-xs">{shared ? "복사됐어요!" : "초대하기"}</span>
-      </Button>
+        {/* 친구 초대 — 모바일: 공유 시트, 데스크탑: 링크 복사 */}
+        <Button variant="ghost" size="sm" className="gap-1.5" onClick={handleShare}>
+          {shared ? <Check className="size-3.5 text-green-500" /> : <Share2 className="size-3.5" />}
+          <span className="text-xs">{shared ? "복사됐어요!" : "초대하기"}</span>
+        </Button>
+      </div>
     </div>
   );
 }

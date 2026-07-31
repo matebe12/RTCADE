@@ -383,7 +383,7 @@ export default function NetplayWaitingScreen({
             </div>
 
             <div className="overflow-hidden rounded-xl border border-border/70 bg-background/40">
-              <ScrollArea className="h-[420px]">
+              <ScrollArea className="h-72 sm:h-[420px]">
                 <div className="grid gap-3 p-3">
                   {roomGamePickerLoading ? (
                     <div className="flex items-center justify-center gap-2 py-16 text-sm text-muted-foreground">
@@ -442,7 +442,7 @@ export default function NetplayWaitingScreen({
                             disabled={isCurrentGame}
                             onClick={() => onChangeRoomGame?.(rom)}
                           >
-                            {isCurrentGame ? "현재 게임" : "이 게임으로 변경"}
+                            {isCurrentGame ? "현재 게임" : <><span className="hidden sm:inline">이 게임으로 </span>변경</>}
                           </Button>
                         </div>
                       );
