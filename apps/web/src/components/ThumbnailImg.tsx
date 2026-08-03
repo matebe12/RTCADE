@@ -20,6 +20,7 @@ export function ThumbnailImg({ src, fallback, alt, className, loading = "lazy" }
       src={displayUrl}
       alt={alt}
       loading={loading}
+      decoding="async"
       onError={() => setErrored(true)}
       className={className}
     />

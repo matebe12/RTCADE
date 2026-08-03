@@ -21,7 +21,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="application-name" content="RTCADE" />
     <meta name="msapplication-TileColor" content="#0b1220" />
-    <meta name="msapplication-TileImage" content="/pwa-icon-192.png" />
+    <meta name="msapplication-TileImage" content="/pwa-icon-192.webp" />
     <meta property="og:locale" content="ko_KR" />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="RTCADE" />
@@ -67,9 +67,22 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
+      rel="preload"
+      as="style"
       href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap"
-      rel="stylesheet"
+      onload="this.onload=null;this.rel='stylesheet'"
     />
+    <noscript>
+      <link
+        href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap"
+        rel="stylesheet"
+      />
+    </noscript>
+    <!-- Critical CSS: CSS가 로딩되기 전에 다크 배경 즉시 표시 (FOUC 방지) -->
+    <style>
+      body{background:#141414;color:#f0f0f0;margin:0;min-height:100vh}
+      #root{min-height:100vh}
+    </style>
   </head>
   <body>
     <div id="root"></div>

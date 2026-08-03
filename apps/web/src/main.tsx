@@ -12,61 +12,74 @@ import {
 import App from "./App.tsx";
 import "./index.css";
 import { appEnvironment } from "@/config/environment";
-import { initAnalytics } from "@/lib/analytics";
+
 import { ThemeProvider } from "@/providers/ThemeProvider";
 
 const { sentryDsn, sentryRelease, appEnv, amplitudeApiKey } = appEnvironment.monitoring;
 
+// Sentry 에러 모니터링은 첫 페인트 이후 requestIdleCallback으로 지연 로딩
 if (sentryDsn) {
-  Sentry.init({
-    dsn: sentryDsn,
-    environment: appEnv,
-    release: sentryRelease,
-    integrations: [
-      Sentry.reactRouterV6BrowserTracingIntegration({
-        useEffect,
-        useLocation,
-        useNavigationType,
-        createRoutesFromChildren,
-        matchRoutes,
-      }),
-    ],
-    tracesSampleRate: 0.2,
-    beforeSend(event, hint) {
-      const original = hint.originalException;
+  const initSentry = () => {
+    Sentry.init({
+      dsn: sentryDsn,
+      environment: appEnv,
+      release: sentryRelease,
+      integrations: [
+        Sentry.reactRouterV6BrowserTracingIntegration({
+          useEffect,
+          useLocation,
+          useNavigationType,
+          createRoutesFromChildren,
+          matchRoutes,
+        }),
+      ],
+      tracesSampleRate: 0.2,
+      beforeSend(event, hint) {
+        const original = hint.originalException;
 
-      if (
-        original &&
-        typeof original === "object" &&
-        !(original instanceof Error)
-      ) {
-        const plain = original as Record<string, unknown>;
-        const keys = Object.keys(plain);
-        const detail = keys
-          .map((k) => `${k}=${JSON.stringify(plain[k])}`)
-          .join(", ");
+        if (
+          original &&
+          typeof original === "object" &&
+          !(original instanceof Error)
+        ) {
+          const plain = original as Record<string, unknown>;
+          const keys = Object.keys(plain);
+          const detail = keys
+            .map((k) => `${k}=${JSON.stringify(plain[k])}`)
+            .join(", ");
 
-        const error = new Error(
-          `Non-Error exception captured: { ${detail} }`,
-        );
+          const error = new Error(
+            `Non-Error exception captured: { ${detail} }`,
+          );
 
-        event.exception = {
-          values: [
-            {
-              type: error.name,
-              value: error.message,
-              mechanism: event.exception?.values?.[0]?.mechanism,
-            },
-          ],
-        };
-      }
+          event.exception = {
+            values: [
+              {
+                type: error.name,
+                value: error.message,
+                mechanism: event.exception?.values?.[0]?.mechanism,
+              },
+            ],
+          };
+        }
 
-      return event;
-    },
-  });
+        return event;
+      },
+    });
+  };
+
+  const idleCb = (window as any).requestIdleCallback ?? ((cb: () => void) => setTimeout(cb, 2000));
+  idleCb(initSentry);
 }
 
-initAnalytics(amplitudeApiKey);
+// Amplitude analytics SDK(209KB)는 requestIdleCallback으로 지연 로딩하여 초기 로딩 속도 개선
+if (amplitudeApiKey) {
+  const idleCallback = (window as any).requestIdleCallback ?? ((cb: () => void) => setTimeout(cb, 2000));
+  idleCallback(() => {
+    import("@/lib/analytics").then(({ initAnalytics: init }) => init(amplitudeApiKey));
+
+  });
+}
 
 if (import.meta.env.PROD && "serviceWorker" in navigator && window.isSecureContext) {
   navigator.serviceWorker.register("/sw.js").catch((error) => {
