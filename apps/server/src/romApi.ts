@@ -2,7 +2,7 @@ import express, { type Express } from "express";
 import fs from "fs";
 import path from "path";
 
-const BIOS_FILES = new Set(["neogeo.zip", "pgm.zip", "skns.zip", "decocass.zip", "neocdz.zip", "stvbios.zip"]);
+const BIOS_FILES = new Set(["neogeo.zip", "pgm.zip", "skns.zip", "decocass.zip", "neocdz.zip", "stvbios.zip", "cpzn2.zip", "qsound.zip"]);
 const CORE_CATALOG_FILE_NAME = ".rtcade-roms.json";
 const SOURCE_CATALOG_PATH = path.join(import.meta.dirname, "rom-catalog.json");
 
