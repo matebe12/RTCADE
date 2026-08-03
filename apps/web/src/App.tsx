@@ -19,8 +19,29 @@ const SentryRoutes = Sentry.withSentryReactRouterV6Routing(Routes);
 
 function RouteFallback() {
   return (
-    <div className="mx-auto flex min-h-[40vh] w-full max-w-6xl items-center justify-center px-4 py-10">
-      <div className="rounded-2xl border border-border/70 bg-card/95 px-6 py-5 text-sm text-muted-foreground shadow-sm">
+    <div
+      style={{
+        display: "flex",
+        minHeight: "40vh",
+        width: "100%",
+        maxWidth: "72rem",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "2.5rem 1rem",
+        margin: "0 auto",
+      }}
+    >
+      <div
+        style={{
+          borderRadius: "1rem",
+          border: "1px solid rgba(255,255,255,0.07)",
+          background: "rgba(23,23,23,0.95)",
+          padding: "1.25rem 1.5rem",
+          fontSize: "0.875rem",
+          color: "#b0b0b0",
+          boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
+        }}
+      >
         화면을 불러오는 중입니다.
       </div>
     </div>

@@ -22,16 +22,43 @@ export default defineConfig({
           }),
         ]
       : []),
+    // CSS를 비동기 로딩으로 전환하여 렌더블로킹 제거 (모바일 FCP/LCP 개선)
+    {
+      name: "async-css",
+      enforce: "post",
+      apply: "build",
+      transformIndexHtml(html) {
+        return html.replace(
+          /<link rel="stylesheet"([^>]*?)href="([^"]*?)"([^>]*?)>/g,
+          '<link rel="preload" as="style"$1href="$2"$3 onload="this.onload=null;this.rel=\'stylesheet\'">'
+          + '<noscript><link rel="stylesheet"$1href="$2"$3></noscript>',
+        );
+      },
+    },
   ],
   build: {
+    target: "esnext",
     sourcemap: true,
+    cssMinify: "lightningcss",
     // FBNeo WASM 파일을 위한 chunk 크기 경고 임계값 상향
     chunkSizeWarningLimit: 50 * 1024, // 50 MB
+    modulePreload: {
+      polyfill: false,
+      // vendor-analytics, vendor-sentry는 동적/지연 로딩 대상이므로 초기 preload 제외
+      resolveDependencies(_filename, deps) {
+        return deps.filter(
+          (d) => !d.includes("vendor-analytics") && !d.includes("vendor-sentry"),
+        );
+      },
+    },
     rollupOptions: {
       output: {
         manualChunks(id: string) {
-          if (id.includes("node_modules/react") || id.includes("node_modules/react-dom") || id.includes("node_modules/react-router")) {
+          if (id.includes("node_modules/react-dom") || id.includes("node_modules/react/")) {
             return "vendor-react";
+          }
+          if (id.includes("node_modules/react-router")) {
+            return "vendor-router";
           }
           if (id.includes("node_modules/@sentry")) {
             return "vendor-sentry";
