@@ -211,7 +211,7 @@ export default function NetplayPlayingScreen({
     <div className={cn("flex w-full flex-col", isExpanded ? "flex-1 min-h-0 gap-5" : "gap-3")}>
       {/* Toolbar — 모바일 최대화 시 숨김 */}
       {!isExpanded && (
-      <div className="flex w-full flex-wrap items-center gap-3">
+      <div className="flex w-full flex-wrap items-center gap-2">
         <AlertDialog>
           <AlertDialogTrigger asChild>
             <Button variant="ghost" size="sm" className="text-xs">
@@ -286,7 +286,7 @@ export default function NetplayPlayingScreen({
             title="전체화면"
           >
             <Maximize2 className="size-3" />
-            전체화면
+            <span className="hidden sm:inline">전체화면</span>
           </Button>
         )}
 

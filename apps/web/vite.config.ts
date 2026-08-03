@@ -27,6 +27,24 @@ export default defineConfig({
     sourcemap: true,
     // FBNeo WASM 파일을 위한 chunk 크기 경고 임계값 상향
     chunkSizeWarningLimit: 50 * 1024, // 50 MB
+    rollupOptions: {
+      output: {
+        manualChunks(id: string) {
+          if (id.includes("node_modules/react") || id.includes("node_modules/react-dom") || id.includes("node_modules/react-router")) {
+            return "vendor-react";
+          }
+          if (id.includes("node_modules/@sentry")) {
+            return "vendor-sentry";
+          }
+          if (id.includes("node_modules/@amplitude")) {
+            return "vendor-analytics";
+          }
+          if (id.includes("node_modules/lucide-react") || id.includes("node_modules/sonner")) {
+            return "vendor-ui";
+          }
+        },
+      },
+    },
   },
   resolve: {
     alias: {

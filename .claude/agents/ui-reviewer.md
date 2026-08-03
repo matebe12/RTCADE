@@ -33,6 +33,26 @@ tags:
 - 강조/제목: **Press Start 2P** (`font-arcade`) — **제한적 사용**
 - 기존 텍스트 계층을 유지, 임의 폰트 변경 금지
 
+### 반응형 (Mobile-First)
+- **최소 지원 너비: 360px** — 모든 기본(모바일) 레이아웃은 360px에서 정상 동작해야 함
+- **기본은 모바일(360px~)**, `sm:`(640px) 브레이크포인트로 데스크탑 확장
+- Flex/Grid row는 모바일에서 `flex-col`/`grid-cols-1`로 쌓고 `sm:flex-row`/`sm:grid-cols-N`으로 전환
+- 카드/버튼 너비는 모바일 `w-full`, 데스크탑 `sm:flex-1` 또는 `sm:w-auto`
+- 텍스트 크기는 모바일 `text-base`, 데스크탑 `sm:text-lg`
+- `truncate` + `min-w-0` 조합으로 텍스트 오버플로우 방지
+- 아이콘+텍스트 조합 카드는 360px에서 한 줄에 3개 배치 금지 — 최대 2개 또는 세로 스택
+
+### 플레이 페이지 특화 반응형
+플레이 관련 페이지(`NetplayPlayingScreen`, `NetplayWaitingScreen`, `NetplayWatchingScreen`, Browse/SoloBrowse, Join 등)는 사용자가 실제 게임을 하는 공간이므로 특히 정밀하게 검토한다.
+
+- **툴바(Toolbar)**: 항목이 많은 플레이 툴바는 `flex-wrap gap-2`로 360px에서 줄바꿈 허용. 버튼 텍스트는 `hidden sm:inline`으로 모바일에서 아이콘만 표시해 공간 절약.
+- **CodeInput**: 6자리 입력칸은 `size-10 sm:size-12` + `gap-1.5 sm:gap-2`로 360px에서 오버플로우 방지 (6×40+5×6=270px < 312px)
+- **RoomCodeDisplay**: 코드+버튼은 `flex-col sm:flex-row`로 모바일에서 세로 배치. `font-arcade` 코드는 `text-xl sm:text-2xl tracking-[0.3em] sm:tracking-[0.5em]`로 크기 조정.
+- **가상 스크롤 리스트**: 고정 높이는 `h-64 sm:h-96`으로 짧은 화면 대응.
+- **다이얼로그 내 스크롤**: `h-72 sm:h-[420px]`로 모바일에서 다이얼로그가 화면보다 커지지 않도록.
+- **참가자 카드**: 뱃지 여러 개가 한 줄에 들어가는 카드는 `flex-wrap`으로 줄바꿈 허용.
+- **게임 카드(GameCard)**: 썸네일(56px) + 텍스트 + 즐겨찾기 버튼 구조는 360px에서도 문제없으나, 버튼 텍스트는 가능한 짧게.
+
 ### 룩앤필
 - **어두운 중립 테마** — 다크 배경, 둥근 카드, 미세한 그라데이션/투명도 레이어
 - 카드 중심 레이아웃, 조밀한 spacing
@@ -69,3 +89,5 @@ tags:
 7. **폰트**: `font-arcade`가 과도하게 사용되었는가? 본문에 다른 폰트가 지정되었는가?
 8. **다크 테마**: 밝은 배경/밝은 텍스트가 다크 테마를 깨는가?
 9. **import**: `@/` 별칭을 사용했는가? `import type`이 필요한가?
+10. **반응형**: 모바일에서 레이아웃이 깨지거나 텍스트가 세로로 오버플로우되는가? `flex-col`→`sm:flex-row` 패턴을 적용했는가?
+11. **플레이 360px**: CodeInput 오버플로우? 툴바 버튼 과밀? RoomCodeDisplay 줄바꿈? 다이얼로그 높이 초과? 가상 리스트 높이 과다?

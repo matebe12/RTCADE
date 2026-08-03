@@ -35,3 +35,4 @@ apps/server/src/roms/**/*.bin
 # Tool artifacts
 .turbo/
 .playwright-mcp/
+nul

@@ -12,39 +12,15 @@
 
 @font-face {
   font-family: "Pretendard";
-  src: url("/font/Pretendard/Pretendard-Thin.woff2") format("woff2");
-  font-weight: 100;
+  src: url("/font/Pretendard/subset/Pretendard-Regular.woff2") format("woff2");
+  font-weight: 100 400;
   font-style: normal;
   font-display: swap;
 }
 
 @font-face {
   font-family: "Pretendard";
-  src: url("/font/Pretendard/Pretendard-ExtraLight.woff2") format("woff2");
-  font-weight: 200;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: "Pretendard";
-  src: url("/font/Pretendard/Pretendard-Light.woff2") format("woff2");
-  font-weight: 300;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: "Pretendard";
-  src: url("/font/Pretendard/Pretendard-Regular.woff2") format("woff2");
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: "Pretendard";
-  src: url("/font/Pretendard/Pretendard-Medium.woff2") format("woff2");
+  src: url("/font/Pretendard/subset/Pretendard-Medium.woff2") format("woff2");
   font-weight: 500;
   font-style: normal;
   font-display: swap;
@@ -52,7 +28,7 @@
 
 @font-face {
   font-family: "Pretendard";
-  src: url("/font/Pretendard/Pretendard-SemiBold.woff2") format("woff2");
+  src: url("/font/Pretendard/subset/Pretendard-SemiBold.woff2") format("woff2");
   font-weight: 600;
   font-style: normal;
   font-display: swap;
@@ -60,24 +36,8 @@
 
 @font-face {
   font-family: "Pretendard";
-  src: url("/font/Pretendard/Pretendard-Bold.woff2") format("woff2");
-  font-weight: 700;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: "Pretendard";
-  src: url("/font/Pretendard/Pretendard-ExtraBold.woff2") format("woff2");
-  font-weight: 800;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: "Pretendard";
-  src: url("/font/Pretendard/Pretendard-Black.woff2") format("woff2");
-  font-weight: 900;
+  src: url("/font/Pretendard/subset/Pretendard-Bold.woff2") format("woff2");
+  font-weight: 700 900;
   font-style: normal;
   font-display: swap;
 }
