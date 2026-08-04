@@ -302,7 +302,13 @@ export default function NetplayLobby({ hasProfile = true }: { hasProfile?: boole
           return;
         }
 
-        const matchedRom = roms.find((rom) => rom.path === romPath && rom.core === core);
+        // 정확한 경로 매칭 우선, 실패 시 filename+core 폴백
+        const matchedRom =
+          roms.find((rom) => rom.path === romPath && rom.core === core) ??
+          roms.find((rom) => {
+            const romFilename = romPath.split("/").pop();
+            return rom.core === core && rom.filename === romFilename;
+          });
 
         if (!matchedRom) {
           const message = "선택한 인기 게임을 찾지 못해 목록 화면으로 이동합니다.";

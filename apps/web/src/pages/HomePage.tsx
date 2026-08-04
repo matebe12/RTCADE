@@ -1,16 +1,18 @@
 import { Gamepad2, Play, TrendingUp, Users, Zap } from "lucide-react";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 
 import { SYSTEM_OPTIONS } from "@/components/EmulatorPlayer";
 import { ThumbnailImg } from "@/components/ThumbnailImg";
+import TodaysPicks from "@/components/TodaysPicks";
 import { useOperationsStats } from "@/hooks/useOperationsStats";
+import { buildBackendUrl } from "@/lib/backend-url";
 import { parseRomName } from "@/lib/game-names";
 import { getFallbackGameThumbnailUrl, getGameThumbnailUrl } from "@/lib/game-thumbnails";
 import type { PopularGameSummary } from "@/lib/operations-api";
 import { usePageSeo } from "@/lib/seo";
 import { getRecentGames, getUserProfile } from "@/lib/user-profile";
-import { useNetplayLobbyStore } from "@/stores/useNetplayLobbyStore";
+import { useNetplayLobbyStore, type RomInfo } from "@/stores/useNetplayLobbyStore";
 import { Badge, Button } from "@rtcade/ui";
 
 // 고퀄 조이스틱 — 받침대·소켓 고정, 레버+공이 좌우 흔들림
@@ -76,6 +78,9 @@ const relativeTimeFormatter = new Intl.DateTimeFormat("ko-KR", {
   month: "short",
   day: "numeric",
 });
+
+/** ROM 카탈로그 모듈 레벨 캐시 — 페이지 재방문 시 재요청 방지 */
+let romCatalogCache: RomInfo[] | null = null;
 
 function getFilename(romPath?: string) {
   if (!romPath) return null;
@@ -153,6 +158,29 @@ export default function HomePage({ hasProfile }: HomePageProps) {
   const recentGames = getRecentGames();
   const recentGame = recentGames[0] ?? null;
   const [activePeriod, setActivePeriod] = useState<PopularGamesPeriod>("today");
+
+  // ROM 카탈로그 fetch (모듈 레벨 캐시로 재방문 시 즉시 표시)
+  const [roms, setRoms] = useState<RomInfo[]>(romCatalogCache ?? []);
+  const [romsReady, setRomsReady] = useState(romCatalogCache !== null);
+
+  useEffect(() => {
+    if (romCatalogCache) return;
+    let cancelled = false;
+    fetch(buildBackendUrl("/api/roms"))
+      .then((res) => res.json())
+      .then((data: RomInfo[]) => {
+        if (cancelled) return;
+        romCatalogCache = data;
+        setRoms(data);
+        setRomsReady(true);
+      })
+      .catch(() => {
+        if (!cancelled) setRomsReady(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const connectedPlayers = stats?.connectedPlayers ?? 0;
   const todayGames = stats?.todayGames ?? 0;
@@ -291,6 +319,9 @@ export default function HomePage({ hasProfile }: HomePageProps) {
           </div>
         )}
       </section>
+
+      {/* 오늘의 추천 — ROM 카탈로그 기반, 인기 게임과 별개로 항상 표시 */}
+      {romsReady && roms.length > 0 && <TodaysPicks roms={roms} />}
 
       {/* Recent Activity (only if has profile and played before) */}
       {profile && recentGame && (
