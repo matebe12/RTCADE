@@ -119,7 +119,11 @@ function resolveCatalogBios(catalog: CoreCatalog | null, filename: string) {
   }
 
   if (catalog.defaults && catalog.defaults.bios !== undefined) {
-    return { hasCatalog: true, bios: catalog.defaults.bios ?? undefined };
+    // null means "no default BIOS" — allow fallback to auto-detection
+    if (catalog.defaults.bios === null) {
+      return { hasCatalog: false, bios: undefined as string | undefined };
+    }
+    return { hasCatalog: true, bios: catalog.defaults.bios };
   }
 
   // ROM not in catalog — allow fallback to auto-detected BIOS
