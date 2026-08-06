@@ -198,12 +198,14 @@ export function registerRomRoutes(app: Express, romsDir: string) {
     "/roms",
     (_req, res, next) => {
       res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
+      res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
       next();
     },
     express.static(romsDir),
   );
 
   app.get("/api/roms", (_req, res) => {
+    res.setHeader("Cache-Control", "public, max-age=300");
     res.json(listRoms(romsDir));
   });
 }
