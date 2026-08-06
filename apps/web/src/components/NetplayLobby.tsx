@@ -27,6 +27,7 @@ import { toast } from "sonner";
 export default function NetplayLobby({ hasProfile = true }: { hasProfile?: boolean }) {
   const location = useLocation();
   const navigate = useNavigate();
+  const { pathname, search } = location;
   const {
     mode,
     setMode,
@@ -173,8 +174,30 @@ export default function NetplayLobby({ hasProfile = true }: { hasProfile?: boole
   const joinOrAutoSpectateRef = useRef(joinOrAutoSpectateWithCode);
   const currentLobbyStepRef = useRef(state.step);
 
+  // entry useEffect에서 사용하는 콜백들을 ref로 안정화 — 참조 변경으로 effect가 취소되지 않도록
+  const handleCreateRoomRef = useRef(handleCreateRoom);
+  const fetchRomsRef = useRef(fetchRoms);
+  const setErrorRef = useRef(setError);
+  const setModeRef = useRef(setMode);
+  const setRoomVisibilityRef = useRef(setRoomVisibility);
+  const setSearchQueryRef = useRef(setSearchQuery);
+  const setStateRef = useRef(setState);
+  const setStatusRef = useRef(setStatus);
+  const startSoloGameRef = useRef(startSoloGame);
+  const navigateRef = useRef(navigate);
+
   useEffect(() => {
     joinOrAutoSpectateRef.current = joinOrAutoSpectateWithCode;
+    handleCreateRoomRef.current = handleCreateRoom;
+    fetchRomsRef.current = fetchRoms;
+    setErrorRef.current = setError;
+    setModeRef.current = setMode;
+    setRoomVisibilityRef.current = setRoomVisibility;
+    setSearchQueryRef.current = setSearchQuery;
+    setStateRef.current = setState;
+    setStatusRef.current = setStatus;
+    startSoloGameRef.current = startSoloGame;
+    navigateRef.current = navigate;
   });
 
   useEffect(() => {
@@ -189,7 +212,7 @@ export default function NetplayLobby({ hasProfile = true }: { hasProfile?: boole
   }, [state.step]);
 
   useEffect(() => {
-    const searchParams = new URLSearchParams(location.search);
+    const searchParams = new URLSearchParams(search);
     const code = searchParams.get("code");
 
     if (!code) return;
@@ -224,7 +247,7 @@ export default function NetplayLobby({ hasProfile = true }: { hasProfile?: boole
   }, [hasProfile]);
 
   useEffect(() => {
-    const searchParams = new URLSearchParams(location.search);
+    const searchParams = new URLSearchParams(search);
     const entry = searchParams.get("entry");
 
     if (!entry) {
@@ -232,7 +255,7 @@ export default function NetplayLobby({ hasProfile = true }: { hasProfile?: boole
       return;
     }
 
-    const entryRequestKey = `${location.pathname}?${searchParams.toString()}`;
+    const entryRequestKey = `${pathname}?${searchParams.toString()}`;
     if (handledEntryRequestRef.current === entryRequestKey) {
       return;
     }
@@ -240,40 +263,40 @@ export default function NetplayLobby({ hasProfile = true }: { hasProfile?: boole
     handledEntryRequestRef.current = entryRequestKey;
 
     const openEntryFallback = (nextEntry: "create-room" | "solo", roms?: RomInfo[]) => {
-      setError("");
-      setStatus("");
-      setSearchQuery("");
+      setErrorRef.current("");
+      setStatusRef.current("");
+      setSearchQueryRef.current("");
 
       if (nextEntry === "solo") {
-        setMode("solo");
+        setModeRef.current("solo");
         if (roms) {
-          setState({ step: "solo-browse", roms });
+          setStateRef.current({ step: "solo-browse", roms });
           return;
         }
 
-        void fetchRoms("solo");
+        void fetchRomsRef.current("solo");
         return;
       }
 
-      setMode("netplay");
+      setModeRef.current("netplay");
       if (roms) {
-        setState({ step: "browse", roms });
+        setStateRef.current({ step: "browse", roms });
         return;
       }
 
-      void fetchRoms();
+      void fetchRomsRef.current();
     };
 
     let cancelled = false;
 
     const runEntry = async () => {
       if (currentLobbyStepRef.current !== "menu") {
-        navigate(location.pathname, { replace: true });
+        navigateRef.current(pathname, { replace: true });
         return;
       }
 
       if (entry !== "solo" && entry !== "create-room") {
-        navigate(location.pathname, { replace: true });
+        navigateRef.current(pathname, { replace: true });
         return;
       }
 
@@ -284,10 +307,10 @@ export default function NetplayLobby({ hasProfile = true }: { hasProfile?: boole
 
       if (!romPath || !core) {
         if (entry === "create-room") {
-          setRoomVisibility(roomVisibilityFromEntry);
+          setRoomVisibilityRef.current(roomVisibilityFromEntry);
         }
         openEntryFallback(entry);
-        navigate(location.pathname, { replace: true });
+        navigateRef.current(pathname, { replace: true });
         return;
       }
 
@@ -312,42 +335,42 @@ export default function NetplayLobby({ hasProfile = true }: { hasProfile?: boole
 
         if (!matchedRom) {
           const message = "선택한 인기 게임을 찾지 못해 목록 화면으로 이동합니다.";
-          setError(message);
+          setErrorRef.current(message);
           toast(message);
           openEntryFallback(entry, roms);
-          navigate(location.pathname, { replace: true });
+          navigateRef.current(pathname, { replace: true });
           return;
         }
 
-        setError("");
-        setStatus("");
-        setSearchQuery("");
+        setErrorRef.current("");
+        setStatusRef.current("");
+        setSearchQueryRef.current("");
 
         if (entry === "solo") {
-          setMode("solo");
-          startSoloGame(matchedRom);
-          navigate(location.pathname, { replace: true });
+          setModeRef.current("solo");
+          startSoloGameRef.current(matchedRom);
+          navigateRef.current(pathname, { replace: true });
           return;
         }
 
-        setMode("netplay");
-        setRoomVisibility(roomVisibilityFromEntry);
-        await handleCreateRoom(matchedRom);
+        setModeRef.current("netplay");
+        setRoomVisibilityRef.current(roomVisibilityFromEntry);
+        await handleCreateRoomRef.current(matchedRom);
         if (cancelled) {
           return;
         }
 
-        navigate(location.pathname, { replace: true });
+        navigateRef.current(pathname, { replace: true });
       } catch {
         if (cancelled) {
           return;
         }
 
         const message = "게임 목록을 불러오지 못해 목록 화면으로 이동합니다.";
-        setError(message);
+        setErrorRef.current(message);
         toast.error(message);
         openEntryFallback(entry);
-        navigate(location.pathname, { replace: true });
+        navigateRef.current(pathname, { replace: true });
       }
     };
 
@@ -355,20 +378,12 @@ export default function NetplayLobby({ hasProfile = true }: { hasProfile?: boole
 
     return () => {
       cancelled = true;
+      handledEntryRequestRef.current = null; // StrictMode remount 대응: 언마운트 시 리셋
     };
   }, [
-    handleCreateRoom,
-    fetchRoms,
-    location.pathname,
-    location.search,
-    navigate,
-    setError,
-    setMode,
-    setRoomVisibility,
-    setSearchQuery,
-    setState,
-    setStatus,
-    startSoloGame,
+    // URL 바뀔 때만 entry 처리 — 콜백들은 ref로 안정화되어 재생성돼도 effect가 취소되지 않음
+    pathname,
+    search,
   ]);
 
   const handleToggleFavoriteGame = useCallback(
